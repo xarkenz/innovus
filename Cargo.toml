@@ -1,0 +1,22 @@
+[package]
+name = "rust-gaming"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "innovus"
+path = "src/innovus/lib.rs"
+
+[[bin]]
+name = "rust-gaming"
+path = "src/snek/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gl = "0.14"
+glfw = "0.45"
+image = "0.24"
+
+[profile.dev]
+overflow-checks = false
