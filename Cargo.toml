@@ -8,15 +8,21 @@ name = "innovus"
 path = "src/innovus/lib.rs"
 
 [[bin]]
-name = "rust-gaming"
+name = "rust-gaming" # javagame
+path = "src/javagame/main.rs"
+
+[[bin]]
+name = "snek" # snek
 path = "src/snek/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gl = "0.14"
-glfw = "0.45"
-image = "0.24"
+num = "0.4.0"
+gl = "0.14.0"
+glfw = "0.50.0"
+image = "0.24.5"
+uuid = {version = "1.2.2", features = ["v4", "fast-rng"]}
 
 [profile.dev]
 overflow-checks = false

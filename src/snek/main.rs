@@ -1,12 +1,9 @@
-#![allow(unused_imports)]
-
 extern crate glfw;
 
-use std::{str::FromStr, f32::consts, collections::VecDeque};
 use glfw::{Action, Context, Key, MouseButton};
 use innovus::gfx::{self, *};
-use innovus::util::{Vector, Transform3D, Clock, Easing, AnimationTimer};
-
+use innovus::tools::{AnimationTimer, Clock, Easing, Transform3D, Vector};
+use std::{collections::VecDeque, f32::consts, str::FromStr};
 
 const BOARD_W: u32 = 10;
 const BOARD_H: u32 = 10;
@@ -21,53 +18,90 @@ const BOARD_SPACE: f32 = 4.0;
 ];*/
 
 const CAMERA_STATE: [(f32, f32, f32, f32, f32); 5] = [
-    (40.0, 0.0, 0.5 * consts::FRAC_PI_8,  0.0, 0.0),
-    (40.0, consts::FRAC_PI_2, 0.5 * consts::FRAC_PI_8,  0.0, consts::FRAC_PI_2),
-    (40.0, consts::PI, 0.5 * consts::FRAC_PI_8,  0.0, consts::PI),
-    (40.0, 3.0 * consts::FRAC_PI_2, 0.5 * consts::FRAC_PI_8,  0.0, 3.0 * consts::FRAC_PI_2),
-    (30.0, 0.0, consts::FRAC_PI_2,  -consts::FRAC_PI_2, 0.0),
+    (40.0, 0.0, 0.5 * consts::FRAC_PI_8, 0.0, 0.0),
+    (
+        40.0,
+        consts::FRAC_PI_2,
+        0.5 * consts::FRAC_PI_8,
+        0.0,
+        consts::FRAC_PI_2,
+    ),
+    (40.0, consts::PI, 0.5 * consts::FRAC_PI_8, 0.0, consts::PI),
+    (
+        40.0,
+        3.0 * consts::FRAC_PI_2,
+        0.5 * consts::FRAC_PI_8,
+        0.0,
+        3.0 * consts::FRAC_PI_2,
+    ),
+    (30.0, 0.0, consts::FRAC_PI_2, -consts::FRAC_PI_2, 0.0),
 ];
 
-
-fn get_space_center(node: &(i32, i32)) -> Vector<3> {
-    Vector::new([(node.0 as f32 - BOARD_W as f32 * 0.5 + 0.5) * BOARD_SPACE, 0.0, (node.1 as f32 - BOARD_H as f32 * 0.5 + 0.5) * BOARD_SPACE])
+fn get_space_center(node: &(i32, i32)) -> Vector<f32, 3> {
+    Vector([
+        (node.0 as f32 - BOARD_W as f32 * 0.5 + 0.5) * BOARD_SPACE,
+        0.0,
+        (node.1 as f32 - BOARD_H as f32 * 0.5 + 0.5) * BOARD_SPACE,
+    ])
 }
 
-
-fn load_snek_geometry(geometry: &mut Geometry<Vertex3D>, nodes: &VecDeque<(i32, i32)>, face: &(i32, i32)) {
+fn load_snek_geometry(
+    geometry: &mut Geometry<Vertex3D>,
+    nodes: &VecDeque<(i32, i32)>,
+    face: &(i32, i32),
+) {
     const ARROW_COLOR: [f32; 4] = [0.8, 0.3, 0.1, 1.0];
-    let head = nodes.back().unwrap();  // nodes should never be empty
+    let head = nodes.back().unwrap(); // nodes should never be empty
     geometry.clear();
     for node in nodes {
         let major = if *node == *head { 1.3 } else { 1.0 };
         //let minor = major * 0.8;
         let mut center = get_space_center(node);
         center.set_y(major);
-        geometry.add_icosphere(&center, major, [0.1, 0.4, 0.8, 1.0], 2);
+        geometry.add_icosphere(center, major, [0.1, 0.4, 0.8, 1.0], 2);
     }
     let pos = get_space_center(&(head.0 + face.0, head.1 + face.1));
     let arrow_verts = if face.0 < 0 {
-        ([pos.x() - 1.0, 1.0, pos.z()], [pos.x() + 1.0, 1.0, pos.z() + 1.0], [pos.x() + 1.0, 1.0, pos.z() - 1.0])
+        (
+            [pos.x() - 1.0, 1.0, pos.z()],
+            [pos.x() + 1.0, 1.0, pos.z() + 1.0],
+            [pos.x() + 1.0, 1.0, pos.z() - 1.0],
+        )
     } else if face.0 > 0 {
-        ([pos.x() + 1.0, 1.0, pos.z()], [pos.x() - 1.0, 1.0, pos.z() - 1.0], [pos.x() - 1.0, 1.0, pos.z() + 1.0])
+        (
+            [pos.x() + 1.0, 1.0, pos.z()],
+            [pos.x() - 1.0, 1.0, pos.z() - 1.0],
+            [pos.x() - 1.0, 1.0, pos.z() + 1.0],
+        )
     } else if face.1 < 0 {
-        ([pos.x(), 1.0, pos.z() - 1.0], [pos.x() - 1.0, 1.0, pos.z() + 1.0], [pos.x() + 1.0, 1.0, pos.z() + 1.0])
+        (
+            [pos.x(), 1.0, pos.z() - 1.0],
+            [pos.x() - 1.0, 1.0, pos.z() + 1.0],
+            [pos.x() + 1.0, 1.0, pos.z() + 1.0],
+        )
     } else {
-        ([pos.x(), 1.0, pos.z() + 1.0], [pos.x() + 1.0, 1.0, pos.z() - 1.0], [pos.x() - 1.0, 1.0, pos.z() - 1.0])
+        (
+            [pos.x(), 1.0, pos.z() + 1.0],
+            [pos.x() + 1.0, 1.0, pos.z() - 1.0],
+            [pos.x() - 1.0, 1.0, pos.z() - 1.0],
+        )
     };
-    geometry.add(&[
-        Vertex3D::colored(arrow_verts.0, ARROW_COLOR.clone()),
-        Vertex3D::colored(arrow_verts.1, ARROW_COLOR.clone()),
-        Vertex3D::colored(arrow_verts.2, ARROW_COLOR.clone()),
-    ], &[[0, 1, 2]]);
+    geometry.add(
+        &[
+            Vertex3D::colored(arrow_verts.0, ARROW_COLOR),
+            Vertex3D::colored(arrow_verts.1, ARROW_COLOR),
+            Vertex3D::colored(arrow_verts.2, ARROW_COLOR),
+        ],
+        &[[0, 1, 2]],
+    );
 }
-
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::Samples(Some(8)));
 
-    let (mut window, events) = glfw.create_window(800, 800, "Rust Gaming.", glfw::WindowMode::Windowed)
+    let (mut window, events) = glfw
+        .create_window(800, 800, "Rust Gaming.", glfw::WindowMode::Windowed)
         .expect("failed to create GLFW window.");
     window.maximize();
     window.make_current();
@@ -81,7 +115,9 @@ fn main() {
 
     let shader_program = Program::from_preset(ProgramPreset::Default3DShader).unwrap();
 
-    let test_image = Image::from_file("/home/xarkenz/Projects/Rust/rust-gaming/src/snek/assets/koopa_red.png").unwrap();
+    let test_image =
+        Image::from_file("/home/xarkenz/Projects/Rust/rust-gaming/src/snek/assets/koopa_red.png")
+            .unwrap();
     let mut test_tex = Texture::from_image(&test_image).unwrap();
     test_tex.bind(0);
 
@@ -124,28 +160,33 @@ fn main() {
         transform_thingy.rotate_z(-consts::FRAC_PI_2);
         transform_thingy.rotate_y(consts::FRAC_PI_2);
         transform_thingy.translate(0.0, 0.0, -10.0);
-        kooper.transform(&kooper.as_slice(), &transform_thingy);
+        kooper.transform(&kooper.as_slice(), transform_thingy);
     }
 
-    let pt_light_pos = Vector::new([0.0, 50.0, 0.0]);
-    let pt_light_color = Vector::new([1.0, 1.0, 1.0]);
-    let ambient_color = Vector::new([0.5, 0.4, 0.3]);
+    let pt_light_pos = Vector([0.0, 50.0, 0.0]);
+    let pt_light_color = Vector([1.0, 1.0, 1.0]);
+    let ambient_color = Vector([0.5, 0.4, 0.3]);
 
     let (mut width, mut height) = (800_i32, 800_i32);
     let clock = Clock::start();
-    let mut prev_time: f32 = 0.0;
+    let mut prev_time = clock.read();
     let (mut prev_x, mut prev_y) = (0.0_f32, 0.0_f32);
 
     let mut camera_state: usize = 0;
-    let mut camera_pos = Vector::new([0.0, 8.0, 20.0]);
+    let mut camera_pos = Vector([0.0, 8.0, 20.0]);
     let mut camera_view = Transform3D::zero();
     let mut camera_proj = Transform3D::zero();
 
-    let mut cam_r_anim = AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].0);
-    let mut cam_h_anim = AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].1);
-    let mut cam_v_anim = AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].2);
-    let mut cam_p_anim = AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].3);
-    let mut cam_a_anim = AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].4);
+    let mut cam_r_anim =
+        AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].0);
+    let mut cam_h_anim =
+        AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].1);
+    let mut cam_v_anim =
+        AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].2);
+    let mut cam_p_anim =
+        AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].3);
+    let mut cam_a_anim =
+        AnimationTimer::new(&clock, Easing::SineOut, 1.0, CAMERA_STATE[camera_state].4);
 
     let mut snek_nodes: VecDeque<(i32, i32)> = VecDeque::from([(1, 5), (2, 5), (3, 5)]);
     let mut snek_face: (i32, i32) = (1, 0);
@@ -161,7 +202,7 @@ fn main() {
                     width = w;
                     height = h;
                     screen::set_viewport(0, 0, w as usize, h as usize);
-                },
+                }
                 glfw::WindowEvent::CursorPos(x, y) => {
                     let (x, y) = (x as f32, y as f32);
                     let (dx, dy) = (prev_x - x, prev_y - y);
@@ -170,7 +211,7 @@ fn main() {
                     }
                     prev_x = x;
                     prev_y = y;
-                },
+                }
                 glfw::WindowEvent::MouseButton(button, action, _mods) => match action {
                     Action::Press => match button {
                         MouseButton::Button1 => {
@@ -179,7 +220,7 @@ fn main() {
                             snek_nodes.push_back((head.0 + snek_face.0, head.1 + snek_face.1));
                             load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
                             snek_prev_face = snek_face;
-                        },
+                        }
                         _ => {}
                     },
                     _ => {}
@@ -195,23 +236,31 @@ fn main() {
                             cam_v_anim.set_target(CAMERA_STATE[camera_state].2);
                             cam_p_anim.set_target(CAMERA_STATE[camera_state].3);
                             cam_a_anim.set_target(CAMERA_STATE[camera_state].4);
-                        },
-                        Key::Up | Key::W => if snek_prev_face.0 != 0 || snek_prev_face.1 <= 0 {
-                            snek_face = (0, -1);
-                            load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
-                        },
-                        Key::Left | Key::A => if snek_prev_face.1 != 0 || snek_prev_face.0 <= 0 {
-                            snek_face = (-1, 0);
-                            load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
-                        },
-                        Key::Down | Key::S => if snek_prev_face.0 != 0 || snek_prev_face.1 >= 0 {
-                            snek_face = (0, 1);
-                            load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
-                        },
-                        Key::Right | Key::D => if snek_prev_face.1 != 0 || snek_prev_face.0 >= 0 {
-                            snek_face = (1, 0);
-                            load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
-                        },
+                        }
+                        Key::Up | Key::W => {
+                            if snek_prev_face.0 != 0 || snek_prev_face.1 <= 0 {
+                                snek_face = (0, -1);
+                                load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                            }
+                        }
+                        Key::Left | Key::A => {
+                            if snek_prev_face.1 != 0 || snek_prev_face.0 <= 0 {
+                                snek_face = (-1, 0);
+                                load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                            }
+                        }
+                        Key::Down | Key::S => {
+                            if snek_prev_face.0 != 0 || snek_prev_face.1 >= 0 {
+                                snek_face = (0, 1);
+                                load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                            }
+                        }
+                        Key::Right | Key::D => {
+                            if snek_prev_face.1 != 0 || snek_prev_face.0 >= 0 {
+                                snek_face = (1, 0);
+                                load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                            }
+                        }
                         _ => {}
                     },
                     _ => {}
@@ -250,12 +299,12 @@ fn main() {
         camera_proj.perspective(90.0, width as f32 / height as f32, 1.0, 100.0);
 
         shader_program.set("time", time);
-        shader_program.set("camera_pos", &camera_pos);
-        shader_program.set("camera_view", &camera_view);
-        shader_program.set("camera_proj", &camera_proj);
-        shader_program.set("ambient_color", &ambient_color);
-        shader_program.set("pt_light_pos", &pt_light_pos);
-        shader_program.set("pt_light_color", &pt_light_color);
+        shader_program.set("camera_pos", camera_pos);
+        shader_program.set("camera_view", camera_view);
+        shader_program.set("camera_proj", camera_proj);
+        shader_program.set("ambient_color", ambient_color);
+        shader_program.set("pt_light_pos", pt_light_pos);
+        shader_program.set("pt_light_color", pt_light_color);
         shader_program.set("pt_light_power", 1.0);
         shader_program.set("tex_atlas", &test_tex);
 

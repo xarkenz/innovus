@@ -20,5 +20,5 @@ void main() {
     frag_tex = vertex_tex;
     frag_uv = vertex_uv;
 
-    gl_Position = camera_proj * camera_view * vec4(vertex.pos, 1.0);
+    gl_Position = camera_proj * camera_view * vec4(vertex_pos, 1.0);
 }
