@@ -11,6 +11,8 @@ pub mod gfx;
 pub mod scene;
 pub mod tools;
 
+pub type WindowEventReceiver = Receiver<(f64, WindowEvent)>;
+
 pub struct Application {
     glfw: glfw::Glfw,
     windows: Vec<Window>,
@@ -30,7 +32,7 @@ impl Application {
         height: u32,
         title: &str,
         mode: WindowMode<'_>,
-    ) -> Option<(Window, Receiver<(f64, WindowEvent)>)> {
+    ) -> Option<(Window, WindowEventReceiver)> {
         let mut created = self.glfw.create_window(width, height, title, mode);
         if let Some((window, _)) = &mut created {
             window.make_current();

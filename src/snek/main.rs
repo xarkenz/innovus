@@ -116,7 +116,7 @@ fn main() {
     let shader_program = Program::from_preset(ProgramPreset::Default3DShader).unwrap();
 
     let test_image =
-        Image::from_file("/home/xarkenz/Projects/Rust/rust-gaming/src/snek/assets/koopa_red.png")
+        Image::from_file("/home/xarkenz/innovus/src/snek/assets/koopa_red.png")
             .unwrap();
     let mut test_tex = Texture::from_image(&test_image).unwrap();
     test_tex.bind(0);

@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 
-use innovus::tools::*;
-
-use crate::*;
+use crate::{tools::*, *};
 
 pub mod block;
 pub mod entity;
@@ -25,18 +23,16 @@ impl World {
         }
     }
 
-    pub fn try_get_chunk(&self, location: block::ChunkLocation) -> Option<&block::Chunk> {
+    pub fn get_chunk(&self, location: block::ChunkLocation) -> Option<&block::Chunk> {
         self.chunks.get(&location)
     }
 
-    // FIXME: borrow issues :(
-    /*pub fn get_chunk(&mut self, location: block::ChunkLocation) -> &block::Chunk {
-        if let Some(chunk) = self.try_get_chunk(location) {
-            return chunk;
+    pub fn force_get_chunk(&mut self, location: block::ChunkLocation) -> &block::Chunk {
+        if !self.chunks.contains_key(&location) {
+            self.chunks.insert(location, self.generate_chunk(location));
         }
-        self.chunks.insert(location, self.generate_chunk(location));
-        self.try_get_chunk(location).unwrap()
-    }*/
+        self.get_chunk(location).unwrap()
+    }
 
     pub fn put_chunk(&mut self, chunk: block::Chunk) {
         self.chunks.insert(chunk.location(), chunk);
@@ -49,18 +45,21 @@ impl World {
         }
     }
 
-    pub fn update(&mut self, dt: f32) {
-        for entity in &mut self.entities {
-            entity.update(&mut self.physics, dt);
-        }
+    pub fn update(&mut self, inputs: &input::InputState, dt: f32) {
         for (_location, chunk) in &mut self.chunks {
             chunk.update(dt);
         }
+        for entity in &mut self.entities {
+            entity.update(dt, inputs, &mut self.physics);
+        }
     }
 
-    pub fn render(&self) {
-        for (_location, chunk) in &self.chunks {
-            chunk.render();
+    pub fn render(&mut self, dt: f32) {
+        for (_location, chunk) in &mut self.chunks {
+            chunk.render(dt);
+        }
+        for entity in &mut self.entities {
+            entity.render(dt);
         }
     }
 }

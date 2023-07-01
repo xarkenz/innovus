@@ -8,7 +8,13 @@ pub mod phys;
 
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
-pub struct Vector<T: NumAssign + Copy + Debug, const N: usize>(pub [T; N]);
+pub struct Vector<T: NumAssign + Copy + Debug, const N: usize>(
+    pub [T; N],
+);
+
+pub type Vector2i = Vector<f32, 2>;
+pub type Vector2f = Vector<f32, 2>;
+pub type Vector2d = Vector<f32, 2>;
 
 impl<T: NumAssign + Copy + Debug, const N: usize> Eq for Vector<T, N> where T: Eq {}
 

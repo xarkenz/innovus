@@ -1,7 +1,7 @@
 extern crate glfw;
 
-use crate::world::gen::WorldGenerator;
-use innovus::{gfx::*, tools::*, *};
+use crate::{tools::*, world::gen::WorldGenerator};
+use innovus::{gfx::*, *};
 
 pub mod tools;
 pub mod view;
@@ -10,7 +10,7 @@ pub mod world;
 fn main() {
     let mut application = Application::new().unwrap();
     application.set_multisampling(Some(8));
-    let (mut window, events) = application
+    let (mut window, event_receiver) = application
         .create_window(1200, 800, "Even More Rust Gaming.", WindowMode::Windowed)
         .expect("failed to create GLFW window.");
     window.maximize();
@@ -23,6 +23,8 @@ fn main() {
     screen::set_clear_color(0.6, 0.8, 1.0);
     screen::set_blend(screen::Blend::Transparency);
     screen::set_viewport(0, 0, 1200, 800);
+
+    let mut input_state = input::InputState::new(event_receiver);
 
     let clock = Clock::start();
     let mut prev_time = clock.read();
@@ -40,8 +42,7 @@ fn main() {
     );
 
     while !window.should_close() {
-        application.poll_events();
-        for (_, event) in glfw::flush_messages(&events) {
+        for event in input_state.process_events(&mut application) {
             match event {
                 WindowEvent::Size(w, h) => {
                     camera.set_size(Vector([w as f32, h as f32]));
@@ -56,25 +57,6 @@ fn main() {
                     prev_x = x;
                     prev_y = y;
                 }
-                WindowEvent::MouseButton(button, action, _mods) => match action {
-                    Action::Press => match button {
-                        MouseButton::Button1 => {}
-                        _ => {}
-                    },
-                    _ => {}
-                },
-                WindowEvent::Key(key, _scancode, action, _mods) => match action {
-                    Action::Press => match key {
-                        Key::Escape => window.set_should_close(true),
-                        Key::Enter => {}
-                        Key::Up | Key::W => {}
-                        Key::Left | Key::A => {}
-                        Key::Down | Key::S => {}
-                        Key::Right | Key::D => {}
-                        _ => {}
-                    },
-                    _ => {}
-                },
                 _ => {}
             }
         }
@@ -86,7 +68,7 @@ fn main() {
         current_world.put_chunk(current_world.generate_chunk(Vector([0, -1])));
         current_world.put_chunk(current_world.generate_chunk(Vector([-1, -1])));
 
-        current_world.update(dt);
+        current_world.update(&input_state, dt);
         camera.update(dt);
 
         shaders.set("camera_view", camera.view());
@@ -94,7 +76,7 @@ fn main() {
         //shaders.set("tex_atlas", &test_tex);
 
         screen::clear();
-        current_world.render();
+        current_world.render(dt);
         window.swap_buffers();
     }
 }

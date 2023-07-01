@@ -62,17 +62,17 @@ impl std::fmt::Debug for BlockType {
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    id: &'static BlockType,
+    block_type: &'static BlockType,
     attributes: Vec<AttributeValue>,
     block_light: u8,
     sky_light: u8,
 }
 
 impl Block {
-    pub fn new(id: &'static BlockType, block_light: u8, sky_light: u8) -> Self {
+    pub fn new(block_type: &'static BlockType, block_light: u8, sky_light: u8) -> Self {
         Block {
-            id,
-            attributes: id.default_attributes(),
+            block_type,
+            attributes: block_type.default_attributes(),
             block_light,
             sky_light,
         }
@@ -138,7 +138,11 @@ impl Chunk {
         }
     }
 
-    pub fn update(&mut self, _dt: f32) {
+    pub fn update(&mut self, dt: f32) {
+        // TODO
+    }
+
+    pub fn render(&mut self, dt: f32) {
         if self.geometry.is_empty() {
             let l = self.location.x() as f32 * CHUNK_SIZE_F32;
             let b = self.location.y() as f32 * CHUNK_SIZE_F32;
@@ -156,9 +160,7 @@ impl Chunk {
                 &[[0, 1, 2], [3, 4, 5]],
             );
         }
-    }
 
-    pub fn render(&self) {
         self.geometry.render();
     }
 }
