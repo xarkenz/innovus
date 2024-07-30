@@ -115,11 +115,13 @@ fn main() {
 
     let shader_program = Program::from_preset(ProgramPreset::Default3DShader).unwrap();
 
-    let test_image =
-        Image::from_file("/home/xarkenz/innovus/src/snek/assets/koopa_red.png")
-            .unwrap();
-    let mut test_tex = Texture::from_image(&test_image).unwrap();
-    test_tex.bind(0);
+    let test_image = Image::from_file("src/snek/assets/koopa_red.png").unwrap();
+    let mut test_tex = Texture2D::new(0);
+    test_tex.set_minify_filter(TextureSampling::Linear);
+    test_tex.set_magnify_filter(TextureSampling::Linear);
+    test_tex.set_wrap_s(TextureWrap::MirroredRepeat);
+    test_tex.set_wrap_t(TextureWrap::MirroredRepeat);
+    test_tex.load_from_image(&test_image);
 
     screen::set_clear_color(0.6, 0.9, 1.0);
     screen::set_blend(screen::Blend::Transparency);
@@ -201,7 +203,7 @@ fn main() {
                 glfw::WindowEvent::Size(w, h) => {
                     width = w;
                     height = h;
-                    screen::set_viewport(0, 0, w as usize, h as usize);
+                    screen::set_viewport(0, 0, w, h);
                 }
                 glfw::WindowEvent::CursorPos(x, y) => {
                     let (x, y) = (x as f32, y as f32);
@@ -298,20 +300,20 @@ fn main() {
         camera_proj.reset_to_identity();
         camera_proj.perspective(90.0, width as f32 / height as f32, 1.0, 100.0);
 
-        shader_program.set("time", time);
-        shader_program.set("camera_pos", camera_pos);
-        shader_program.set("camera_view", camera_view);
-        shader_program.set("camera_proj", camera_proj);
-        shader_program.set("ambient_color", ambient_color);
-        shader_program.set("pt_light_pos", pt_light_pos);
-        shader_program.set("pt_light_color", pt_light_color);
-        shader_program.set("pt_light_power", 1.0);
-        shader_program.set("tex_atlas", &test_tex);
+        shader_program.set_uniform("time", time);
+        shader_program.set_uniform("camera_pos", camera_pos);
+        shader_program.set_uniform("camera_view", camera_view);
+        shader_program.set_uniform("camera_proj", camera_proj);
+        shader_program.set_uniform("ambient_color", ambient_color);
+        shader_program.set_uniform("pt_light_pos", pt_light_pos);
+        shader_program.set_uniform("pt_light_color", pt_light_color);
+        shader_program.set_uniform("pt_light_power", 1.0);
+        shader_program.set_uniform("tex_atlas", &test_tex);
 
         screen::clear();
-        board_geometry.render();
-        snek_geometry.render();
-        // kooper.render();
+        // board_geometry.render();
+        // snek_geometry.render();
+        kooper.render();
         window.swap_buffers();
     }
 }

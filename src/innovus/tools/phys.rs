@@ -3,46 +3,41 @@ use super::*;
 #[derive(Clone, Debug)]
 pub struct Collider {
     pub fixed: bool,
-    pub rect: Rectangle<f32>,
-    pub vel: Vector<f32, 2>,
+    pub rectangle: Rectangle<f32>,
+    pub velocity: Vector<f32, 2>,
 }
 
 impl Collider {
-    pub fn new(rect: Rectangle<f32>, vel: Vector<f32, 2>) -> Self {
+    pub fn new(rectangle: Rectangle<f32>, velocity: Vector<f32, 2>) -> Self {
         Self {
             fixed: false,
-            rect,
-            vel,
+            rectangle,
+            velocity,
         }
     }
 
     pub fn new_fixed(rect: Rectangle<f32>) -> Self {
         Self {
             fixed: true,
-            rect,
-            vel: Vector::zero(),
+            rectangle: rect,
+            velocity: Vector::zero(),
         }
     }
 
     pub fn stop(&mut self) {
-        self.vel = Vector::zero();
+        self.velocity = Vector::zero();
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
-        self.rect.intersects(&other.rect)
+        self.rectangle.intersects(&other.rectangle)
     }
 
     pub fn broad_phase(&self, dt: f32) -> Rectangle<f32> {
-        if self.fixed {
-            self.rect.clone()
-        } else {
-            Rectangle::new(
-                self.rect.x() + self.vel.x().min(0.0) * dt,
-                self.rect.y() + self.vel.y().min(0.0) * dt,
-                self.rect.width() + self.vel.x().abs() * dt,
-                self.rect.height() + self.vel.y().abs() * dt,
-            )
+        let mut phase = self.rectangle;
+        if !self.fixed {
+            phase.expand_toward(self.velocity * dt);
         }
+        phase
     }
 }
 

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use innovus::{gfx::*, tools::*};
 use std::fmt::Formatter;
 
@@ -11,6 +12,7 @@ pub enum AttributeType {
     U32(u32),
     I32(i32),
     String(&'static str),
+    // default variant index, variant display names
     Enum(u8, &'static [&'static str]),
 }
 
@@ -28,7 +30,7 @@ pub struct BlockType {
     pub name: &'static str,
     pub attributes: &'static [(&'static str, AttributeType)],
     pub colliders: &'static [Rectangle<i32>],
-    pub full_block: bool,
+    pub is_full_block: bool,
     pub light_emission: u8,
     pub connector: fn(&Self, &Self) -> bool,
 }
@@ -60,17 +62,81 @@ impl std::fmt::Debug for BlockType {
     }
 }
 
+pub const BLOCK_QUAD_OFFSETS: [Vector<f32, 2>; 4] = [
+    Vector([0.0, 0.5]), // Top left
+    Vector([0.5, 0.5]), // Top right
+    Vector([0.0, 0.0]), // Bottom left
+    Vector([0.5, 0.0]), // Bottom right
+];
+pub const BLOCK_QUAD_VERTEX_OFFSETS: [Vector<f32, 2>; 4] = [
+    Vector([0.0, 0.0]), // Bottom left
+    Vector([0.0, 0.5]), // Top left
+    Vector([0.5, 0.5]), // Top right
+    Vector([0.5, 0.0]), // Bottom right
+];
+pub const VERTICES_PER_BLOCK: usize = BLOCK_QUAD_OFFSETS.len() * BLOCK_QUAD_VERTEX_OFFSETS.len();
+
+#[derive(Debug)]
+pub struct BlockAppearance {
+    pub offset: Vector<u32, 2>,
+}
+
+pub struct BlockRenderer {
+    pub atlas: Image,
+    texture: Texture2D,
+    appearances: HashMap<*const BlockType, BlockAppearance>,
+}
+
+impl BlockRenderer {
+    pub fn new() -> Result<Self, String> {
+        let (images, block_types): (Vec<Image>, Vec<&BlockType>) = types::BLOCK_TYPES.iter()
+            .filter_map(|&block_type| {
+                let path = format!("src/javagame/assets/textures/block/{}.png", block_type.name);
+                Image::from_file(&path).ok().map(|image| (image, block_type))
+            })
+            .unzip();
+
+        let (atlas, offsets) = Image::new_atlas(&images);
+
+        let appearances = HashMap::from_iter(block_types.iter()
+            .zip(offsets)
+            .map(|(&block_type, offset)| {
+                let appearance = BlockAppearance {
+                    offset,
+                };
+                (block_type as *const BlockType, appearance)
+            }));
+
+        let mut texture = Texture2D::new(0);
+        texture.set_minify_filter(TextureSampling::Nearest);
+        texture.set_magnify_filter(TextureSampling::Nearest);
+        texture.set_wrap_s(TextureWrap::Repeat);
+        texture.set_wrap_t(TextureWrap::Repeat);
+        texture.load_from_image(&atlas);
+
+        Ok(Self {
+            atlas,
+            texture,
+            appearances,
+        })
+    }
+
+    pub fn get_appearance(&self, block_type: &'static BlockType) -> Option<&BlockAppearance> {
+        self.appearances.get(&(block_type as *const BlockType))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Block {
-    block_type: &'static BlockType,
-    attributes: Vec<AttributeValue>,
-    block_light: u8,
-    sky_light: u8,
+    pub block_type: &'static BlockType,
+    pub attributes: Vec<AttributeValue>,
+    pub block_light: u8,
+    pub sky_light: u8,
 }
 
 impl Block {
     pub fn new(block_type: &'static BlockType, block_light: u8, sky_light: u8) -> Self {
-        Block {
+        Self {
             block_type,
             attributes: block_type.default_attributes(),
             block_light,
@@ -95,15 +161,17 @@ pub struct Chunk {
     location: ChunkLocation,
     blocks: [[Block; CHUNK_SIZE]; CHUNK_SIZE],
     blocks_dirty: [[bool; CHUNK_SIZE]; CHUNK_SIZE],
+    dirty: bool,
     geometry: Geometry<Vertex2D>,
 }
 
 impl Chunk {
     pub fn new(location: ChunkLocation) -> Self {
-        Chunk {
+        Self {
             location,
             blocks: Default::default(),
             blocks_dirty: [[true; CHUNK_SIZE]; CHUNK_SIZE],
+            dirty: true,
             geometry: Geometry::new_render().unwrap(),
         }
     }
@@ -120,47 +188,101 @@ impl Chunk {
         self.blocks[y][x] = block;
     }
 
-    pub fn dirty_at(&self, x: usize, y: usize) -> bool {
+    pub fn is_dirty_at(&self, x: usize, y: usize) -> bool {
         self.blocks_dirty[y][x]
     }
 
     pub fn set_dirty_at(&mut self, x: usize, y: usize, dirty: bool) {
         self.blocks_dirty[y][x] = dirty;
+        self.dirty = self.dirty || dirty;
     }
 
-    pub fn dirty(&self) -> bool {
-        self.blocks_dirty.iter().any(|row| row.iter().any(|b| *b))
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
     }
 
     pub fn set_dirty(&mut self, dirty: bool) {
-        for row in &mut self.blocks_dirty {
-            row.fill(dirty);
-        }
+        self.dirty = dirty;
     }
 
     pub fn update(&mut self, dt: f32) {
         // TODO
     }
 
-    pub fn render(&mut self, dt: f32) {
+    pub fn render(&mut self, dt: f32, renderer: &BlockRenderer) {
         if self.geometry.is_empty() {
-            let l = self.location.x() as f32 * CHUNK_SIZE_F32;
-            let b = self.location.y() as f32 * CHUNK_SIZE_F32;
-            let r = l + CHUNK_SIZE_F32;
-            let t = b + CHUNK_SIZE_F32;
-            self.geometry.add(
-                &[
-                    Vertex2D::new([l, b, 0.0], Some([1.0, 0.0, 0.0, 1.0]), None),
-                    Vertex2D::new([r, t, 0.0], Some([1.0, 0.0, 0.0, 1.0]), None),
-                    Vertex2D::new([l, t, 0.0], Some([1.0, 0.0, 0.0, 1.0]), None),
-                    Vertex2D::new([l, b, 0.0], Some([0.0, 1.0, 0.0, 1.0]), None),
-                    Vertex2D::new([r, b, 0.0], Some([0.0, 1.0, 0.0, 1.0]), None),
-                    Vertex2D::new([r, t, 0.0], Some([0.0, 1.0, 0.0, 1.0]), None),
-                ],
-                &[[0, 1, 2], [3, 4, 5]],
-            );
+            let mut vertices = Vec::new();
+            let mut faces = Vec::new();
+            for block_y in 0..CHUNK_SIZE {
+                for block_x in 0..CHUNK_SIZE {
+                    for offset in BLOCK_QUAD_OFFSETS {
+                        let index = vertices.len() as u32;
+                        faces.push([index + 0, index + 1, index + 2]);
+                        faces.push([index + 2, index + 3, index + 0]);
+                        // TODO: obviously lossy
+                        let x = self.location.x() as f32 * CHUNK_SIZE_F32 + block_x as f32 + offset.x();
+                        let y = self.location.y() as f32 * CHUNK_SIZE_F32 + block_y as f32 + offset.y();
+                        for vertex_offset in BLOCK_QUAD_VERTEX_OFFSETS {
+                            vertices.push(Vertex2D::new(
+                                [x + vertex_offset.x(), y + vertex_offset.y(), 0.0],
+                                Some([0.0, 0.0, 0.0, 0.0]),
+                                None,
+                            ));
+                        }
+                    }
+                }
+            }
+            self.geometry.add(&vertices, &faces);
+        }
+
+        if self.is_dirty() {
+            let mut dirty_count: usize = 0;
+            for y in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    if self.is_dirty_at(x, y) {
+                        self.update_block_vertices(x, y, renderer);
+                        self.set_dirty_at(x, y, false);
+                        dirty_count += 1;
+                    }
+                }
+            }
+            self.geometry.update_vertex_buffer();
+            self.set_dirty(false);
         }
 
         self.geometry.render();
+    }
+
+    fn update_block_vertices(&mut self, x: usize, y: usize, renderer: &BlockRenderer) {
+        // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
+        let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
+        if let Some(appearance) = renderer.get_appearance(self.block_at(x, y).block_type) {
+            let mut index = first_index;
+            for quad_offset in BLOCK_QUAD_OFFSETS {
+                for vertex_offset in BLOCK_QUAD_VERTEX_OFFSETS {
+                    let mut vertex = self.geometry.get_vertex(index);
+                    vertex.color = [1.0; 4];
+                    vertex.tex = true;
+                    let pos = quad_offset + vertex_offset;
+                    vertex.uv = [
+                        appearance.offset.x() as f32 + pos.x() * 16.0,
+                        appearance.offset.y() as f32 + (1.0 - pos.y()) * 16.0,
+                    ];
+                    self.geometry.set_vertex(index, &vertex);
+                    index += 1;
+                }
+            }
+        }
+        else {
+            let mut index = first_index;
+            for _ in 0..VERTICES_PER_BLOCK {
+                let mut vertex = self.geometry.get_vertex(index);
+                vertex.color = [0.0; 4];
+                vertex.tex = false;
+                vertex.uv = [0.0; 2];
+                self.geometry.set_vertex(index, &vertex);
+                index += 1;
+            }
+        }
     }
 }

@@ -1,0 +1,22 @@
+[
+  {
+    "attribute": "wall",
+    "value": "bottom",
+    "texture": "blocks/amethyst_crystal/wall_bottom"
+  },
+  {
+    "attribute": "wall",
+    "value": "left",
+    "texture": "blocks/amethyst_crystal/wall_left"
+  },
+  {
+    "attribute": "wall",
+    "value": "right",
+    "texture": "blocks/amethyst_crystal/wall_right"
+  },
+  {
+    "attribute": "wall",
+    "value": "top",
+    "texture": "blocks/amethyst_crystal/wall_top"
+  }
+]

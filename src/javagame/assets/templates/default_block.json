@@ -1,0 +1,11 @@
+{
+  "format": "connected_quads_simple",
+  "texture_size": 16,
+  "textures": [
+    "outward_corners",
+    "horizontal",
+    "vertical",
+    "inward_corners",
+    "fill"
+  ]
+}

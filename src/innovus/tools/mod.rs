@@ -12,9 +12,9 @@ pub struct Vector<T: NumAssign + Copy + Debug, const N: usize>(
     pub [T; N],
 );
 
-pub type Vector2i = Vector<f32, 2>;
+pub type Vector2i = Vector<i32, 2>;
 pub type Vector2f = Vector<f32, 2>;
-pub type Vector2d = Vector<f32, 2>;
+pub type Vector2d = Vector<f64, 2>;
 
 impl<T: NumAssign + Copy + Debug, const N: usize> Eq for Vector<T, N> where T: Eq {}
 
@@ -693,93 +693,161 @@ impl Mul<Vector<f32, 3>> for Transform3D {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Rectangle<T: Copy + Debug> {
-    x: T,
-    y: T,
-    width: T,
-    height: T,
+pub struct Rectangle<T: NumAssign + Copy + Debug> {
+    min: Vector<T, 2>,
+    max: Vector<T, 2>,
 }
 
-impl<T: Copy + Debug> Rectangle<T> {
-    pub const fn new(x: T, y: T, width: T, height: T) -> Self {
+impl<T: NumAssign + Copy + Debug> Rectangle<T> {
+    pub const fn new(min: Vector<T, 2>, max: Vector<T, 2>) -> Self {
         Self {
-            x,
-            y,
-            width,
-            height,
+            min,
+            max,
         }
     }
 
-    pub fn x(&self) -> T {
-        self.x
+    pub fn from_size(min: Vector<T, 2>, size: Vector<T, 2>) -> Self {
+        Self {
+            min,
+            max: min + size,
+        }
     }
 
-    pub fn y(&self) -> T {
-        self.y
+    pub fn min(&self) -> Vector<T, 2> {
+        self.min
+    }
+
+    pub fn min_x(&self) -> T {
+        self.min.x()
+    }
+
+    pub fn min_y(&self) -> T {
+        self.min.y()
+    }
+
+    pub fn max(&self) -> Vector<T, 2> {
+        self.max
+    }
+
+    pub fn max_x(&self) -> T {
+        self.max.x()
+    }
+
+    pub fn max_y(&self) -> T {
+        self.max.y()
+    }
+
+    pub fn size(&self) -> Vector<T, 2> {
+        Vector([self.width(), self.height()])
     }
 
     pub fn width(&self) -> T {
-        self.width
+        self.max_x() - self.min_x()
     }
 
     pub fn height(&self) -> T {
-        self.height
+        self.max_y() - self.min_y()
     }
 
-    pub fn set_x(&mut self, x: T) {
-        self.x = x;
+    pub fn set_min(&mut self, min: Vector<T, 2>) {
+        self.min = min;
     }
 
-    pub fn set_y(&mut self, y: T) {
-        self.y = y;
+    pub fn set_min_x(&mut self, x: T) {
+        self.min.set_x(x);
     }
 
-    pub fn set_width(&mut self, width: T) {
-        self.width = width;
+    pub fn set_min_y(&mut self, y: T) {
+        self.min.set_y(y);
     }
 
-    pub fn set_height(&mut self, height: T) {
-        self.height = height;
+    pub fn set_max(&mut self, max: Vector<T, 2>) {
+        self.max = max;
+    }
+
+    pub fn set_max_x(&mut self, x: T) {
+        self.max.set_x(x);
+    }
+
+    pub fn set_max_y(&mut self, y: T) {
+        self.max.set_y(y);
+    }
+
+    pub fn shift_by(&mut self, amount: Vector<T, 2>) {
+        self.shift_x_by(amount.x());
+        self.shift_y_by(amount.y());
+    }
+
+    pub fn shift_x_by(&mut self, amount: T) {
+        self.min.set_x(self.min.x() + amount);
+        self.max.set_x(self.max.x() + amount);
+    }
+
+    pub fn shift_y_by(&mut self, amount: T) {
+        self.min.set_y(self.min.y() + amount);
+        self.max.set_y(self.max.y() + amount);
+    }
+
+    pub fn shift_min_to(&mut self, min: Vector<T, 2>) {
+        self.shift_min_x_to(min.x());
+        self.shift_min_y_to(min.y());
+    }
+
+    pub fn shift_min_x_to(&mut self, x: T) {
+        self.max.set_x(x + self.width());
+        self.min.set_x(x);
+    }
+
+    pub fn shift_min_y_to(&mut self, y: T) {
+        self.max.set_y(y + self.height());
+        self.min.set_y(y);
+    }
+
+    pub fn shift_max_to(&mut self, max: Vector<T, 2>) {
+        self.shift_max_x_to(max.x());
+        self.shift_max_y_to(max.y());
+    }
+
+    pub fn shift_max_x_to(&mut self, x: T) {
+        self.min.set_x(x - self.width());
+        self.max.set_x(x);
+    }
+
+    pub fn shift_max_y_to(&mut self, y: T) {
+        self.min.set_y(y - self.height());
+        self.max.set_y(y);
+    }
+
+    pub fn center(&self) -> Vector<T, 2> {
+        (self.min + self.max) / (T::one() + T::one())
     }
 }
 
 impl<T: NumAssign + PartialOrd + Copy + Debug> Rectangle<T> {
-    pub fn xw(&self) -> T {
-        self.x + self.width
+    pub fn expand_toward(&mut self, amount: Vector<T, 2>) {
+        self.expand_x_toward(amount.x());
+        self.expand_y_toward(amount.y());
     }
 
-    pub fn yh(&self) -> T {
-        self.y + self.height
+    pub fn expand_x_toward(&mut self, amount: T) {
+        if amount >= T::zero() {
+            self.set_max_x(self.max_x() + amount);
+        } else {
+            self.set_min_x(self.min_x() + amount);
+        }
     }
 
-    pub fn xy(&self) -> Vector<T, 2> {
-        Vector([self.x, self.y])
-    }
-
-    pub fn size(&self) -> Vector<T, 2> {
-        Vector([self.width, self.height])
-    }
-
-    pub fn center(&self) -> Vector<T, 2> {
-        Vector([
-            self.x + self.width / (T::one() + T::one()),
-            self.y + self.height / (T::one() + T::one()),
-        ])
-    }
-
-    pub fn set_xy(&mut self, xy: Vector<T, 2>) {
-        [self.x, self.y] = xy.content();
-    }
-
-    pub fn set_size(&mut self, size: Vector<T, 2>) {
-        [self.width, self.height] = size.content();
+    pub fn expand_y_toward(&mut self, amount: T) {
+        if amount >= T::zero() {
+            self.set_max_y(self.max_y() + amount);
+        } else {
+            self.set_min_y(self.min_y() + amount);
+        }
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
-        self.xw() > other.x()
-            && self.x() < other.xw()
-            && self.yh() > other.y()
-            && self.y() < other.yh()
+        self.max_x() > other.min_x() && self.min_x() < other.max_x()
+            && self.max_y() > other.min_y() && self.min_y() < other.max_y()
     }
 }
 

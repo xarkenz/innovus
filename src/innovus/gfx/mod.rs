@@ -14,12 +14,6 @@ use std::mem::{size_of, swap};
 use std::num::{ParseFloatError, ParseIntError};
 use std::str::FromStr;
 
-fn whitespace_cstring(len: usize) -> CString {
-    let mut buffer: Vec<u8> = Vec::with_capacity(len as usize + 1);
-    buffer.extend([b' '].iter().cycle().take(len as usize));
-    unsafe { CString::from_vec_unchecked(buffer) }
-}
-
 pub enum Color {
     RGB(u8, u8, u8),
     RGBA(u8, u8, u8, u8),
@@ -44,15 +38,17 @@ pub struct Shader {
 
 impl Shader {
     pub fn create(source: &str, shader_type: ShaderType) -> Result<Shader, String> {
-        let cstring_source = CString::new(source).map_err(|err| err.to_string())?;
+        let source = CString::new(source)
+            .map_err(|err| err.to_string())?;
 
         let id = unsafe { gl::CreateShader(shader_type as GLenum) };
         if id == 0 {
-            return Err("Shader::create(): failed to create GL shader object.".to_string());
+            return Err("Shader::create(): failed to create GL shader object.".into());
         }
+        let shader = Shader { id };
 
         unsafe {
-            gl::ShaderSource(id, 1, &cstring_source.as_ptr(), std::ptr::null());
+            gl::ShaderSource(id, 1, &source.as_ptr(), std::ptr::null());
             gl::CompileShader(id);
         }
 
@@ -61,22 +57,45 @@ impl Shader {
             gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success);
         }
         if success == 0 {
-            let mut len: GLint = 0;
-            unsafe {
-                gl::GetShaderiv(id, gl::INFO_LOG_LENGTH, &mut len);
-            }
-            let error = whitespace_cstring(len as usize);
-            unsafe {
-                gl::GetShaderInfoLog(id, len, std::ptr::null_mut(), error.as_ptr() as *mut GLchar);
-            }
-            return Err(error.to_string_lossy().into_owned());
+            return Err(shader.get_info_log());
         }
 
-        Ok(Shader { id })
+        Ok(shader)
     }
 
     pub fn id(&self) -> GLuint {
         self.id
+    }
+
+    pub fn get_info_log(&self) -> String {
+        // Determine the number of bytes the information log occupies, including the null terminator
+        let mut length: GLint = 0;
+        unsafe {
+            gl::GetShaderiv(self.id, gl::INFO_LOG_LENGTH, &mut length);
+        }
+
+        if length <= 0 {
+            // The shader has no information log
+            String::new()
+        }
+        else {
+            // Allocate space for the information log and read it
+            let mut info_log = Vec::with_capacity(length as usize);
+            unsafe {
+                gl::GetShaderInfoLog(
+                    self.id,
+                    length,
+                    std::ptr::null_mut(),
+                    info_log.as_mut_ptr() as *mut GLchar,
+                );
+                // Now that it contains data, update the length of the info log buffer,
+                // excluding the null terminator (`length` is at least 1)
+                info_log.set_len(length as usize - 1);
+            }
+
+            // It should be valid UTF-8, but check it to be sure
+            String::from_utf8(info_log).unwrap()
+        }
     }
 }
 
@@ -215,14 +234,10 @@ impl ShaderUniformType for Matrix<f32, 3, 4> {
     }
 }
 
-impl ShaderUniformType for &Texture {
+impl ShaderUniformType for &Texture2D {
     fn upload_uniform(self, location: GLint) {
         unsafe {
-            gl::Uniform1ui(
-                location,
-                self.slot()
-                    .expect("attempted to set an unbound texture uniform."),
-            );
+            gl::Uniform1ui(location, self.slot());
         }
     }
 }
@@ -240,8 +255,9 @@ impl Program {
     pub fn from_shaders(shaders: &[Shader]) -> Result<Program, String> {
         let id = unsafe { gl::CreateProgram() };
         if id == 0 {
-            return Err("Program::from_shaders(): failed to create GL program.".to_string());
+            return Err("Program::from_shaders(): failed to create GL program.".into());
         }
+        let program = Program { id };
 
         for shader in shaders {
             unsafe {
@@ -258,15 +274,7 @@ impl Program {
             gl::GetProgramiv(id, gl::LINK_STATUS, &mut success);
         }
         if success == 0 {
-            let mut len: GLint = 0;
-            unsafe {
-                gl::GetProgramiv(id, gl::INFO_LOG_LENGTH, &mut len);
-            }
-            let error = whitespace_cstring(len as usize);
-            unsafe {
-                gl::GetProgramInfoLog(id, len, std::ptr::null_mut(), error.as_ptr() as *mut GLchar);
-            }
-            return Err(error.to_string_lossy().into_owned());
+            return Err(program.get_info_log());
         }
 
         for shader in shaders {
@@ -275,33 +283,35 @@ impl Program {
             }
         }
 
-        Ok(Program { id })
+        Ok(program)
     }
 
     pub fn from_preset(preset: ProgramPreset) -> Result<Program, String> {
-        let get_source = |path| std::fs::read_to_string(path).map_err(|err| err.to_string());
+        let fetch_source = |path| std::fs::read_to_string(path)
+            .map_err(|err| err.to_string());
+
         Program::from_shaders(&match preset {
             ProgramPreset::Default2DShader => vec![
                 Shader::create(
-                    &get_source("./src/innovus/assets/default2d.v.glsl")?,
+                    &fetch_source("./src/innovus/assets/default2d.v.glsl")?,
                     ShaderType::Vertex,
                 )?,
                 Shader::create(
-                    &get_source("./src/innovus/assets/default2d.f.glsl")?,
+                    &fetch_source("./src/innovus/assets/default2d.f.glsl")?,
                     ShaderType::Fragment,
                 )?,
             ],
             ProgramPreset::Default3DShader => vec![
                 Shader::create(
-                    &get_source("./src/innovus/assets/default3d.v.glsl")?,
+                    &fetch_source("./src/innovus/assets/default3d.v.glsl")?,
                     ShaderType::Vertex,
                 )?,
                 Shader::create(
-                    &get_source("./src/innovus/assets/default3d.g.glsl")?,
+                    &fetch_source("./src/innovus/assets/default3d.g.glsl")?,
                     ShaderType::Geometry,
                 )?,
                 Shader::create(
-                    &get_source("./src/innovus/assets/default3d.f.glsl")?,
+                    &fetch_source("./src/innovus/assets/default3d.f.glsl")?,
                     ShaderType::Fragment,
                 )?,
             ],
@@ -318,14 +328,44 @@ impl Program {
         }
     }
 
-    pub fn set(&self, name: &str, value: impl ShaderUniformType) {
-        let cstring_name = CString::new(name).unwrap();
+    pub fn get_info_log(&self) -> String {
+        // Determine the number of bytes the information log occupies, including the null terminator
+        let mut length: GLint = 0;
         unsafe {
-            gl::UseProgram(self.id);
+            gl::GetProgramiv(self.id, gl::INFO_LOG_LENGTH, &mut length);
         }
-        value.upload_uniform(unsafe {
-            gl::GetUniformLocation(self.id, cstring_name.as_ptr() as *const GLchar)
-        });
+
+        if length <= 0 {
+            // The program has no information log
+            String::new()
+        }
+        else {
+            // Allocate space for the information log and read it
+            let mut info_log = Vec::with_capacity(length as usize);
+            unsafe {
+                gl::GetProgramInfoLog(
+                    self.id,
+                    length,
+                    std::ptr::null_mut(),
+                    info_log.as_mut_ptr() as *mut GLchar,
+                );
+                // Now that it contains data, update the length of the info log buffer,
+                // excluding the null terminator (`length` is at least 1)
+                info_log.set_len(length as usize - 1);
+            }
+
+            // It should be valid UTF-8, but check it to be sure
+            String::from_utf8(info_log).unwrap()
+        }
+    }
+
+    pub fn set_uniform(&self, name: &str, value: impl ShaderUniformType) {
+        let name = CString::new(name).expect("uniform name must not contain any NUL bytes.");
+        self.bind();
+        let location = unsafe {
+            gl::GetUniformLocation(self.id, name.as_ptr() as *const GLchar)
+        };
+        value.upload_uniform(location);
     }
 }
 
@@ -488,10 +528,10 @@ impl Vertex for Vertex2D {
 
 #[derive(Copy, Clone, Debug)]
 pub struct GeometrySlice {
-    first_vertex: usize,
-    vertex_count: usize,
-    first_face: usize,
-    face_count: usize,
+    pub first_vertex: usize,
+    pub vertex_count: usize,
+    pub first_face: usize,
+    pub face_count: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -503,7 +543,7 @@ pub struct Geometry<V: Vertex> {
     elements: Vec<GLuint>,
     vertex_count: usize,
     face_count: usize,
-    vertex_type: PhantomData<V>,
+    vertex_type: PhantomData<*const V>,
 }
 
 impl<V: Vertex> Geometry<V> {
@@ -541,8 +581,7 @@ impl<V: Vertex> Geometry<V> {
             gl::GenVertexArrays(1, &mut self.vao);
             if self.vao == 0 {
                 return Err(
-                    "Geometry::enable_render(): failed to create GL vertex array object."
-                        .to_string(),
+                    "Geometry::enable_render(): failed to create GL vertex array object.".into(),
                 );
             }
             gl::BindVertexArray(self.vao);
@@ -550,8 +589,7 @@ impl<V: Vertex> Geometry<V> {
             gl::GenBuffers(1, &mut self.vbo);
             if self.vbo == 0 {
                 return Err(
-                    "Geometry::enable_render(): failed to create GL vertex buffer object."
-                        .to_string(),
+                    "Geometry::enable_render(): failed to create GL vertex buffer object.".into(),
                 );
             }
             gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
@@ -642,34 +680,14 @@ impl<V: Vertex> Geometry<V> {
     }
 
     pub fn clear(&mut self) {
-        if self.vbo != 0 && self.ebo != 0 {
-            unsafe {
-                gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
-                gl::BufferData(
-                    gl::ARRAY_BUFFER,
-                    0 as GLsizeiptr,
-                    std::ptr::null(),
-                    gl::STATIC_DRAW,
-                );
-                gl::BindBuffer(gl::ARRAY_BUFFER, 0);
-
-                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ebo);
-                gl::BufferData(
-                    gl::ELEMENT_ARRAY_BUFFER,
-                    0 as GLsizeiptr,
-                    std::ptr::null(),
-                    gl::STATIC_DRAW,
-                );
-                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
-            }
-        }
-
         self.vertex_count = 0;
         self.face_count = 0;
+
         self.vertices.clear();
-        self.vertices.shrink_to_fit();
         self.elements.clear();
-        self.elements.shrink_to_fit();
+
+        self.update_vertex_buffer();
+        self.update_element_buffer();
     }
 
     pub fn update_vertex_buffer(&self) {
@@ -1064,7 +1082,7 @@ impl FromStr for Geometry<Vertex3D> {
     fn from_str(data: &str) -> Result<Self, Self::Err> {
         let parse_f32 = |s: &str| {
             s.parse::<f32>()
-                .map_err(|error| ParseGeometryError::from(error))
+                .map_err(ParseGeometryError::from)
         };
         let parse_clamp_f32 = |s: &str| match parse_f32(s)? {
             num if 0.0 <= num && num <= 1.0 => Ok(num),
@@ -1074,7 +1092,7 @@ impl FromStr for Geometry<Vertex3D> {
         };
         let parse_usize = |s: &str| {
             s.parse::<usize>()
-                .map_err(|error| ParseGeometryError::from(error))
+                .map_err(ParseGeometryError::from)
         };
         let parse_face_element = |s: &str| {
             let mut indices: [usize; 4] = [0; 4];
@@ -1106,7 +1124,7 @@ impl FromStr for Geometry<Vertex3D> {
             }
             if indices[0] == 0 {
                 Err(ParseGeometryError {
-                    message: "face element index cannot be 0".to_string(),
+                    message: "face element index cannot be 0".into(),
                 })
             } else {
                 Ok(indices)
@@ -1114,7 +1132,7 @@ impl FromStr for Geometry<Vertex3D> {
         };
 
         let missing_error = ParseGeometryError {
-            message: "missing command argument".to_string(),
+            message: "missing command argument".into(),
         };
 
         let mut positions: Vec<[f32; 3]> = Vec::new();
@@ -1226,16 +1244,48 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn from_file(path: &str) -> Result<Image, String> {
+    pub fn new(width: u32, height: u32) -> Self {
+        let size_bytes = (width * height * 4) as usize;
+        Self {
+            data: Vec::from_iter(std::iter::repeat(0).take(size_bytes)),
+            width,
+            height,
+        }
+    }
+
+    pub fn from_file(path: &str) -> Result<Self, String> {
         let input = image::io::Reader::open(path)
-            .map_err(|_err| format!("Image::from_file(): failed to open '{}'.", path))?
+            .map_err(|err| format!("Image::from_file(): failed to open '{}'. ({err})", path))?
             .decode()
-            .map_err(|_err| format!("Image::from_file(): failed to decode '{}'.", path))?;
-        Ok(Image {
+            .map_err(|err| format!("Image::from_file(): failed to decode '{}'. ({err})", path))?;
+        Ok(Self {
             data: input.to_rgba8().to_vec(),
             width: input.width(),
             height: input.height(),
         })
+    }
+
+    pub fn new_atlas(images: &[Self]) -> (Self, Vec<Vector<u32, 2>>) {
+        let atlas_width = images.iter().map(Self::width).max().unwrap_or(0);
+        let atlas_height = images.iter().map(Self::height).sum();
+
+        let mut atlas = Self::new(atlas_width, atlas_height);
+        let mut image_origins = Vec::with_capacity(images.len());
+
+        let mut origin_y = 0;
+        for image in images {
+            let mut row_offset = (origin_y * atlas_width * 4) as usize;
+            for row_data in image.data().chunks_exact((image.width() * 4) as usize) {
+                atlas.data_mut()[row_offset .. (row_offset + row_data.len())]
+                    .copy_from_slice(row_data);
+                row_offset += (atlas_width * 4) as usize;
+            }
+
+            image_origins.push(Vector([0, origin_y]));
+            origin_y += image.height();
+        }
+
+        (atlas, image_origins)
     }
 
     pub fn width(&self) -> u32 {
@@ -1249,32 +1299,67 @@ impl Image {
     pub fn data(&self) -> &[u8] {
         &self.data
     }
+
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        &mut self.data
+    }
 }
 
-pub struct Texture {
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum TextureSampling {
+    Nearest = gl::NEAREST as isize,
+    Linear = gl::LINEAR as isize,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum TextureWrap {
+    ClampToEdge = gl::CLAMP_TO_EDGE as isize,
+    ClampToBorder = gl::CLAMP_TO_BORDER as isize,
+    MirroredRepeat = gl::MIRRORED_REPEAT as isize,
+    Repeat = gl::REPEAT as isize,
+    MirrorClampToEdge = gl::MIRROR_CLAMP_TO_EDGE as isize,
+}
+
+pub struct Texture2D {
     id: GLuint,
-    slot: Option<GLuint>,
+    slot: GLuint,
 }
 
-impl<'img> Texture {
-    pub fn from_image(image: &'img Image) -> Result<Texture, String> {
-        // TODO: options for wrapping and min/mag filters
-        let mut tex = Texture { id: 0, slot: None };
+impl Texture2D {
+    pub fn new(slot: GLuint) -> Self {
+        let mut texture = Self { id: 0, slot };
         unsafe {
-            gl::GenTextures(1, &mut tex.id);
-            gl::BindTexture(gl::TEXTURE_2D, tex.id);
-            gl::TexParameteri(
-                gl::TEXTURE_2D,
-                gl::TEXTURE_WRAP_S,
-                gl::MIRRORED_REPEAT as GLint,
-            );
-            gl::TexParameteri(
-                gl::TEXTURE_2D,
-                gl::TEXTURE_WRAP_T,
-                gl::MIRRORED_REPEAT as GLint,
-            );
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
+            gl::GenTextures(1, &mut texture.id);
+        }
+        texture
+    }
+
+    pub fn set_parameter_int(&mut self, parameter: GLenum, value: GLint) {
+        self.bind();
+        unsafe {
+            gl::TexParameteri(gl::TEXTURE_2D, parameter, value);
+        }
+    }
+
+    pub fn set_minify_filter(&mut self, sampling: TextureSampling) {
+        self.set_parameter_int(gl::TEXTURE_MIN_FILTER, sampling as GLint);
+    }
+
+    pub fn set_magnify_filter(&mut self, sampling: TextureSampling) {
+        self.set_parameter_int(gl::TEXTURE_MAG_FILTER, sampling as GLint);
+    }
+
+    pub fn set_wrap_s(&mut self, wrap: TextureWrap) {
+        self.set_parameter_int(gl::TEXTURE_WRAP_S, wrap as GLint);
+    }
+
+    pub fn set_wrap_t(&mut self, wrap: TextureWrap) {
+        self.set_parameter_int(gl::TEXTURE_WRAP_T, wrap as GLint);
+    }
+
+    pub fn load_from_image(&mut self, image: &Image) {
+        self.bind();
+        unsafe {
             gl::TexImage2D(
                 gl::TEXTURE_2D,
                 0,
@@ -1287,31 +1372,25 @@ impl<'img> Texture {
                 image.data().as_ptr() as *const GLvoid,
             );
         }
-        Ok(tex)
     }
 
     pub fn id(&self) -> GLuint {
         self.id
     }
 
-    pub fn slot(&self) -> Option<GLuint> {
+    pub fn slot(&self) -> GLuint {
         self.slot
     }
 
-    pub fn bind(&mut self, slot: u32) {
-        self.slot = Some(slot as GLuint);
+    pub fn bind(&self) {
         unsafe {
-            gl::ActiveTexture(gl::TEXTURE0 + slot);
+            gl::ActiveTexture(gl::TEXTURE0 + self.slot);
             gl::BindTexture(gl::TEXTURE_2D, self.id);
         }
     }
-
-    pub fn unbind(&mut self) {
-        self.slot = None;
-    }
 }
 
-impl Drop for Texture {
+impl Drop for Texture2D {
     fn drop(&mut self) {
         unsafe {
             gl::DeleteTextures(1, &self.id);

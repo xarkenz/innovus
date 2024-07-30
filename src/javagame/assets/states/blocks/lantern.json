@@ -1,0 +1,22 @@
+[
+  {
+    "attribute": "type",
+    "value": "floor",
+    "texture": "blocks/lantern/type_floor"
+  },
+  {
+    "attribute": "type",
+    "value": "hanging",
+    "texture": "blocks/lantern/type_hanging"
+  },
+  {
+    "attribute": "type",
+    "value": "left",
+    "texture": "blocks/lantern/type_left"
+  },
+  {
+    "attribute": "type",
+    "value": "right",
+    "texture": "blocks/lantern/type_right"
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "attribute": "shape",
+    "value": "center",
+    "texture": "blocks/phylumus_mushroom/shape_center_0"
+  },
+  {
+    "attribute": "shape",
+    "value": "center",
+    "texture": "blocks/phylumus_mushroom/shape_center_1"
+  },
+  {
+    "attribute": "shape",
+    "value": "left",
+    "texture": "blocks/phylumus_mushroom/shape_left"
+  },
+  {
+    "attribute": "shape",
+    "value": "right",
+    "texture": "blocks/phylumus_mushroom/shape_right"
+  }
+]

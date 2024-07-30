@@ -14,4 +14,7 @@ void main() {
     if (bool(frag_tex)) {
         final_frag_color *= texture(tex_atlas, frag_uv);
     }
+    if (final_frag_color.a <= 0.0) {
+        discard;
+    }
 }

@@ -7,20 +7,20 @@ pub const DEFAULT_FRICTION_DECELERATION: f32 = 256.0;
 
 pub fn apply_gravity(collider: &mut phys::Collider, dt: f32, acceleration: f32, terminal_velocity: f32) {
     if !collider.fixed {
-        if collider.vel.y() - acceleration * dt < -terminal_velocity {
-            collider.vel.set_y(-terminal_velocity);
+        if collider.velocity.y() - acceleration * dt < -terminal_velocity {
+            collider.velocity.set_y(-terminal_velocity);
         } else {
-            collider.vel.set_y(collider.vel.y() - acceleration * dt);
+            collider.velocity.set_y(collider.velocity.y() - acceleration * dt);
         }
     }
 }
 
 pub fn apply_friction(collider: &mut phys::Collider, dt: f32, deceleration: f32) {
-    if !collider.fixed && collider.vel.x() != 0.0 {
-        let x_sign = collider.vel.x().signum();
-        collider.vel.set_x(collider.vel.x() - x_sign * deceleration * dt);
-        if collider.vel.x().signum() != x_sign {
-            collider.vel.set_x(0.0);
+    if !collider.fixed && collider.velocity.x() != 0.0 {
+        let x_sign = collider.velocity.x().signum();
+        collider.velocity.set_x(collider.velocity.x() - x_sign * deceleration * dt);
+        if collider.velocity.x().signum() != x_sign {
+            collider.velocity.set_x(0.0);
         }
     }
 }

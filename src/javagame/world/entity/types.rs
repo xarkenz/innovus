@@ -27,7 +27,7 @@ impl Player {
             uuid: generate_uuid(),
             position,
             collider: physics.add_collider(phys::Collider::new(
-                Rectangle::new(position.x() - 6.0, position.y(), 12.0, 27.0),
+                Rectangle::from_size(Vector([position.x() - 6.0, position.y()]), Vector([12.0, 27.0])),
                 Vector::zero(),
             )),
             geometry: Geometry::new_render().unwrap(),
@@ -50,8 +50,8 @@ impl Player {
         let collider = physics.get_collider_mut(&self.collider).unwrap();
 
         if let Some(Vector([x, y])) = self.spawn_point {
-            collider.rect.set_x(x as f32 - 0.5 * collider.rect.width());
-            collider.rect.set_y(y as f32);
+            collider.rectangle.shift_min_x_to(x as f32 - 0.5 * collider.rectangle.width());
+            collider.rectangle.shift_min_y_to(y as f32);
             // if not colliding, return
         }
 
@@ -88,7 +88,7 @@ impl Entity for Player {
         }
         if self.jump_cooldown <= 0.0 {
             if inputs.key_is_held(input::Key::Space) /*&& collider.is_grounded()*/ {
-                collider.vel.set_y(self.jump_speed);
+                collider.velocity.set_y(self.jump_speed);
                 self.jump_cooldown = JUMP_COOLDOWN_SECONDS;
             }
         } else {
@@ -97,10 +97,10 @@ impl Entity for Player {
 
         if inputs.key_is_held(input::Key::Z) {
             self.crouching = true;
-            collider.rect.set_height(23.0);
+            collider.rectangle.set_max_y(collider.rectangle.min_y() + 23.0);
         } else {
             self.crouching = false;
-            collider.rect.set_height(27.0);
+            collider.rectangle.set_max_y(collider.rectangle.min_y() + 27.0);
         }
 
         let speed_multiplier = if self.crouching /*&& collider.is_grounded()*/ {

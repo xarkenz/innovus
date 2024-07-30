@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::{tools::*, *};
+use crate::world::block::BlockRenderer;
 
 pub mod block;
 pub mod entity;
@@ -54,9 +55,9 @@ impl World {
         }
     }
 
-    pub fn render(&mut self, dt: f32) {
+    pub fn render(&mut self, dt: f32, block_renderer: &BlockRenderer) {
         for (_location, chunk) in &mut self.chunks {
-            chunk.render(dt);
+            chunk.render(dt, block_renderer);
         }
         for entity in &mut self.entities {
             entity.render(dt);

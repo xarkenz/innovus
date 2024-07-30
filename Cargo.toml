@@ -16,6 +16,10 @@ path = "src/javagame/main.rs"
 name = "snek"
 path = "src/snek/main.rs"
 
+[[bin]]
+name = "stratego"
+path = "src/stratego/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

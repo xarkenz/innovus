@@ -10,7 +10,9 @@ pub fn bind_glfw(manager: &glfw::Glfw) {
 
 
 pub fn set_clear_color(r: GLfloat, g: GLfloat, b: GLfloat) {
-    unsafe { gl::ClearColor(r, g, b, 1.0); }
+    unsafe {
+        gl::ClearColor(r, g, b, 1.0);
+    }
 }
 
 pub enum Blend {
@@ -21,11 +23,16 @@ pub enum Blend {
 
 pub fn set_blend(blend: Blend) {
     unsafe {
-        gl::Enable(gl::BLEND);
-        match blend {
-            Blend::None => gl::Disable(gl::BLEND),
-            Blend::Transparency => gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA),
-            Blend::Custom(src, dest) => gl::BlendFunc(src, dest),
+        if let Blend::None = blend {
+            gl::Disable(gl::BLEND);
+        }
+        else {
+            gl::Enable(gl::BLEND);
+            match blend {
+                Blend::None => unreachable!(),
+                Blend::Transparency => gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA),
+                Blend::Custom(src, dest) => gl::BlendFunc(src, dest),
+            }
         }
     }
 }
@@ -34,7 +41,8 @@ pub fn set_culling(enable: bool) {
     unsafe {
         if enable {
             gl::Enable(gl::CULL_FACE);
-        } else {
+        }
+        else {
             gl::Disable(gl::CULL_FACE);
         }
     }
@@ -45,14 +53,17 @@ pub fn set_depth_testing(enable: bool) {
         if enable {
             gl::Enable(gl::DEPTH_TEST);
             gl::DepthFunc(gl::LEQUAL);
-        } else {
+        }
+        else {
             gl::Disable(gl::DEPTH_TEST);
         }
     }
 }
 
-pub fn set_viewport(x: i32, y: i32, width: usize, height: usize) {
-    unsafe { gl::Viewport(x as GLint, y as GLint, width as GLsizei, height as GLsizei); }
+pub fn set_viewport(x: i32, y: i32, width: i32, height: i32) {
+    unsafe {
+        gl::Viewport(x as GLint, y as GLint, width as GLsizei, height as GLsizei);
+    }
 }
 
 

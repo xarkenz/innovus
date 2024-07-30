@@ -1,0 +1,12 @@
+[
+  {
+    "attribute": "axis",
+    "value": "x",
+    "texture": "blocks/chain/axis_x"
+  },
+  {
+    "attribute": "axis",
+    "value": "y",
+    "texture": "blocks/chain/axis_y"
+  }
+]

@@ -1,12 +1,14 @@
-use std::sync::mpsc::Receiver;
-use glfw::{Action, Modifiers, MouseButton, WindowEvent};
+use glfw::{Action, Modifiers, WindowEvent};
 use innovus::{Application, WindowEventReceiver};
 
-pub use glfw::Key;
+pub use glfw::{Key, MouseButton, MouseButtonLeft, MouseButtonRight, MouseButtonMiddle};
 
 const FIRST_KEY_VALUE: usize = glfw::ffi::KEY_SPACE as usize;
 const LAST_KEY_VALUE: usize = glfw::ffi::KEY_LAST as usize;
 const KEY_ARRAY_SIZE: usize = LAST_KEY_VALUE - FIRST_KEY_VALUE + 1;
+const FIRST_MOUSE_BUTTON_VALUE: usize = glfw::ffi::MOUSE_BUTTON_1 as usize;
+const LAST_MOUSE_BUTTON_VALUE: usize = glfw::ffi::MOUSE_BUTTON_LAST as usize;
+const MOUSE_BUTTON_ARRAY_SIZE: usize = LAST_MOUSE_BUTTON_VALUE - FIRST_MOUSE_BUTTON_VALUE + 1;
 
 const fn get_key_index(key: Key) -> Option<usize> {
     let key = key as usize;
@@ -17,9 +19,19 @@ const fn get_key_index(key: Key) -> Option<usize> {
     }
 }
 
+const fn get_mouse_button_index(button: MouseButton) -> Option<usize> {
+    let button = button as usize;
+    if FIRST_MOUSE_BUTTON_VALUE <= button && button <= LAST_MOUSE_BUTTON_VALUE {
+        Some(button - FIRST_MOUSE_BUTTON_VALUE)
+    } else {
+        None
+    }
+}
+
 pub struct InputState {
     event_receiver: WindowEventReceiver,
     held_keys: [bool; KEY_ARRAY_SIZE],
+    held_mouse_buttons: [bool; MOUSE_BUTTON_ARRAY_SIZE],
 }
 
 impl InputState {
@@ -27,6 +39,7 @@ impl InputState {
         Self {
             event_receiver,
             held_keys: [false; KEY_ARRAY_SIZE],
+            held_mouse_buttons: [false; MOUSE_BUTTON_ARRAY_SIZE],
         }
     }
 
@@ -57,7 +70,13 @@ impl InputState {
     }
 
     pub fn handle_mouse_button(&mut self, button: MouseButton, action: Action, mods: Modifiers) {
-        // TODO
+        if let Some(button_index) = get_mouse_button_index(button) {
+            match action {
+                Action::Press => self.held_mouse_buttons[button_index] = true,
+                Action::Release => self.held_mouse_buttons[button_index] = false,
+                _ => {}
+            }
+        }
     }
 
     pub fn handle_cursor_pos(&mut self, x: f64, y: f64) {
@@ -67,6 +86,14 @@ impl InputState {
     pub fn key_is_held(&self, key: Key) -> bool {
         if let Some(key_index) = get_key_index(key) {
             self.held_keys[key_index]
+        } else {
+            false
+        }
+    }
+
+    pub fn mouse_button_is_held(&self, button: MouseButton) -> bool {
+        if let Some(button_index) = get_mouse_button_index(button) {
+            self.held_mouse_buttons[button_index]
         } else {
             false
         }
