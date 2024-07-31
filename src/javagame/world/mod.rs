@@ -56,8 +56,13 @@ impl World {
     }
 
     pub fn render(&mut self, dt: f32, block_renderer: &BlockRenderer) {
-        for (_location, chunk) in &mut self.chunks {
-            chunk.render(dt, block_renderer);
+        let chunk_locations = Vec::from_iter(self.chunks.keys().cloned());
+        for location in chunk_locations {
+            // TODO: need a better way for chunks to gather information from adjacent chunks
+            // We can safely unwrap because the entry is guaranteed to exist
+            let mut chunk = self.chunks.remove(&location).unwrap();
+            chunk.render(dt, block_renderer, self);
+            self.chunks.insert(location, chunk);
         }
         for entity in &mut self.entities {
             entity.render(dt);

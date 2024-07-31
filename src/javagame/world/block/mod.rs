@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use innovus::{gfx::*, tools::*};
 use std::fmt::Formatter;
+use num::Integer;
+use crate::world::World;
 
 pub mod types;
 
@@ -62,13 +64,13 @@ impl std::fmt::Debug for BlockType {
     }
 }
 
-pub const BLOCK_QUAD_OFFSETS: [Vector<f32, 2>; 4] = [
+pub const BLOCK_QUAD_OFFSETS: [Vector2f; 4] = [
     Vector([0.0, 0.5]), // Top left
     Vector([0.5, 0.5]), // Top right
     Vector([0.0, 0.0]), // Bottom left
     Vector([0.5, 0.0]), // Bottom right
 ];
-pub const BLOCK_QUAD_VERTEX_OFFSETS: [Vector<f32, 2>; 4] = [
+pub const BLOCK_QUAD_VERTEX_OFFSETS: [Vector2f; 4] = [
     Vector([0.0, 0.0]), // Bottom left
     Vector([0.0, 0.5]), // Top left
     Vector([0.5, 0.5]), // Top right
@@ -78,11 +80,82 @@ pub const VERTICES_PER_BLOCK: usize = BLOCK_QUAD_OFFSETS.len() * BLOCK_QUAD_VERT
 
 #[derive(Debug)]
 pub struct BlockAppearance {
+    pub block_type: &'static BlockType,
     pub offset: Vector<u32, 2>,
+    pub resolution: u32,
+}
+
+impl BlockAppearance {
+    fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
+        if value < 0 {
+            (-1, (value + CHUNK_SIZE as isize) as usize)
+        }
+        else if value >= CHUNK_SIZE as isize {
+            (1, (value - CHUNK_SIZE as isize) as usize)
+        }
+        else {
+            (0, value as usize)
+        }
+    }
+
+    fn get_block_type(world: &World, chunk: &Chunk, x: isize, y: isize) -> &'static BlockType {
+        let (chunk_offset_x, x) = Self::resolve_relative_coordinate(x);
+        let (chunk_offset_y, y) = Self::resolve_relative_coordinate(y);
+
+        if chunk_offset_x == 0 && chunk_offset_y == 0 {
+            chunk.block_at(x, y).block_type
+        }
+        else {
+            match world.get_chunk(Vector([
+                chunk.location().x() + chunk_offset_x,
+                chunk.location().y() + chunk_offset_y,
+            ])) {
+                Some(chunk) => chunk.block_at(x, y).block_type,
+                None => &types::AIR,
+            }
+        }
+    }
+
+    fn get_connect(&self, world: &World, chunk: &Chunk, x: isize, y: isize) -> bool {
+        self.block_type.connects_to(Self::get_block_type(world, chunk, x, y))
+    }
+
+    fn get_quad_type(&self, world: &World, chunk: &Chunk, x: isize, y: isize, x_connect: bool, y_connect: bool) -> u32 {
+        match (x_connect, y_connect) {
+            (false, false) => 0,
+            (true, false) => 1,
+            (false, true) => 2,
+            (true, true) => if self.get_connect(world, chunk, x, y) { 4 } else { 3 },
+        }
+    }
+
+    pub fn get_quad_uv_offsets(&self, world: &World, chunk: &Chunk, x: usize, y: usize) -> [Vector<u32, 2>; 4] {
+        let left_x = x as isize - 1;
+        let right_x = x as isize + 1;
+        let down_y = y as isize - 1;
+        let up_y = y as isize + 1;
+
+        let left_connect = self.get_connect(world, chunk, left_x, y as isize);
+        let right_connect = self.get_connect(world, chunk, right_x, y as isize);
+        let down_connect = self.get_connect(world, chunk, x as isize, down_y);
+        let up_connect = self.get_connect(world, chunk, x as isize, up_y);
+
+        let quad_types: [u32; 4] = [
+            self.get_quad_type(world, chunk, left_x, up_y, left_connect, up_connect),
+            self.get_quad_type(world, chunk, right_x, up_y, right_connect, up_connect),
+            self.get_quad_type(world, chunk, left_x, down_y, left_connect, down_connect),
+            self.get_quad_type(world, chunk, right_x, down_y, right_connect, down_connect),
+        ];
+
+        quad_types.map(|quad_type| Vector([
+            self.offset.x() + quad_type * self.resolution,
+            self.offset.y(),
+        ]))
+    }
 }
 
 pub struct BlockRenderer {
-    pub atlas: Image,
+    atlas: Image,
     texture: Texture2D,
     appearances: HashMap<*const BlockType, BlockAppearance>,
 }
@@ -102,7 +175,9 @@ impl BlockRenderer {
             .zip(offsets)
             .map(|(&block_type, offset)| {
                 let appearance = BlockAppearance {
+                    block_type,
                     offset,
+                    resolution: 16,
                 };
                 (block_type as *const BlockType, appearance)
             }));
@@ -119,6 +194,14 @@ impl BlockRenderer {
             texture,
             appearances,
         })
+    }
+
+    pub fn atlas(&self) -> &Image {
+        &self.atlas
+    }
+
+    pub fn texture(&self) -> &Texture2D {
+        &self.texture
     }
 
     pub fn get_appearance(&self, block_type: &'static BlockType) -> Option<&BlockAppearance> {
@@ -209,7 +292,7 @@ impl Chunk {
         // TODO
     }
 
-    pub fn render(&mut self, dt: f32, renderer: &BlockRenderer) {
+    pub fn render(&mut self, dt: f32, renderer: &BlockRenderer, world: &World) {
         if self.geometry.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
@@ -240,7 +323,7 @@ impl Chunk {
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     if self.is_dirty_at(x, y) {
-                        self.update_block_vertices(x, y, renderer);
+                        self.update_block_vertices(x, y, renderer, world);
                         self.set_dirty_at(x, y, false);
                         dirty_count += 1;
                     }
@@ -253,20 +336,21 @@ impl Chunk {
         self.geometry.render();
     }
 
-    fn update_block_vertices(&mut self, x: usize, y: usize, renderer: &BlockRenderer) {
+    fn update_block_vertices(&mut self, x: usize, y: usize, renderer: &BlockRenderer, world: &World) {
         // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
         let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
         if let Some(appearance) = renderer.get_appearance(self.block_at(x, y).block_type) {
             let mut index = first_index;
-            for quad_offset in BLOCK_QUAD_OFFSETS {
+            let uv_offsets = appearance.get_quad_uv_offsets(world, self, x, y);
+            for (quad_offset, uv_offset) in std::iter::zip(BLOCK_QUAD_OFFSETS, uv_offsets) {
                 for vertex_offset in BLOCK_QUAD_VERTEX_OFFSETS {
                     let mut vertex = self.geometry.get_vertex(index);
                     vertex.color = [1.0; 4];
                     vertex.tex = true;
                     let pos = quad_offset + vertex_offset;
                     vertex.uv = [
-                        appearance.offset.x() as f32 + pos.x() * 16.0,
-                        appearance.offset.y() as f32 + (1.0 - pos.y()) * 16.0,
+                        uv_offset.x() as f32 + pos.x() * appearance.resolution as f32,
+                        uv_offset.y() as f32 + (1.0 - pos.y()) * appearance.resolution as f32,
                     ];
                     self.geometry.set_vertex(index, &vertex);
                     index += 1;

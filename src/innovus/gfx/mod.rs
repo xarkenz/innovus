@@ -29,7 +29,7 @@ pub enum ShaderType {
     Compute = gl::COMPUTE_SHADER as isize,
     Geometry = gl::GEOMETRY_SHADER as isize,
     TessControl = gl::TESS_CONTROL_SHADER as isize,
-    TessEval = gl::TESS_EVALUATION_SHADER as isize,
+    TessEvaluation = gl::TESS_EVALUATION_SHADER as isize,
 }
 
 pub struct Shader {
@@ -37,7 +37,7 @@ pub struct Shader {
 }
 
 impl Shader {
-    pub fn create(source: &str, shader_type: ShaderType) -> Result<Shader, String> {
+    pub fn create(source: &str, shader_type: ShaderType) -> Result<Self, String> {
         let source = CString::new(source)
             .map_err(|err| err.to_string())?;
 
@@ -45,7 +45,7 @@ impl Shader {
         if id == 0 {
             return Err("Shader::create(): failed to create GL shader object.".into());
         }
-        let shader = Shader { id };
+        let shader = Self { id };
 
         unsafe {
             gl::ShaderSource(id, 1, &source.as_ptr(), std::ptr::null());
@@ -252,12 +252,12 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_shaders(shaders: &[Shader]) -> Result<Program, String> {
+    pub fn from_shaders(shaders: &[Shader]) -> Result<Self, String> {
         let id = unsafe { gl::CreateProgram() };
         if id == 0 {
             return Err("Program::from_shaders(): failed to create GL program.".into());
         }
-        let program = Program { id };
+        let program = Self { id };
 
         for shader in shaders {
             unsafe {
@@ -286,11 +286,11 @@ impl Program {
         Ok(program)
     }
 
-    pub fn from_preset(preset: ProgramPreset) -> Result<Program, String> {
+    pub fn from_preset(preset: ProgramPreset) -> Result<Self, String> {
         let fetch_source = |path| std::fs::read_to_string(path)
             .map_err(|err| err.to_string());
 
-        Program::from_shaders(&match preset {
+        Self::from_shaders(&match preset {
             ProgramPreset::Default2DShader => vec![
                 Shader::create(
                     &fetch_source("./src/innovus/assets/default2d.v.glsl")?,
@@ -597,8 +597,7 @@ impl<V: Vertex> Geometry<V> {
             gl::GenBuffers(1, &mut self.ebo);
             if self.ebo == 0 {
                 return Err(
-                    "Geometry::enable_render(): failed to create GL element buffer object."
-                        .to_string(),
+                    "Geometry::enable_render(): failed to create GL element buffer object.".into(),
                 );
             }
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ebo);
@@ -1223,7 +1222,7 @@ impl FromStr for Geometry<Vertex3D> {
             }
         }
 
-        Ok(Geometry::from_data(&vertices, &faces))
+        Ok(Self::from_data(&vertices, &faces))
     }
 }
 
@@ -1255,9 +1254,9 @@ impl Image {
 
     pub fn from_file(path: &str) -> Result<Self, String> {
         let input = image::io::Reader::open(path)
-            .map_err(|err| format!("Image::from_file(): failed to open '{}'. ({err})", path))?
+            .map_err(|err| format!("Image::from_file(): failed to open '{path}'. ({err})"))?
             .decode()
-            .map_err(|err| format!("Image::from_file(): failed to decode '{}'. ({err})", path))?;
+            .map_err(|err| format!("Image::from_file(): failed to decode '{path}'. ({err})"))?;
         Ok(Self {
             data: input.to_rgba8().to_vec(),
             width: input.width(),

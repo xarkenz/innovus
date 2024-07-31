@@ -23,7 +23,6 @@ fn main() {
     let shader_program = Program::from_preset(ProgramPreset::Default2DShader).unwrap();
     screen::set_clear_color(0.6, 0.8, 1.0);
     screen::set_blend(screen::Blend::Transparency);
-    screen::set_viewport(0, 0, 1200, 800);
 
     let mut input_state = input::InputState::new(event_receiver);
 
@@ -41,6 +40,7 @@ fn main() {
         Vector([0.0, 0.0]),
         Vector({
             let (width, height) = window.get_size();
+            screen::set_viewport(0, 0, width, height);
             [width as f32, height as f32]
         }),
     );
