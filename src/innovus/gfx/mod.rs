@@ -1265,23 +1265,40 @@ impl Image {
     }
 
     pub fn new_atlas(images: &[Self]) -> (Self, Vec<Vector<u32, 2>>) {
-        let atlas_width = images.iter().map(Self::width).max().unwrap_or(0);
-        let atlas_height = images.iter().map(Self::height).sum();
+        let atlas_width = images.iter().map(Self::width).max().map_or(0, |width| width + 2);
+        let atlas_height = images.iter().map(Self::height).sum::<u32>() + 2 * images.len() as u32;
 
         let mut atlas = Self::new(atlas_width, atlas_height);
         let mut image_origins = Vec::with_capacity(images.len());
 
-        let mut origin_y = 0;
+        fn write_row(atlas: &mut Image, offset: usize, data: &[u8]) {
+            atlas.data_mut()[offset - 4 ..offset]
+                .copy_from_slice(&data[0 .. 4]);
+            atlas.data_mut()[offset.. offset + data.len()]
+                .copy_from_slice(data);
+            atlas.data_mut()[offset + data.len() .. offset + data.len() + 4]
+                .copy_from_slice(&data[data.len() - 4 .. data.len()]);
+        }
+
+        let mut origin_y = 1;
         for image in images {
-            let mut row_offset = (origin_y * atlas_width * 4) as usize;
-            for row_data in image.data().chunks_exact((image.width() * 4) as usize) {
-                atlas.data_mut()[row_offset .. (row_offset + row_data.len())]
-                    .copy_from_slice(row_data);
+            let mut row_offset = ((origin_y - 1) * atlas_width * 4) as usize + 4;
+            for (row_index, row_data) in image.data().chunks_exact((image.width() * 4) as usize).enumerate() {
+                if row_index == 0 {
+                    write_row(&mut atlas, row_offset, row_data);
+                    row_offset += (atlas_width * 4) as usize;
+                }
+
+                write_row(&mut atlas, row_offset, row_data);
                 row_offset += (atlas_width * 4) as usize;
+
+                if row_index == image.height() as usize - 1 {
+                    write_row(&mut atlas, row_offset, row_data);
+                }
             }
 
-            image_origins.push(Vector([0, origin_y]));
-            origin_y += image.height();
+            image_origins.push(Vector([1, origin_y]));
+            origin_y += image.height() + 2;
         }
 
         (atlas, image_origins)

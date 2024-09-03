@@ -58,6 +58,13 @@ impl BlockType {
     }
 }
 
+impl PartialEq for BlockType {
+    fn eq(&self, other: &Self) -> bool {
+        // Comparing pointers is sufficient
+        self as *const Self == other as *const Self
+    }
+}
+
 impl std::fmt::Debug for BlockType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "BlockType({})", self.name)
@@ -269,6 +276,7 @@ impl Chunk {
 
     pub fn set_block_at(&mut self, x: usize, y: usize, block: Block) {
         self.blocks[y][x] = block;
+        self.set_dirty_at(x, y, true);
     }
 
     pub fn is_dirty_at(&self, x: usize, y: usize) -> bool {

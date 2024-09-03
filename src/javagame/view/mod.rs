@@ -12,7 +12,7 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(position: Vector<f32, 2>, size: Vector<f32, 2>) -> Self {
-        Camera {
+        Self {
             view: Transform3D::identity(),
             projection: Transform3D::identity(),
             position,
@@ -57,11 +57,15 @@ impl Camera {
         self.zoom = zoom;
     }
 
+    pub fn get_world_pos(&self, screen_pos: Vector<f32, 2>) -> Vector<f32, 2> {
+        (screen_pos - self.size * 0.5) * Vector([1.0, -1.0]) / self.zoom + self.position
+    }
+
     pub fn update(&mut self, _dt: f32) {
         self.view.reset_to_identity();
         self.view.look_at(
-            Vector([self.position.x(), self.position.y(), 20.0]),
-            Vector([self.position.x(), self.position.y(), -1.0]),
+            Vector([self.position.x(), self.position.y(), 1.0]),
+            Vector([self.position.x(), self.position.y(), 0.0]),
             Vector([0.0, 1.0, 0.0]),
         );
 

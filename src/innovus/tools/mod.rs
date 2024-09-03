@@ -1,14 +1,14 @@
 use num::{traits::NumAssign, Float, Signed};
 use std::cmp::Ordering;
-use std::{fmt::*, ops::*};
+use std::{fmt, ops::*};
 
 pub use uuid::Uuid;
 
 pub mod phys;
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
-pub struct Vector<T: NumAssign + Copy + Debug, const N: usize>(
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct Vector<T: NumAssign + Copy, const N: usize>(
     pub [T; N],
 );
 
@@ -16,18 +16,15 @@ pub type Vector2i = Vector<i32, 2>;
 pub type Vector2f = Vector<f32, 2>;
 pub type Vector2d = Vector<f64, 2>;
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Eq for Vector<T, N> where T: Eq {}
+impl<T: NumAssign + Copy, const N: usize> Eq for Vector<T, N> where T: Eq {}
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Ord for Vector<T, N>
-where
-    T: Ord,
-{
+impl<T: NumAssign + Copy, const N: usize> Ord for Vector<T, N> where T: Ord {
     fn cmp(&self, other: &Self) -> Ordering {
         <Self as PartialOrd>::partial_cmp(self, other).unwrap()
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
     pub fn zero() -> Self {
         Vector([T::zero(); N])
     }
@@ -61,7 +58,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> Vector<T, N> {
     }
 }
 
-impl<T: Float + NumAssign + Debug, const N: usize> Vector<T, N> {
+impl<T: Float + NumAssign, const N: usize> Vector<T, N> {
     pub fn magnitude(&self) -> T {
         self.dot(self).sqrt()
     }
@@ -76,7 +73,7 @@ impl<T: Float + NumAssign + Debug, const N: usize> Vector<T, N> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug> Vector<T, 2> {
+impl<T: NumAssign + Copy> Vector<T, 2> {
     pub fn x(&self) -> T {
         self.0[0]
     }
@@ -94,7 +91,7 @@ impl<T: NumAssign + Copy + Debug> Vector<T, 2> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug> Vector<T, 3> {
+impl<T: NumAssign + Copy> Vector<T, 3> {
     pub fn x(&self) -> T {
         self.0[0]
     }
@@ -128,7 +125,7 @@ impl<T: NumAssign + Copy + Debug> Vector<T, 3> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug> Vector<T, 4> {
+impl<T: NumAssign + Copy> Vector<T, 4> {
     pub fn x(&self) -> T {
         self.0[0]
     }
@@ -162,7 +159,7 @@ impl<T: NumAssign + Copy + Debug> Vector<T, 4> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Index<usize> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> Index<usize> for Vector<T, N> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -170,13 +167,13 @@ impl<T: NumAssign + Copy + Debug, const N: usize> Index<usize> for Vector<T, N> 
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> IndexMut<usize> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> IndexMut<usize> for Vector<T, N> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         self.0.index_mut(index)
     }
 }
 
-impl<T: Signed + NumAssign + Copy + Debug, const N: usize> Neg for Vector<T, N> {
+impl<T: Signed + NumAssign + Copy, const N: usize> Neg for Vector<T, N> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -184,7 +181,7 @@ impl<T: Signed + NumAssign + Copy + Debug, const N: usize> Neg for Vector<T, N> 
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Add<Self> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> Add<Self> for Vector<T, N> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -196,7 +193,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> Add<Self> for Vector<T, N> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> AddAssign<Self> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> AddAssign<Self> for Vector<T, N> {
     fn add_assign(&mut self, rhs: Self) {
         for index in 0..N {
             self[index] += rhs[index];
@@ -204,7 +201,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> AddAssign<Self> for Vector<T, 
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Sub<Self> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> Sub<Self> for Vector<T, N> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -216,7 +213,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> Sub<Self> for Vector<T, N> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> SubAssign<Self> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> SubAssign<Self> for Vector<T, N> {
     fn sub_assign(&mut self, rhs: Self) {
         for index in 0..N {
             self[index] -= rhs[index];
@@ -224,7 +221,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> SubAssign<Self> for Vector<T, 
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Mul<Self> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> Mul<Self> for Vector<T, N> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -236,7 +233,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> Mul<Self> for Vector<T, N> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> MulAssign<Self> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> MulAssign<Self> for Vector<T, N> {
     fn mul_assign(&mut self, rhs: Self) {
         for index in 0..N {
             self[index] *= rhs[index];
@@ -244,7 +241,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> MulAssign<Self> for Vector<T, 
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Div<Self> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> Div<Self> for Vector<T, N> {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
@@ -256,7 +253,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> Div<Self> for Vector<T, N> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> DivAssign<Self> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> DivAssign<Self> for Vector<T, N> {
     fn div_assign(&mut self, rhs: Self) {
         for index in 0..N {
             self[index] /= rhs[index];
@@ -264,7 +261,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> DivAssign<Self> for Vector<T, 
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Mul<T> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> Mul<T> for Vector<T, N> {
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self::Output {
@@ -276,7 +273,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> Mul<T> for Vector<T, N> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> MulAssign<T> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> MulAssign<T> for Vector<T, N> {
     fn mul_assign(&mut self, rhs: T) {
         for index in 0..N {
             self[index] *= rhs;
@@ -284,7 +281,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> MulAssign<T> for Vector<T, N> 
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> Div<T> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> Div<T> for Vector<T, N> {
     type Output = Self;
 
     fn div(self, rhs: T) -> Self::Output {
@@ -296,7 +293,7 @@ impl<T: NumAssign + Copy + Debug, const N: usize> Div<T> for Vector<T, N> {
     }
 }
 
-impl<T: NumAssign + Copy + Debug, const N: usize> DivAssign<T> for Vector<T, N> {
+impl<T: NumAssign + Copy, const N: usize> DivAssign<T> for Vector<T, N> {
     fn div_assign(&mut self, rhs: T) {
         for index in 0..N {
             self[index] /= rhs;
@@ -304,16 +301,22 @@ impl<T: NumAssign + Copy + Debug, const N: usize> DivAssign<T> for Vector<T, N> 
     }
 }
 
+impl<T: NumAssign + Copy, const N: usize> fmt::Debug for Vector<T, N> where T: fmt::Debug {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Vector{:?}", self.0)
+    }
+}
+
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
-pub struct Matrix<T: Float + NumAssign + Debug, const R: usize, const C: usize>(
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct Matrix<T: Float + NumAssign, const R: usize, const C: usize>(
     pub [Vector<T, R>; C],
 );
 
 pub type Transform2D = Matrix<f32, 3, 3>;
 pub type Transform3D = Matrix<f32, 4, 4>;
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Matrix<T, R, C> {
+impl<T: Float + NumAssign, const R: usize, const C: usize> Matrix<T, R, C> {
     pub fn zero() -> Self {
         Matrix([Vector::zero(); C])
     }
@@ -330,7 +333,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Matrix<T, R, 
         self.0[col][row] = value;
     }
 
-    pub unsafe fn as_ptr(&self) -> *const T {
+    pub fn as_ptr(&self) -> *const T {
         self.0.as_ptr() as *const T
     }
 
@@ -388,7 +391,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Matrix<T, R, 
     }
 }
 
-impl<T: Float + NumAssign + Debug, const N: usize> Matrix<T, N, N> {
+impl<T: Float + NumAssign, const N: usize> Matrix<T, N, N> {
     pub fn identity() -> Self {
         let mut matrix = Matrix::zero();
         for n in 0..N {
@@ -467,6 +470,49 @@ impl Transform3D {
         self[2] *= by;
     }
 
+    pub fn inverted(&self) -> Self {
+        // Borrowed from JOML (github.com/JOML-CI/JOML)
+        let a = self[0][0] * self[1][1] - self[0][1] * self[1][0];
+        let b = self[0][0] * self[1][2] - self[0][2] * self[1][0];
+        let c = self[0][0] * self[1][3] - self[0][3] * self[1][0];
+        let d = self[0][1] * self[1][2] - self[0][2] * self[1][1];
+        let e = self[0][1] * self[1][3] - self[0][3] * self[1][1];
+        let f = self[0][2] * self[1][3] - self[0][3] * self[1][2];
+        let g = self[2][0] * self[3][1] - self[2][1] * self[3][0];
+        let h = self[2][0] * self[3][2] - self[2][2] * self[3][0];
+        let i = self[2][0] * self[3][3] - self[2][3] * self[3][0];
+        let j = self[2][1] * self[3][2] - self[2][2] * self[3][1];
+        let k = self[2][1] * self[3][3] - self[2][3] * self[3][1];
+        let l = self[2][2] * self[3][3] - self[2][3] * self[3][2];
+
+        Self([
+            Vector([
+                l.mul_add(self[1][1], k.mul_add(-self[1][2], j * self[1][3])),
+                l.mul_add(-self[0][1], k.mul_add(self[0][2], j * -self[0][3])),
+                f.mul_add(self[3][1], e.mul_add(-self[3][2], d * self[3][3])),
+                f.mul_add(-self[2][1], e.mul_add(self[2][2], d * -self[2][3])),
+            ]),
+            Vector([
+                l.mul_add(-self[1][0], i.mul_add(self[1][2], h * -self[1][3])),
+                l.mul_add(self[0][0], i.mul_add(-self[0][2], h * self[0][3])),
+                f.mul_add(-self[3][0], c.mul_add(self[3][2], b * -self[3][3])),
+                f.mul_add(self[2][0], c.mul_add(-self[2][2], b * self[2][3])),
+            ]),
+            Vector([
+                k.mul_add(self[1][0], i.mul_add(-self[1][1], g * self[1][3])),
+                k.mul_add(-self[0][0], i.mul_add(self[0][1], g * -self[0][3])),
+                e.mul_add(self[3][0], c.mul_add(-self[3][1], a * self[3][3])),
+                e.mul_add(-self[2][0], c.mul_add(self[2][1], a * -self[2][3])),
+            ]),
+            Vector([
+                j.mul_add(-self[1][0], h.mul_add(self[1][1], g * -self[1][2])),
+                j.mul_add(self[0][0], h.mul_add(-self[0][1], g * self[0][2])),
+                d.mul_add(-self[3][0], b.mul_add(self[3][1], a * -self[3][2])),
+                d.mul_add(self[2][0], b.mul_add(-self[2][1], a * self[2][2])),
+            ]),
+        ])
+    }
+
     pub fn set_look_at(&mut self, eye: Vector<f32, 3>, center: Vector<f32, 3>, up: Vector<f32, 3>) {
         let forward = (eye - center).normalized();
         let right = up.cross(&forward).normalized();
@@ -539,7 +585,7 @@ impl Transform3D {
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Index<usize>
+impl<T: Float + NumAssign, const R: usize, const C: usize> Index<usize>
     for Matrix<T, R, C>
 {
     type Output = Vector<T, R>;
@@ -549,7 +595,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Index<usize>
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> IndexMut<usize>
+impl<T: Float + NumAssign, const R: usize, const C: usize> IndexMut<usize>
     for Matrix<T, R, C>
 {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
@@ -557,7 +603,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> IndexMut<usiz
     }
 }
 
-impl<T: Signed + Float + NumAssign + Debug, const R: usize, const C: usize> Neg
+impl<T: Signed + Float + NumAssign, const R: usize, const C: usize> Neg
     for Matrix<T, R, C>
 {
     type Output = Self;
@@ -567,7 +613,7 @@ impl<T: Signed + Float + NumAssign + Debug, const R: usize, const C: usize> Neg
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Mul<T> for Matrix<T, R, C> {
+impl<T: Float + NumAssign, const R: usize, const C: usize> Mul<T> for Matrix<T, R, C> {
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self::Output {
@@ -579,7 +625,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Mul<T> for Ma
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Div<T> for Matrix<T, R, C> {
+impl<T: Float + NumAssign, const R: usize, const C: usize> Div<T> for Matrix<T, R, C> {
     type Output = Self;
 
     fn div(self, rhs: T) -> Self::Output {
@@ -591,7 +637,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Div<T> for Ma
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Mul<Vector<T, C>>
+impl<T: Float + NumAssign, const R: usize, const C: usize> Mul<Vector<T, C>>
     for Matrix<T, R, C>
 {
     type Output = Vector<T, R>;
@@ -606,7 +652,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Mul<Vector<T,
 }
 
 // help me.
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Mul<Vector<T, C>>
+impl<T: Float + NumAssign, const R: usize, const C: usize> Mul<Vector<T, C>>
     for &Matrix<T, R, C>
 {
     type Output = <Matrix<T, R, C> as Mul<Vector<T, C>>>::Output;
@@ -615,7 +661,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Mul<Vector<T,
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Mul<Vector<T, C>>
+impl<T: Float + NumAssign, const R: usize, const C: usize> Mul<Vector<T, C>>
     for &mut Matrix<T, R, C>
 {
     type Output = <Matrix<T, R, C> as Mul<Vector<T, C>>>::Output;
@@ -624,7 +670,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> Mul<Vector<T,
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const N: usize, const C: usize>
+impl<T: Float + NumAssign, const R: usize, const N: usize, const C: usize>
     Mul<Matrix<T, N, C>> for Matrix<T, R, N>
 {
     type Output = Matrix<T, R, C>;
@@ -638,7 +684,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const N: usize, const C: usiz
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const N: usize, const C: usize>
+impl<T: Float + NumAssign, const R: usize, const N: usize, const C: usize>
     Mul<Matrix<T, N, C>> for &Matrix<T, R, N>
 {
     type Output = <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::Output;
@@ -647,7 +693,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const N: usize, const C: usiz
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const N: usize, const C: usize>
+impl<T: Float + NumAssign, const R: usize, const N: usize, const C: usize>
     Mul<Matrix<T, N, C>> for &mut Matrix<T, R, N>
 {
     type Output = <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::Output;
@@ -656,7 +702,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const N: usize, const C: usiz
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> MulAssign<Matrix<T, C, C>>
+impl<T: Float + NumAssign, const R: usize, const C: usize> MulAssign<Matrix<T, C, C>>
     for Matrix<T, R, C>
 {
     fn mul_assign(&mut self, rhs: Matrix<T, C, C>) {
@@ -667,7 +713,7 @@ impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> MulAssign<Mat
     }
 }
 
-impl<T: Float + NumAssign + Debug, const R: usize, const C: usize> MulAssign<Matrix<T, C, C>>
+impl<T: Float + NumAssign, const R: usize, const C: usize> MulAssign<Matrix<T, C, C>>
     for &mut Matrix<T, R, C>
 {
     fn mul_assign(&mut self, rhs: Matrix<T, C, C>) {
@@ -692,13 +738,19 @@ impl Mul<Vector<f32, 3>> for Transform3D {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Rectangle<T: NumAssign + Copy + Debug> {
+impl<T: Float + NumAssign, const R: usize, const C: usize> fmt::Debug for Matrix<T, R, C> where T: fmt::Debug {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Matrix{:?}", self.0)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct Rectangle<T: NumAssign + Copy> {
     min: Vector<T, 2>,
     max: Vector<T, 2>,
 }
 
-impl<T: NumAssign + Copy + Debug> Rectangle<T> {
+impl<T: NumAssign + Copy> Rectangle<T> {
     pub const fn new(min: Vector<T, 2>, max: Vector<T, 2>) -> Self {
         Self {
             min,
@@ -823,7 +875,7 @@ impl<T: NumAssign + Copy + Debug> Rectangle<T> {
     }
 }
 
-impl<T: NumAssign + PartialOrd + Copy + Debug> Rectangle<T> {
+impl<T: NumAssign + Copy> Rectangle<T> where T: PartialOrd {
     pub fn expand_toward(&mut self, amount: Vector<T, 2>) {
         self.expand_x_toward(amount.x());
         self.expand_y_toward(amount.y());
@@ -848,6 +900,15 @@ impl<T: NumAssign + PartialOrd + Copy + Debug> Rectangle<T> {
     pub fn intersects(&self, other: &Self) -> bool {
         self.max_x() > other.min_x() && self.min_x() < other.max_x()
             && self.max_y() > other.min_y() && self.min_y() < other.max_y()
+    }
+}
+
+impl<T: NumAssign + Copy> fmt::Debug for Rectangle<T> where T: fmt::Debug {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Rectangle")
+            .field("min", &self.min)
+            .field("max", &self.max)
+            .finish()
     }
 }
 

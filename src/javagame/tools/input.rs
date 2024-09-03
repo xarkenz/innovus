@@ -2,6 +2,7 @@ use glfw::{Action, Modifiers, WindowEvent};
 use innovus::{Application, WindowEventReceiver};
 
 pub use glfw::{Key, MouseButton, MouseButtonLeft, MouseButtonRight, MouseButtonMiddle};
+use innovus::tools::Vector;
 
 const FIRST_KEY_VALUE: usize = glfw::ffi::KEY_SPACE as usize;
 const LAST_KEY_VALUE: usize = glfw::ffi::KEY_LAST as usize;
@@ -32,6 +33,7 @@ pub struct InputState {
     event_receiver: WindowEventReceiver,
     held_keys: [bool; KEY_ARRAY_SIZE],
     held_mouse_buttons: [bool; MOUSE_BUTTON_ARRAY_SIZE],
+    cursor_pos: Vector<f64, 2>,
 }
 
 impl InputState {
@@ -40,6 +42,7 @@ impl InputState {
             event_receiver,
             held_keys: [false; KEY_ARRAY_SIZE],
             held_mouse_buttons: [false; MOUSE_BUTTON_ARRAY_SIZE],
+            cursor_pos: Vector::zero(),
         }
     }
 
@@ -80,22 +83,20 @@ impl InputState {
     }
 
     pub fn handle_cursor_pos(&mut self, x: f64, y: f64) {
-        // TODO
+        self.cursor_pos = Vector([x, y]);
     }
 
     pub fn key_is_held(&self, key: Key) -> bool {
-        if let Some(key_index) = get_key_index(key) {
-            self.held_keys[key_index]
-        } else {
-            false
-        }
+        get_key_index(key)
+            .is_some_and(|key_index| self.held_keys[key_index])
     }
 
     pub fn mouse_button_is_held(&self, button: MouseButton) -> bool {
-        if let Some(button_index) = get_mouse_button_index(button) {
-            self.held_mouse_buttons[button_index]
-        } else {
-            false
-        }
+        get_mouse_button_index(button)
+            .is_some_and(|button_index| self.held_mouse_buttons[button_index])
+    }
+
+    pub fn cursor_pos(&self) -> Vector<f64, 2> {
+        self.cursor_pos
     }
 }

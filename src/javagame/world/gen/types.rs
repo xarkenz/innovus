@@ -28,20 +28,6 @@ impl WorldGenerator for OverworldGenerator {
             for x in 0..16 {
                 chunk.set_block_at(x, 15, block::Block::new(&block::types::GRASSY_DIRT, 0, 15));
             }
-            if location == Vector([-1, -1]) {
-                chunk.set_block_at(3, 8, block::Block::new(&block::types::COPPER_BLOCK, 0, 15));
-                chunk.set_block_at(3, 7, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(3, 6, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(4, 6, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(5, 6, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(6, 6, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(6, 5, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(6, 7, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(7, 7, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(8, 7, block::Block::new(&block::types::COPPER_WIRE, 0, 15));
-                chunk.set_block_at(8, 8, block::Block::new(&block::types::COPPER_BLOCK, 0, 15));
-                chunk.set_block_at(15, 7, block::Block::new(&block::types::DIRT, 0, 15));
-            }
             chunk
         }
         else {
