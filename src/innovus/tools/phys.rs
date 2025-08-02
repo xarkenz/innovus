@@ -301,8 +301,17 @@ impl Physics {
         // Incrementally handle all swept collisions, earliest first
         let mut collisions = self.get_collisions(dt);
         while let Some(collision) = collisions.pop() {
-            let collision_velocity = self.slots[collision.index_1].current_collider().unwrap()
-                .collision_velocity(&self.slots[collision.index_2].current_collider().unwrap());
+            let collider_1 = self.slots[collision.index_1].current_collider().unwrap();
+            let collider_2 = self.slots[collision.index_2].current_collider().unwrap();
+
+            // Double-check that there is still a broad phase intersection between the colliders.
+            // This is necessary because the colliders' velocities may have changed since the
+            // initial sweep (due to previous collisions).
+            if !collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
+                continue;
+            }
+
+            let collision_velocity = collider_1.collision_velocity(collider_2);
 
             for index in [collision.index_1, collision.index_2] {
                 let collider = self.slots[index].current_collider_mut().unwrap();
