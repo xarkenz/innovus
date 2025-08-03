@@ -11,11 +11,8 @@ pub trait WorldGenerator {
 
     fn seed(&self) -> u64;
 
-    fn get_chunk(&self, location: block::ChunkLocation) -> block::Chunk {
-        block::Chunk::new(location)
-    }
-
-    fn get_chunk_entities(&self, location: block::ChunkLocation) -> Vec<Box<dyn entity::Entity>> {
+    fn generate_chunk(&self, chunk: &mut block::Chunk, chunk_map: &block::ChunkMap, physics: &mut phys::Physics) -> Vec<Box<dyn entity::Entity>> {
+        let _ = (chunk, chunk_map, physics);
         Vec::new()
     }
 }

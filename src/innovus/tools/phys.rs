@@ -294,6 +294,7 @@ impl Physics {
     }
 
     pub fn step_simulation(&mut self, dt: f32) {
+        // FIXME: something is still a little broken here. objects sometimes clip through each other
         // Keep track of how much time has been used by advancing to collision sites
         let mut time_used = Vec::with_capacity(self.slots.len());
         time_used.resize(self.slots.len(), 0.0);

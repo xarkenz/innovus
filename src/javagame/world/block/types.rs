@@ -4,11 +4,13 @@ use super::*;
 
 pub const BLOCK_RECT: Rectangle<i32> = Rectangle::new(Vector([0, 0]), Vector([32, 32]));
 
-pub fn connect_never(_this: &BlockType, _that: &BlockType) -> bool {
+pub fn connect_never(this: &BlockType, that: &BlockType) -> bool {
+    let _ = (this, that);
     false
 }
 
-pub fn connect_full_block(_this: &BlockType, that: &BlockType) -> bool {
+pub fn connect_full_block(this: &BlockType, that: &BlockType) -> bool {
+    let _ = this;
     that.is_full_block
 }
 
@@ -46,7 +48,7 @@ pub static COPPER_BLOCK: BlockType = BlockType {
 pub static COPPER_WIRE: BlockType = BlockType {
     name: "copper_wire",
     attributes: &[],
-    colliders: &[BLOCK_RECT], // FIXME
+    colliders: &[],
     is_full_block: false,
     light_emission: 0,
     connector: |this, that| that.name == this.name || that.name == COPPER_BLOCK.name,

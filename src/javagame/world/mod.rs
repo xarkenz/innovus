@@ -1,7 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
-
+use std::cell::{Ref, RefCell, RefMut};
+use std::collections::HashMap;
+use std::ops::DerefMut;
 use crate::{tools::*, *};
-use crate::world::block::BlockRenderer;
 
 pub mod block;
 pub mod entity;
@@ -11,7 +11,7 @@ pub struct World<'world> {
     generator: Option<Box<dyn WorldGenerator>>,
     physics: phys::Physics,
     entities: HashMap<Uuid, Box<dyn entity::Entity + 'world>>,
-    chunks: BTreeMap<block::ChunkLocation, block::Chunk>,
+    chunks: block::ChunkMap,
 }
 
 impl<'world> World<'world> where Self: 'world {
@@ -20,7 +20,7 @@ impl<'world> World<'world> where Self: 'world {
             generator,
             physics: phys::Physics::new(),
             entities: HashMap::new(),
-            chunks: BTreeMap::new(),
+            chunks: block::ChunkMap::new(),
         }
     }
 
@@ -32,36 +32,49 @@ impl<'world> World<'world> where Self: 'world {
         &mut self.physics
     }
 
-    pub fn get_chunk(&self, location: block::ChunkLocation) -> Option<&block::Chunk> {
-        self.chunks.get(&location)
+    pub fn get_chunk(&self, location: block::ChunkLocation) -> Option<Ref<block::Chunk>> {
+        self.chunks.get(&location).map(|chunk| chunk.borrow())
     }
 
-    pub fn get_chunk_mut(&mut self, location: block::ChunkLocation) -> Option<&mut block::Chunk> {
-        self.chunks.get_mut(&location)
+    pub fn get_chunk_mut(&self, location: block::ChunkLocation) -> Option<RefMut<block::Chunk>> {
+        self.chunks.get(&location).map(|chunk| chunk.borrow_mut())
     }
 
-    pub fn force_get_chunk(&mut self, location: block::ChunkLocation) -> &block::Chunk {
-        if !self.chunks.contains_key(&location) {
-            self.chunks.insert(location, self.generate_chunk(location));
+    pub fn force_get_chunk(&mut self, location: block::ChunkLocation) -> Ref<block::Chunk> {
+        self.force_get_chunk_cell(location).borrow()
+    }
+
+    pub fn force_get_chunk_mut(&mut self, location: block::ChunkLocation) -> RefMut<block::Chunk> {
+        self.force_get_chunk_cell(location).borrow_mut()
+    }
+
+    fn force_get_chunk_cell(&mut self, location: block::ChunkLocation) -> &RefCell<block::Chunk> {
+        if self.chunks.contains_key(&location) {
+            &self.chunks[&location]
         }
-        self.chunks.get(&location).unwrap()
-    }
-
-    pub fn force_get_chunk_mut(&mut self, location: block::ChunkLocation) -> &mut block::Chunk {
-        if !self.chunks.contains_key(&location) {
-            self.chunks.insert(location, self.generate_chunk(location));
+        else {
+            self.chunks.insert(location, RefCell::new(block::Chunk::new(location)));
+            let cell = &self.chunks[&location];
+            if let Some(generator) = &self.generator {
+                generator.generate_chunk(cell.borrow_mut().deref_mut(), &self.chunks, &mut self.physics);
+            }
+            cell
         }
-        self.chunks.get_mut(&location).unwrap()
     }
 
-    pub fn put_chunk(&mut self, chunk: block::Chunk) {
-        self.chunks.insert(chunk.location(), chunk);
+    pub fn user_place_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize, block_type: &'static block::BlockType) {
+        self.force_get_chunk_cell(chunk_location);
+        let mut chunk = self.chunks[&chunk_location].borrow_mut();
+        if chunk.block_at(block_x, block_y).block_type == &block::types::AIR {
+            chunk.set_block_at(block_x, block_y, block::Block::new(block_type, 0, 15), &self.chunks, &mut self.physics);
+        }
     }
 
-    pub fn generate_chunk(&self, location: block::ChunkLocation) -> block::Chunk {
-        match &self.generator {
-            Some(generator) => generator.get_chunk(location),
-            None => block::Chunk::new(location),
+    pub fn user_destroy_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize) {
+        self.force_get_chunk_cell(chunk_location);
+        let mut chunk = self.chunks[&chunk_location].borrow_mut();
+        if chunk.block_at(block_x, block_y).block_type != &block::types::AIR {
+            chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR, 0, 15), &self.chunks, &mut self.physics);
         }
     }
 
@@ -88,8 +101,8 @@ impl<'world> World<'world> where Self: 'world {
     }
 
     pub fn update(&mut self, inputs: &input::InputState, dt: f32) {
-        for chunk in self.chunks.values_mut() {
-            chunk.update(dt);
+        for chunk in self.chunks.values() {
+            chunk.borrow_mut().update(dt);
         }
         for entity in self.entities.values_mut() {
             entity.update(dt, inputs, &mut self.physics);
@@ -97,14 +110,9 @@ impl<'world> World<'world> where Self: 'world {
         self.physics.step_simulation(dt);
     }
 
-    pub fn render(&mut self, dt: f32, block_renderer: &BlockRenderer) {
-        let chunk_locations = Vec::from_iter(self.chunks.keys().cloned());
-        for location in chunk_locations {
-            // TODO: need a better way for chunks to gather information from adjacent chunks
-            // We can safely unwrap because the entry is guaranteed to exist
-            let mut chunk = self.chunks.remove(&location).unwrap();
-            chunk.render(dt, block_renderer, self);
-            self.chunks.insert(location, chunk);
+    pub fn render(&mut self, dt: f32, block_renderer: &block::BlockRenderer) {
+        for chunk in self.chunks.values() {
+            chunk.borrow_mut().render(dt, block_renderer, &self.chunks);
         }
         for entity in self.entities.values_mut() {
             entity.render(dt);

@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 use innovus::{gfx::*, tools::*};
 use std::fmt::Formatter;
-use num::Integer;
-use crate::world::World;
+use innovus::tools::phys::ColliderHandle;
 
 pub mod types;
 
@@ -105,7 +105,7 @@ impl BlockAppearance {
         }
     }
 
-    fn get_block_type(world: &World, chunk: &Chunk, x: isize, y: isize) -> &'static BlockType {
+    fn get_block_type(chunk_map: &ChunkMap, chunk: &Chunk, x: isize, y: isize) -> &'static BlockType {
         let (chunk_offset_x, x) = Self::resolve_relative_coordinate(x);
         let (chunk_offset_y, y) = Self::resolve_relative_coordinate(y);
 
@@ -113,45 +113,45 @@ impl BlockAppearance {
             chunk.block_at(x, y).block_type
         }
         else {
-            match world.get_chunk(Vector([
+            match chunk_map.get(&Vector([
                 chunk.location().x() + chunk_offset_x,
                 chunk.location().y() + chunk_offset_y,
             ])) {
-                Some(chunk) => chunk.block_at(x, y).block_type,
+                Some(other_chunk) => other_chunk.borrow().block_at(x, y).block_type,
                 None => &types::AIR,
             }
         }
     }
 
-    fn get_connect(&self, world: &World, chunk: &Chunk, x: isize, y: isize) -> bool {
-        self.block_type.connects_to(Self::get_block_type(world, chunk, x, y))
+    fn get_connect(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: isize, y: isize) -> bool {
+        self.block_type.connects_to(Self::get_block_type(chunk_map, chunk, x, y))
     }
 
-    fn get_quad_type(&self, world: &World, chunk: &Chunk, x: isize, y: isize, x_connect: bool, y_connect: bool) -> u32 {
+    fn get_quad_type(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: isize, y: isize, x_connect: bool, y_connect: bool) -> u32 {
         match (x_connect, y_connect) {
             (false, false) => 0,
             (true, false) => 1,
             (false, true) => 2,
-            (true, true) => if self.get_connect(world, chunk, x, y) { 4 } else { 3 },
+            (true, true) => if self.get_connect(chunk_map, chunk, x, y) { 4 } else { 3 },
         }
     }
 
-    pub fn get_quad_uv_offsets(&self, world: &World, chunk: &Chunk, x: usize, y: usize) -> [Vector<u32, 2>; 4] {
+    pub fn get_quad_uv_offsets(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: usize, y: usize) -> [Vector<u32, 2>; 4] {
         let left_x = x as isize - 1;
         let right_x = x as isize + 1;
         let down_y = y as isize - 1;
         let up_y = y as isize + 1;
 
-        let left_connect = self.get_connect(world, chunk, left_x, y as isize);
-        let right_connect = self.get_connect(world, chunk, right_x, y as isize);
-        let down_connect = self.get_connect(world, chunk, x as isize, down_y);
-        let up_connect = self.get_connect(world, chunk, x as isize, up_y);
+        let left_connect = self.get_connect(chunk_map, chunk, left_x, y as isize);
+        let right_connect = self.get_connect(chunk_map, chunk, right_x, y as isize);
+        let down_connect = self.get_connect(chunk_map, chunk, x as isize, down_y);
+        let up_connect = self.get_connect(chunk_map, chunk, x as isize, up_y);
 
         let quad_types: [u32; 4] = [
-            self.get_quad_type(world, chunk, left_x, up_y, left_connect, up_connect),
-            self.get_quad_type(world, chunk, right_x, up_y, right_connect, up_connect),
-            self.get_quad_type(world, chunk, left_x, down_y, left_connect, down_connect),
-            self.get_quad_type(world, chunk, right_x, down_y, right_connect, down_connect),
+            self.get_quad_type(chunk_map, chunk, left_x, up_y, left_connect, up_connect),
+            self.get_quad_type(chunk_map, chunk, right_x, up_y, right_connect, up_connect),
+            self.get_quad_type(chunk_map, chunk, left_x, down_y, left_connect, down_connect),
+            self.get_quad_type(chunk_map, chunk, right_x, down_y, right_connect, down_connect),
         ];
 
         quad_types.map(|quad_type| Vector([
@@ -245,11 +245,13 @@ pub const CHUNK_SIZE: usize = 16;
 const CHUNK_SIZE_F32: f32 = CHUNK_SIZE as f32;
 
 pub type ChunkLocation = Vector<i64, 2>;
+pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Chunk {
     location: ChunkLocation,
     blocks: [[Block; CHUNK_SIZE]; CHUNK_SIZE],
+    block_colliders: [[Box<[ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE],
     blocks_dirty: [[bool; CHUNK_SIZE]; CHUNK_SIZE],
     dirty: bool,
     geometry: Geometry<Vertex2D>,
@@ -260,6 +262,7 @@ impl Chunk {
         Self {
             location,
             blocks: Default::default(),
+            block_colliders: [(); CHUNK_SIZE].map(|_| [(); CHUNK_SIZE].map(|_| Box::from([]))),
             blocks_dirty: [[true; CHUNK_SIZE]; CHUNK_SIZE],
             dirty: true,
             geometry: Geometry::new_render().unwrap(),
@@ -274,9 +277,76 @@ impl Chunk {
         &self.blocks[y][x]
     }
 
-    pub fn set_block_at(&mut self, x: usize, y: usize, block: Block) {
+    pub fn set_block_at(&mut self, x: usize, y: usize, block: Block, chunk_map: &ChunkMap, physics: &mut phys::Physics) {
+        // Add new physics colliders and remove the old ones
+        let block_origin = Vector([
+            self.location.x() as f32 * CHUNK_SIZE_F32 + x as f32,
+            self.location.y() as f32 * CHUNK_SIZE_F32 + y as f32,
+        ]);
+        let colliders = block.block_type.colliders
+            .iter()
+            .map(|&bounds| {
+                let mut collider_bounds = Rectangle::new(
+                    Vector([
+                        bounds.min_x() as f32 / 32.0,
+                        bounds.min_y() as f32 / 32.0,
+                    ]),
+                    Vector([
+                        bounds.max_x() as f32 / 32.0,
+                        bounds.max_y() as f32 / 32.0,
+                    ]),
+                );
+                collider_bounds.shift_by(block_origin);
+                physics.add_collider(phys::Collider::new_fixed(collider_bounds))
+            })
+            .collect();
+        let old_colliders = std::mem::replace(&mut self.block_colliders[y][x], colliders);
+        for handle in old_colliders {
+            physics.remove_collider(handle);
+        }
+
         self.blocks[y][x] = block;
         self.set_dirty_at(x, y, true);
+        // Propagate the dirty flag to the surrounding blocks in order to update their appearances
+        self.propagate_dirty(x, y, chunk_map);
+    }
+
+    pub fn propagate_dirty(&mut self, x: usize, y: usize, chunk_map: &ChunkMap) {
+        for dy in [-1, 0, 1] {
+            for dx in [-1, 0, 1] {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let mut chunk_location = self.location;
+                let mut dirty_x = x as isize + dx;
+                let mut dirty_y = y as isize + dy;
+                // Check if the targeted block is in another chunk horizontally
+                if dirty_x < 0 {
+                    chunk_location.set_x(chunk_location.x() - 1);
+                    dirty_x += CHUNK_SIZE as isize;
+                }
+                else if dirty_x >= CHUNK_SIZE as isize {
+                    chunk_location.set_x(chunk_location.x() + 1);
+                    dirty_x -= CHUNK_SIZE as isize;
+                }
+                // Check if the targeted block is in another chunk vertically
+                if dirty_y < 0 {
+                    chunk_location.set_y(chunk_location.y() - 1);
+                    dirty_y += CHUNK_SIZE as isize;
+                }
+                else if dirty_y >= CHUNK_SIZE as isize {
+                    chunk_location.set_y(chunk_location.y() + 1);
+                    dirty_y -= CHUNK_SIZE as isize;
+                }
+
+                if chunk_location == self.location {
+                    self.set_dirty_at(dirty_x as usize, dirty_y as usize, true);
+                }
+                else if let Some(chunk) = chunk_map.get(&chunk_location) {
+                    chunk.borrow_mut().set_dirty_at(dirty_x as usize, dirty_y as usize, true);
+                }
+            }
+        }
     }
 
     pub fn is_dirty_at(&self, x: usize, y: usize) -> bool {
@@ -292,15 +362,20 @@ impl Chunk {
         self.dirty
     }
 
-    pub fn set_dirty(&mut self, dirty: bool) {
-        self.dirty = dirty;
+    pub fn set_dirty(&mut self) {
+        self.dirty = true;
+        // Force a re-render for all blocks in the chunk
+        for row in &mut self.blocks_dirty {
+            row.fill(true);
+        }
     }
 
     pub fn update(&mut self, dt: f32) {
-        // TODO
+        let _ = dt;
     }
 
-    pub fn render(&mut self, dt: f32, renderer: &BlockRenderer, world: &World) {
+    pub fn render(&mut self, dt: f32, renderer: &BlockRenderer, chunk_map: &ChunkMap) {
+        let _ = dt;
         if self.geometry.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
@@ -327,29 +402,28 @@ impl Chunk {
         }
 
         if self.is_dirty() {
-            let mut dirty_count: usize = 0;
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     if self.is_dirty_at(x, y) {
-                        self.update_block_vertices(x, y, renderer, world);
-                        self.set_dirty_at(x, y, false);
-                        dirty_count += 1;
+                        self.update_block_vertices(x, y, renderer, chunk_map);
+                        self.blocks_dirty[y][x] = false;
                     }
                 }
             }
             self.geometry.update_vertex_buffer();
-            self.set_dirty(false);
+            self.dirty = false;
         }
 
         self.geometry.render();
     }
 
-    fn update_block_vertices(&mut self, x: usize, y: usize, renderer: &BlockRenderer, world: &World) {
+    fn update_block_vertices(&mut self, x: usize, y: usize, renderer: &BlockRenderer, chunk_map: &ChunkMap) {
         // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
         let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
+
         if let Some(appearance) = renderer.get_appearance(self.block_at(x, y).block_type) {
             let mut index = first_index;
-            let uv_offsets = appearance.get_quad_uv_offsets(world, self, x, y);
+            let uv_offsets = appearance.get_quad_uv_offsets(chunk_map, self, x, y);
             for (quad_offset, uv_offset) in std::iter::zip(BLOCK_QUAD_OFFSETS, uv_offsets) {
                 for vertex_offset in BLOCK_QUAD_VERTEX_OFFSETS {
                     let mut vertex = self.geometry.get_vertex(index);
@@ -366,6 +440,7 @@ impl Chunk {
             }
         }
         else {
+            // Make block invisible since it has no appearance (e.g. air)
             let mut index = first_index;
             for _ in 0..VERTICES_PER_BLOCK {
                 let mut vertex = self.geometry.get_vertex(index);

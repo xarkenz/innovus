@@ -17,21 +17,19 @@ impl WorldGenerator for OverworldGenerator {
         self.seed
     }
 
-    fn get_chunk(&self, location: block::ChunkLocation) -> block::Chunk {
-        if location == Vector([0, -1]) || location == Vector([-1, -1]) {
-            let mut chunk = block::Chunk::new(location);
+    fn generate_chunk(&self, chunk: &mut block::Chunk, chunk_map: &block::ChunkMap, physics: &mut phys::Physics) -> Vec<Box<dyn entity::Entity>> {
+        if chunk.location() == Vector([0, -1]) || chunk.location() == Vector([-1, -1]) {
             for y in 8..15 {
                 for x in 0..16 {
-                    chunk.set_block_at(x, y, block::Block::new(&block::types::DIRT, 0, 15));
+                    let block = block::Block::new(&block::types::DIRT, 0, 15);
+                    chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }
             for x in 0..16 {
-                chunk.set_block_at(x, 15, block::Block::new(&block::types::GRASSY_DIRT, 0, 15));
+                let block = block::Block::new(&block::types::GRASSY_DIRT, 0, 15);
+                chunk.set_block_at(x, 15, block, chunk_map, physics);
             }
-            chunk
         }
-        else {
-            block::Chunk::new(location)
-        }
+        Vec::new()
     }
 }

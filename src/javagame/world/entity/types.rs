@@ -15,29 +15,29 @@ pub struct Player {
     health: f32,
     crouching: bool,
     spawn_point: Option<Vector<i64, 2>>,
-    movement_speed: f32,
+    movement_accel: f32,
     jump_speed: f32,
     jump_cooldown: f32,
+    rectangle: Rectangle<f32>,
 }
 
 impl Player {
     pub fn new(physics: &mut phys::Physics, position: Vector<f32, 2>, name: Option<String>) -> Self {
+        let rectangle = Rectangle::from_size(Vector([position.x() - 0.375, position.y()]), Vector([0.75, 1.6875]));
         Self {
             uuid: generate_uuid(),
             position,
-            collider: Some(physics.add_collider(phys::Collider::new(
-                Rectangle::from_size(Vector([position.x() - 6.0, position.y()]), Vector([12.0, 27.0])),
-                Vector::zero(),
-            ))),
+            collider: Some(physics.add_collider(phys::Collider::new(rectangle, Vector::zero()))),
             geometry: Geometry::new_render().unwrap(),
             name: name.unwrap_or_else(|| String::from(Self::entity_type_str())),
             facing: 0.0,
             health: 100.0,
             crouching: false,
             spawn_point: None,
-            movement_speed: 500.0,
-            jump_speed: 200.0,
+            movement_accel: 32.0,
+            jump_speed: 12.5,
             jump_cooldown: 0.0,
+            rectangle,
         }
     }
 
@@ -82,7 +82,12 @@ impl Entity for Player {
     fn update(&mut self, dt: f32, inputs: &input::InputState, physics: &mut phys::Physics) {
         let collider = physics.get_collider_mut(self.collider.as_ref().unwrap()).unwrap();
 
-        if inputs.key_is_held(input::Key::Space) {
+        if collider.rectangle.min_y() < -128.0 {
+            collider.rectangle.shift_min_to(Vector([-0.375, 0.0]));
+            collider.stop();
+        }
+
+        if !inputs.key_is_held(input::Key::Space) {
             self.jump_cooldown = 0.0;
         }
         if self.jump_cooldown <= 0.0 {
@@ -95,13 +100,13 @@ impl Entity for Player {
             self.jump_cooldown -= dt;
         }
 
-        if inputs.key_is_held(input::Key::Z) {
+        if inputs.key_is_held(input::Key::LeftShift) {
             self.crouching = true;
-            collider.rectangle.set_max_y(collider.rectangle.min_y() + 23.0);
+            collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.4375);
         }
         else {
             self.crouching = false;
-            collider.rectangle.set_max_y(collider.rectangle.min_y() + 27.0);
+            collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.6875);
         }
 
         let speed_multiplier = if self.crouching /*&& collider.is_grounded()*/ {
@@ -110,12 +115,35 @@ impl Entity for Player {
             1.0
         };
 
+        if inputs.key_is_held(input::Key::A) {
+            collider.velocity.set_x((collider.velocity.x() - self.movement_accel * dt).max(speed_multiplier * -5.0));
+        }
+        if inputs.key_is_held(input::Key::D) {
+            collider.velocity.set_x((collider.velocity.x() + self.movement_accel * dt).min(speed_multiplier * 5.0));
+        }
+
         movement::apply_gravity(collider, dt, movement::DEFAULT_GRAVITY_ACCELERATION, movement::DEFAULT_TERMINAL_VELOCITY);
         movement::apply_friction(collider, dt, movement::DEFAULT_FRICTION_DECELERATION);
+
+        self.position.set_x(collider.rectangle.min_x() + 0.375);
+        self.position.set_y(collider.rectangle.min_y());
+        self.rectangle = collider.rectangle;
     }
 
     fn render(&mut self, dt: f32) {
+        let _ = dt;
         self.geometry.clear();
+        let color = [0.0, 0.0, 1.0, 1.0];
+        self.geometry.add(&[
+            Vertex2D::new([self.rectangle.min_x(), self.rectangle.min_y(), 1.0], Some(color), None),
+            Vertex2D::new([self.rectangle.min_x(), self.rectangle.max_y(), 1.0], Some(color), None),
+            Vertex2D::new([self.rectangle.max_x(), self.rectangle.max_y(), 1.0], Some(color), None),
+            Vertex2D::new([self.rectangle.max_x(), self.rectangle.min_y(), 1.0], Some(color), None),
+        ], &[
+            [0, 1, 2],
+            [2, 3, 0],
+        ]);
+        self.geometry.render();
     }
 
     fn destroy(&mut self, physics: &mut phys::Physics) {
@@ -210,6 +238,7 @@ impl Entity for TestBox {
     }
 
     fn render(&mut self, dt: f32) {
+        let _ = dt;
         self.geometry.clear();
         self.geometry.add(&[
             Vertex2D::new([self.rectangle.min_x(), self.rectangle.min_y(), 1.0], Some(self.color), None),
