@@ -11,7 +11,7 @@ pub mod world;
 
 fn main() {
     let mut application = Application::new().unwrap();
-    application.set_multisampling(Some(8));
+    //application.set_multisampling(Some(8));
     let (mut window, event_receiver) = application
         .create_window(1200, 800, "Even More Rust Gaming.", WindowMode::Windowed)
         .expect("failed to create GLFW window.");

@@ -2,6 +2,9 @@ use super::*;
 
 use std::collections::BinaryHeap;
 
+// TODO: seems hacky. how else to deal with FP precision?
+pub const COLLISION_TOLERANCE: f32 = 1.0e-5;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CollisionKind {
     // The ordinal values are important for ordering
@@ -105,7 +108,7 @@ impl Collider {
                 / (other.velocity.x() - self.velocity.x()),
             _ => f32::INFINITY
         };
-        if 0.0 <= x_time && x_time <= dt {
+        if -COLLISION_TOLERANCE <= x_time && x_time <= dt {
             // Ensure that collision occurs in the y-direction as well
             let self_dy = self.velocity.y() * x_time;
             let other_dy = other.velocity.y() * x_time;
@@ -127,7 +130,7 @@ impl Collider {
                 / (other.velocity.y() - self.velocity.y()),
             _ => f32::NAN
         };
-        if 0.0 <= y_time && y_time <= dt {
+        if -COLLISION_TOLERANCE <= y_time && y_time <= dt {
             // Ensure that collision occurs in the x-direction as well
             let self_dx = self.velocity.x() * y_time;
             let other_dx = other.velocity.x() * y_time;
@@ -143,7 +146,7 @@ impl Collider {
 
         // Determine which direction collides first, if any
         let collision_time = x_time.min(y_time);
-        if 0.0 <= collision_time && collision_time <= dt {
+        if -COLLISION_TOLERANCE <= collision_time && collision_time <= dt {
             Some((collision_time, CollisionKind::from_times(x_time, y_time)))
         }
         else {
