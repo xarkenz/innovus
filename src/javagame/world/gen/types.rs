@@ -8,11 +8,15 @@ pub struct OverworldGenerator {
     seed: u64,
 }
 
-impl WorldGenerator for OverworldGenerator {
-    fn new(seed: u64) -> Self {
-        Self { seed }
+impl OverworldGenerator {
+    pub fn new(seed: u64) -> Self {
+        Self {
+            seed,
+        }
     }
+}
 
+impl WorldGenerator for OverworldGenerator {
     fn seed(&self) -> u64 {
         self.seed
     }

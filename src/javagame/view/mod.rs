@@ -108,7 +108,7 @@ impl Camera {
             self.snap_to_target();
         }
         else {
-            self.position = self.position.lerp(&self.target, self.speed * dt);
+            self.position = self.position.lerp(&self.target, (self.speed * dt).min(1.0));
         }
     }
 }

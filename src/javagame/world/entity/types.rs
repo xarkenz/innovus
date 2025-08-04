@@ -29,7 +29,7 @@ impl Player {
             position,
             collider: Some(physics.add_collider(phys::Collider::new(rectangle, Vector::zero()))),
             geometry: Geometry::new_render().unwrap(),
-            name: name.unwrap_or_else(|| String::from(Self::entity_type_str())),
+            name: name.unwrap_or_else(|| "(anonymous)".into()),
             facing: 0.0,
             health: 100.0,
             crouching: false,
@@ -59,7 +59,7 @@ impl Player {
 }
 
 impl Entity for Player {
-    fn entity_type_str() -> &'static str {
+    fn entity_type(&self) -> &'static str {
         "player"
     }
 
@@ -191,7 +191,7 @@ impl TestBox {
 }
 
 impl Entity for TestBox {
-    fn entity_type_str() -> &'static str {
+    fn entity_type(&self) -> &'static str {
         "test_box"
     }
 

@@ -1,21 +1,21 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::ops::DerefMut;
-use crate::{tools::*, *};
+use crate::tools::*;
 
 pub mod block;
 pub mod entity;
 pub mod gen;
 
 pub struct World<'world> {
-    generator: Option<Box<dyn WorldGenerator>>,
+    generator: Option<Box<dyn gen::WorldGenerator>>,
     physics: phys::Physics,
     entities: HashMap<Uuid, Box<dyn entity::Entity + 'world>>,
     chunks: block::ChunkMap,
 }
 
 impl<'world> World<'world> where Self: 'world {
-    pub fn new(generator: Option<Box<dyn WorldGenerator>>) -> Self {
+    pub fn new(generator: Option<Box<dyn gen::WorldGenerator>>) -> Self {
         Self {
             generator,
             physics: phys::Physics::new(),
@@ -110,9 +110,9 @@ impl<'world> World<'world> where Self: 'world {
         self.physics.step_simulation(dt);
     }
 
-    pub fn render(&mut self, dt: f32, block_renderer: &block::BlockRenderer) {
+    pub fn render(&mut self, dt: f32, block_gfx: &asset::BlockGraphics) {
         for chunk in self.chunks.values() {
-            chunk.borrow_mut().render(dt, block_renderer, &self.chunks);
+            chunk.borrow_mut().render(dt, block_gfx, &self.chunks);
         }
         for entity in self.entities.values_mut() {
             entity.render(dt);

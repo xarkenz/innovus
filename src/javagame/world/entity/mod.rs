@@ -5,11 +5,7 @@ pub mod movement;
 pub mod types;
 
 pub trait Entity {
-    fn entity_type_str() -> &'static str where Self: Sized;
-
-    fn entity_type(&self) -> &'static str where Self: Sized {
-        Self::entity_type_str()
-    }
+    fn entity_type(&self) -> &'static str;
 
     fn uuid(&self) -> Uuid;
     fn position(&self) -> Vector<f32, 2>;
@@ -20,8 +16,4 @@ pub trait Entity {
     fn render(&mut self, dt: f32);
 
     fn destroy(&mut self, physics: &mut phys::Physics);
-}
-
-pub struct EntityRenderer {
-    //
 }

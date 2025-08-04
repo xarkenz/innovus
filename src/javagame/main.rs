@@ -1,10 +1,6 @@
-extern crate glfw;
-
 use std::collections::HashMap;
-use crate::{tools::*, world::gen::WorldGenerator};
 use innovus::{gfx::*, *};
-use crate::world::block::BlockRenderer;
-use crate::world::entity::Entity;
+use crate::tools::*;
 
 pub mod tools;
 pub mod view;
@@ -42,7 +38,7 @@ fn main() {
         Vector([0.0, 0.0]),
         None,
     );
-    let player_uuid = player.uuid();
+    let player_uuid = world::entity::Entity::uuid(&player);
     current_world.add_entity(Box::new(player));
 
     let mut camera = view::Camera::new(
@@ -54,7 +50,7 @@ fn main() {
         }),
     );
 
-    let block_renderer = BlockRenderer::new().unwrap();
+    let block_renderer = asset::BlockGraphics::new().unwrap();
 
     let mut selected_block_index = 0;
 

@@ -1,8 +1,8 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use innovus::{gfx::*, tools::*};
 use std::fmt::Formatter;
-use innovus::tools::phys::ColliderHandle;
+use crate::tools::asset::BlockGraphics;
 
 pub mod types;
 
@@ -93,38 +93,11 @@ pub struct BlockAppearance {
 }
 
 impl BlockAppearance {
-    fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
-        if value < 0 {
-            (-1, (value + CHUNK_SIZE as isize) as usize)
-        }
-        else if value >= CHUNK_SIZE as isize {
-            (1, (value - CHUNK_SIZE as isize) as usize)
-        }
-        else {
-            (0, value as usize)
-        }
-    }
-
-    fn get_block_type(chunk_map: &ChunkMap, chunk: &Chunk, x: isize, y: isize) -> &'static BlockType {
-        let (chunk_offset_x, x) = Self::resolve_relative_coordinate(x);
-        let (chunk_offset_y, y) = Self::resolve_relative_coordinate(y);
-
-        if chunk_offset_x == 0 && chunk_offset_y == 0 {
-            chunk.block_at(x, y).block_type
-        }
-        else {
-            match chunk_map.get(&Vector([
-                chunk.location().x() + chunk_offset_x,
-                chunk.location().y() + chunk_offset_y,
-            ])) {
-                Some(other_chunk) => other_chunk.borrow().block_at(x, y).block_type,
-                None => &types::AIR,
-            }
-        }
-    }
-
     fn get_connect(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: isize, y: isize) -> bool {
-        self.block_type.connects_to(Self::get_block_type(chunk_map, chunk, x, y))
+        let other_type = chunk
+            .with_block(x, y, chunk_map, |block| block.block_type)
+            .unwrap_or(&types::AIR);
+        self.block_type.connects_to(other_type)
     }
 
     fn get_quad_type(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: isize, y: isize, x_connect: bool, y_connect: bool) -> u32 {
@@ -161,61 +134,6 @@ impl BlockAppearance {
     }
 }
 
-pub struct BlockRenderer {
-    atlas: Image,
-    texture: Texture2D,
-    appearances: HashMap<*const BlockType, BlockAppearance>,
-}
-
-impl BlockRenderer {
-    pub fn new() -> Result<Self, String> {
-        let (images, block_types): (Vec<Image>, Vec<&BlockType>) = types::BLOCK_TYPES.iter()
-            .filter_map(|&block_type| {
-                let path = format!("src/javagame/assets/textures/block/{}.png", block_type.name);
-                Image::from_file(&path).ok().map(|image| (image, block_type))
-            })
-            .unzip();
-
-        let (atlas, offsets) = Image::new_atlas(&images);
-
-        let appearances = HashMap::from_iter(block_types.iter()
-            .zip(offsets)
-            .map(|(&block_type, offset)| {
-                let appearance = BlockAppearance {
-                    block_type,
-                    offset,
-                    resolution: 16,
-                };
-                (block_type as *const BlockType, appearance)
-            }));
-
-        let mut texture = Texture2D::new(0);
-        texture.set_minify_filter(TextureSampling::Nearest);
-        texture.set_magnify_filter(TextureSampling::Nearest);
-        texture.set_wrap_s(TextureWrap::Repeat);
-        texture.set_wrap_t(TextureWrap::Repeat);
-        texture.load_from_image(&atlas);
-
-        Ok(Self {
-            atlas,
-            texture,
-            appearances,
-        })
-    }
-
-    pub fn atlas(&self) -> &Image {
-        &self.atlas
-    }
-
-    pub fn texture(&self) -> &Texture2D {
-        &self.texture
-    }
-
-    pub fn get_appearance(&self, block_type: &'static BlockType) -> Option<&BlockAppearance> {
-        self.appearances.get(&(block_type as *const BlockType))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Block {
     pub block_type: &'static BlockType,
@@ -244,6 +162,18 @@ impl Default for Block {
 pub const CHUNK_SIZE: usize = 16;
 const CHUNK_SIZE_F32: f32 = CHUNK_SIZE as f32;
 
+fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
+    if value < 0 {
+        (-1, (value + CHUNK_SIZE as isize) as usize)
+    }
+    else if value >= CHUNK_SIZE as isize {
+        (1, (value - CHUNK_SIZE as isize) as usize)
+    }
+    else {
+        (0, value as usize)
+    }
+}
+
 pub type ChunkLocation = Vector<i64, 2>;
 pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
 
@@ -251,7 +181,7 @@ pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
 pub struct Chunk {
     location: ChunkLocation,
     blocks: [[Block; CHUNK_SIZE]; CHUNK_SIZE],
-    block_colliders: [[Box<[ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE],
+    block_colliders: [[Box<[phys::ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE],
     blocks_dirty: [[bool; CHUNK_SIZE]; CHUNK_SIZE],
     dirty: bool,
     geometry: Geometry<Vertex2D>,
@@ -311,39 +241,45 @@ impl Chunk {
         self.propagate_dirty(x, y, chunk_map);
     }
 
+    pub fn with_block<F, T>(&self, x: isize, y: isize, chunk_map: &ChunkMap, f: F) -> Option<T>
+    where
+        F: FnOnce(&Block) -> T,
+    {
+        let (chunk_offset_x, block_x) = resolve_relative_coordinate(x);
+        let (chunk_offset_y, block_y) = resolve_relative_coordinate(y);
+
+        if chunk_offset_x == 0 && chunk_offset_y == 0 {
+            Some(f(self.block_at(block_x, block_y)))
+        }
+        else {
+            let other_chunk_location = Vector([
+                self.location.x() + chunk_offset_x,
+                self.location.y() + chunk_offset_y,
+            ]);
+            chunk_map.get(&other_chunk_location).map(|other_chunk| {
+                f(other_chunk.borrow().block_at(block_x, block_y))
+            })
+        }
+    }
+
     pub fn propagate_dirty(&mut self, x: usize, y: usize, chunk_map: &ChunkMap) {
         for dy in [-1, 0, 1] {
             for dx in [-1, 0, 1] {
                 if dx == 0 && dy == 0 {
                     continue;
                 }
-                let mut chunk_location = self.location;
-                let mut dirty_x = x as isize + dx;
-                let mut dirty_y = y as isize + dy;
-                // Check if the targeted block is in another chunk horizontally
-                if dirty_x < 0 {
-                    chunk_location.set_x(chunk_location.x() - 1);
-                    dirty_x += CHUNK_SIZE as isize;
-                }
-                else if dirty_x >= CHUNK_SIZE as isize {
-                    chunk_location.set_x(chunk_location.x() + 1);
-                    dirty_x -= CHUNK_SIZE as isize;
-                }
-                // Check if the targeted block is in another chunk vertically
-                if dirty_y < 0 {
-                    chunk_location.set_y(chunk_location.y() - 1);
-                    dirty_y += CHUNK_SIZE as isize;
-                }
-                else if dirty_y >= CHUNK_SIZE as isize {
-                    chunk_location.set_y(chunk_location.y() + 1);
-                    dirty_y -= CHUNK_SIZE as isize;
-                }
 
-                if chunk_location == self.location {
-                    self.set_dirty_at(dirty_x as usize, dirty_y as usize, true);
+                let (chunk_offset_x, dirty_x) = resolve_relative_coordinate(x as isize + dx);
+                let (chunk_offset_y, dirty_y) = resolve_relative_coordinate(y as isize + dy);
+
+                if chunk_offset_x == 0 && chunk_offset_y == 0 {
+                    self.set_dirty_at(dirty_x, dirty_y, true);
                 }
-                else if let Some(chunk) = chunk_map.get(&chunk_location) {
-                    chunk.borrow_mut().set_dirty_at(dirty_x as usize, dirty_y as usize, true);
+                else if let Some(chunk) = chunk_map.get(&Vector([
+                    self.location.x() + chunk_offset_x,
+                    self.location.y() + chunk_offset_y,
+                ])) {
+                    chunk.borrow_mut().set_dirty_at(dirty_x, dirty_y, true);
                 }
             }
         }
@@ -374,7 +310,7 @@ impl Chunk {
         let _ = dt;
     }
 
-    pub fn render(&mut self, dt: f32, renderer: &BlockRenderer, chunk_map: &ChunkMap) {
+    pub fn render(&mut self, dt: f32, gfx: &BlockGraphics, chunk_map: &ChunkMap) {
         let _ = dt;
         if self.geometry.is_empty() {
             let mut vertices = Vec::new();
@@ -405,7 +341,7 @@ impl Chunk {
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     if self.is_dirty_at(x, y) {
-                        self.update_block_vertices(x, y, renderer, chunk_map);
+                        self.update_block_vertices(x, y, gfx, chunk_map);
                         self.blocks_dirty[y][x] = false;
                     }
                 }
@@ -417,11 +353,11 @@ impl Chunk {
         self.geometry.render();
     }
 
-    fn update_block_vertices(&mut self, x: usize, y: usize, renderer: &BlockRenderer, chunk_map: &ChunkMap) {
+    fn update_block_vertices(&mut self, x: usize, y: usize, gfx: &BlockGraphics, chunk_map: &ChunkMap) {
         // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
         let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
 
-        if let Some(appearance) = renderer.get_appearance(self.block_at(x, y).block_type) {
+        if let Some(appearance) = gfx.get_appearance(self.block_at(x, y).block_type) {
             let mut index = first_index;
             let uv_offsets = appearance.get_quad_uv_offsets(chunk_map, self, x, y);
             for (quad_offset, uv_offset) in std::iter::zip(BLOCK_QUAD_OFFSETS, uv_offsets) {
