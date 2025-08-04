@@ -91,7 +91,7 @@ impl Entity for Player {
             self.jump_cooldown = 0.0;
         }
         if self.jump_cooldown <= 0.0 {
-            if inputs.key_is_held(input::Key::Space) /*&& collider.is_grounded()*/ {
+            if inputs.key_is_held(input::Key::Space) && collider.hit_bottom {
                 collider.velocity.set_y(self.jump_speed);
                 self.jump_cooldown = JUMP_COOLDOWN_SECONDS;
             }
@@ -109,7 +109,7 @@ impl Entity for Player {
             collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.6875);
         }
 
-        let speed_multiplier = if self.crouching /*&& collider.is_grounded()*/ {
+        let speed_multiplier = if self.crouching && collider.hit_bottom {
             0.5
         } else {
             1.0

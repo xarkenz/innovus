@@ -5,20 +5,58 @@ use std::collections::BinaryHeap;
 // TODO: seems hacky. how else to deal with FP precision?
 pub const COLLISION_TOLERANCE: f32 = 1.0e-5;
 
+/// The side/corner of collider 1 which will collide with collider 2.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum CollisionKind {
-    // The ordinal values are important for ordering
-    LeftRight = 0,
-    TopBottom = 1,
-    Corner = 2,
+pub enum CollisionSide {
+    // The order doesn't really matter as long as the corners come last
+    /// The left side of collider 1 will collide with the right side of collider 2.
+    Left,
+    /// The right side of collider 1 will collide with the left side of collider 2.
+    Right,
+    /// The bottom side of collider 1 will collide with the top side of collider 2.
+    Bottom,
+    /// The top side of collider 1 will collide with the bottom side of collider 2.
+    Top,
+    /// The bottom-left corner of collider 1 will collide with the top-right corner of collider 2.
+    BottomLeft,
+    /// The bottom-right corner of collider 1 will collide with the top-left corner of collider 2.
+    BottomRight,
+    /// The top-left corner of collider 1 will collide with the bottom-right corner of collider 2.
+    TopLeft,
+    /// The top-right corner of collider 1 will collide with the bottom-left corner of collider 2.
+    TopRight,
 }
 
-impl CollisionKind {
-    pub fn from_times(x_time: f32, y_time: f32) -> Self {
+impl CollisionSide {
+    pub fn detect(x_time: f32, y_time: f32, relative_velocity: Vector<f32, 2>) -> Self {
         match x_time.total_cmp(&y_time) {
-            Ordering::Less => Self::LeftRight,
-            Ordering::Greater => Self::TopBottom,
-            Ordering::Equal => Self::Corner,
+            Ordering::Less => {
+                if relative_velocity.x() > 0.0 { Self::Right } else { Self::Left }
+            }
+            Ordering::Greater => {
+                if relative_velocity.y() > 0.0 { Self::Top } else { Self::Bottom }
+            }
+            Ordering::Equal => {
+                if relative_velocity.x() > 0.0 {
+                    if relative_velocity.y() > 0.0 { Self::TopRight } else { Self::BottomRight }
+                }
+                else {
+                    if relative_velocity.y() > 0.0 { Self::TopLeft } else { Self::BottomLeft }
+                }
+            }
+        }
+    }
+
+    pub fn opposite(&self) -> Self {
+        match self {
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+            Self::Bottom => Self::Top,
+            Self::Top => Self::Bottom,
+            Self::BottomLeft => Self::TopRight,
+            Self::BottomRight => Self::TopLeft,
+            Self::TopLeft => Self::BottomRight,
+            Self::TopRight => Self::BottomLeft,
         }
     }
 }
@@ -28,12 +66,12 @@ pub struct Collision {
     pub index_1: usize,
     pub index_2: usize,
     pub time: f32,
-    pub kind: CollisionKind,
+    pub side: CollisionSide,
 }
 
 impl PartialEq for Collision {
     fn eq(&self, other: &Self) -> bool {
-        self.time == other.time && self.kind == other.kind
+        self.time == other.time && self.side == other.side
     }
 }
 
@@ -44,10 +82,10 @@ impl PartialOrd for Collision {
         // Since std::collections::BinaryHeap is a max-heap, and we want the earliest collisions
         // processed first, collisions with a greater time are treated as lesser priority
         // (hence the call to reverse()).
-        // Comparing the collision kind ensures that when there is a tie for time,
+        // Comparing the collision side ensures that when there is a tie for time,
         // corner hits are checked after edge hits.
         Some(self.time.partial_cmp(&other.time)?
-            .then_with(|| self.kind.cmp(&other.kind))
+            .then_with(|| self.side.cmp(&other.side))
             .reverse())
     }
 }
@@ -64,6 +102,10 @@ pub struct Collider {
     pub fixed: bool,
     pub rectangle: Rectangle<f32>,
     pub velocity: Vector<f32, 2>,
+    pub hit_left: bool,
+    pub hit_right: bool,
+    pub hit_bottom: bool,
+    pub hit_top: bool,
 }
 
 impl Collider {
@@ -72,6 +114,10 @@ impl Collider {
             fixed: false,
             rectangle,
             velocity,
+            hit_left: false,
+            hit_right: false,
+            hit_bottom: false,
+            hit_top: false,
         }
     }
 
@@ -80,11 +126,55 @@ impl Collider {
             fixed: true,
             rectangle: rect,
             velocity: Vector::zero(),
+            hit_left: false,
+            hit_right: false,
+            hit_bottom: false,
+            hit_top: false,
         }
     }
 
     pub fn stop(&mut self) {
         self.velocity = Vector::zero();
+    }
+
+    pub fn clear_hit_flags(&mut self) {
+        self.hit_left = false;
+        self.hit_right = false;
+        self.hit_bottom = false;
+        self.hit_top = false;
+    }
+
+    pub fn set_hit_flags(&mut self, side: CollisionSide) {
+        match side {
+            CollisionSide::Left => {
+                self.hit_left = true;
+            }
+            CollisionSide::Right => {
+                self.hit_right = true;
+            }
+            CollisionSide::Bottom => {
+                self.hit_bottom = true;
+            }
+            CollisionSide::Top => {
+                self.hit_top = true;
+            }
+            CollisionSide::BottomLeft => {
+                self.hit_left = true;
+                self.hit_bottom = true;
+            }
+            CollisionSide::BottomRight => {
+                self.hit_right = true;
+                self.hit_bottom = true;
+            }
+            CollisionSide::TopLeft => {
+                self.hit_left = true;
+                self.hit_top = true;
+            }
+            CollisionSide::TopRight => {
+                self.hit_right = true;
+                self.hit_top = true;
+            }
+        }
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
@@ -99,7 +189,7 @@ impl Collider {
         phase
     }
 
-    pub fn sweep_collision(&self, other: &Self, dt: f32) -> Option<(f32, CollisionKind)> {
+    pub fn sweep_collision(&self, other: &Self, dt: f32) -> Option<(f32, CollisionSide)> {
         // Determine the time of collision in the x-direction, or infinity if no collision
         let mut x_time = match self.velocity.x().partial_cmp(&other.velocity.x()) {
             Some(Ordering::Less) => (other.rectangle.max_x() - self.rectangle.min_x())
@@ -147,7 +237,7 @@ impl Collider {
         // Determine which direction collides first, if any
         let collision_time = x_time.min(y_time);
         if -COLLISION_TOLERANCE <= collision_time && collision_time <= dt {
-            Some((collision_time, CollisionKind::from_times(x_time, y_time)))
+            Some((collision_time, CollisionSide::detect(x_time, y_time, self.velocity - other.velocity)))
         }
         else {
             None
@@ -233,7 +323,7 @@ impl Physics {
     pub fn add_collider(&mut self, collider: Collider) -> ColliderHandle {
         if let Some(first_open_slot_index) = self.first_open_slot_index {
             if let ColliderSlot::Open { next_open_slot_index, version } = self.slots[first_open_slot_index] {
-                let version = version + 1;
+                let version = version.wrapping_add(1);
                 self.first_open_slot_index = next_open_slot_index;
                 self.slots[first_open_slot_index] = ColliderSlot::Filled {
                     collider,
@@ -297,7 +387,13 @@ impl Physics {
     }
 
     pub fn step_simulation(&mut self, dt: f32) {
-        // FIXME: something is still a little broken here. objects sometimes clip through each other
+        // Clear all collider hit flags
+        for slot in &mut self.slots {
+            if let ColliderSlot::Filled { collider, .. } = slot {
+                collider.clear_hit_flags();
+            }
+        }
+
         // Keep track of how much time has been used by advancing to collision sites
         let mut time_used = Vec::with_capacity(self.slots.len());
         time_used.resize(self.slots.len(), 0.0);
@@ -319,22 +415,35 @@ impl Physics {
 
             for index in [collision.index_1, collision.index_2] {
                 let collider = self.slots[index].current_collider_mut().unwrap();
+
                 // Advance to the collision site
                 collider.rectangle.shift_by(collider.velocity * (collision.time - time_used[index]));
                 // Record the amount of time passed once collision site is reached
                 time_used[index] = collision.time;
                 // Set the post-collision velocity of the collider
-                collider.velocity = match collision.kind {
-                    CollisionKind::LeftRight => Vector([
-                        collision_velocity.x(),
-                        collider.velocity.y(),
-                    ]),
-                    CollisionKind::TopBottom => Vector([
-                        collider.velocity.x(),
-                        collision_velocity.y(),
-                    ]),
-                    CollisionKind::Corner => collision_velocity, // Subject to change
+                collider.velocity = match collision.side {
+                    CollisionSide::Left |
+                    CollisionSide::Right => {
+                        Vector([collision_velocity.x(), collider.velocity.y()])
+                    }
+                    CollisionSide::Bottom |
+                    CollisionSide::Top => {
+                        Vector([collider.velocity.x(), collision_velocity.y()])
+                    }
+                    CollisionSide::BottomLeft |
+                    CollisionSide::BottomRight |
+                    CollisionSide::TopLeft |
+                    CollisionSide::TopRight => {
+                        // Subject to change
+                        collision_velocity
+                    }
                 };
+                // Set the corresponding hit flags in the collider
+                collider.set_hit_flags(if index == collision.index_1 {
+                    collision.side
+                } else {
+                    collision.side.opposite()
+                });
             }
         }
 
@@ -370,11 +479,11 @@ impl Physics {
                         // broad phases don't intersect, we can discard the pair.
                         if collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
                             // Now, check for an actual collision between the two colliders
-                            collider_1.sweep_collision(collider_2, dt).map(|(time, kind)| Collision {
+                            collider_1.sweep_collision(collider_2, dt).map(|(time, side)| Collision {
                                 index_1,
                                 index_2,
                                 time,
-                                kind,
+                                side,
                             })
                         }
                         else {
