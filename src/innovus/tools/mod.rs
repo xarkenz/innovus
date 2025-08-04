@@ -64,12 +64,20 @@ impl<T: Float + NumAssign, const N: usize> Vector<T, N> {
     }
 
     pub fn normalized(&self) -> Self {
-        let mut normal = *self;
-        let magnitude = normal.magnitude();
+        let magnitude = self.magnitude();
+        Vector(self.0.map(|component| component / magnitude))
+    }
+
+    pub fn equals_delta(&self, other: &Self, delta: T) -> bool {
+        std::iter::zip(&self.0, &other.0).all(|(&a, &b)| (a - b).abs() <= delta)
+    }
+
+    pub fn lerp(&self, other: &Self, t: T) -> Self {
+        let mut result = Vector::zero();
         for index in 0..N {
-            normal.0[index] /= magnitude;
+            result.set(index, self.at(index) * (T::one() - t) + other.at(index) * t);
         }
-        normal
+        result
     }
 }
 
@@ -531,7 +539,7 @@ impl Transform3D {
     ) -> Transform3D {
         let mut transform = Transform3D::zero();
         transform.set_look_at(eye, center, up);
-        return transform;
+        transform
     }
 
     pub fn look_at(&mut self, eye: Vector<f32, 3>, center: Vector<f32, 3>, up: Vector<f32, 3>) {
@@ -688,6 +696,7 @@ impl<T: Float + NumAssign, const R: usize, const N: usize, const C: usize>
     Mul<Matrix<T, N, C>> for &Matrix<T, R, N>
 {
     type Output = <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::Output;
+
     fn mul(self, rhs: Matrix<T, N, C>) -> Self::Output {
         <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::mul(*self, rhs)
     }
@@ -697,6 +706,7 @@ impl<T: Float + NumAssign, const R: usize, const N: usize, const C: usize>
     Mul<Matrix<T, N, C>> for &mut Matrix<T, R, N>
 {
     type Output = <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::Output;
+
     fn mul(self, rhs: Matrix<T, N, C>) -> Self::Output {
         <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::mul(*self, rhs)
     }

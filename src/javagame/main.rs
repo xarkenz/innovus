@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use crate::{tools::*, world::gen::WorldGenerator};
 use innovus::{gfx::*, *};
 use crate::world::block::BlockRenderer;
+use crate::world::entity::Entity;
 
 pub mod tools;
 pub mod view;
@@ -36,21 +37,12 @@ fn main() {
     )));
     current_world.force_get_chunk(Vector([0, -1]));
     current_world.force_get_chunk(Vector([-1, -1]));
-    // let test_box = world::entity::types::TestBox::new(
-    //     current_world.physics_mut(),
-    //     phys::Collider::new(
-    //         Rectangle::new(Vector([10.0, 4.0]), Vector([12.0, 6.0])),
-    //         Vector([-1.0, -4.0]),
-    //     ),
-    //     [0.0, 0.0, 1.0, 1.0],
-    //     true,
-    // );
-    // current_world.add_entity(Box::new(test_box));
     let player = world::entity::types::Player::new(
         current_world.physics_mut(),
         Vector([0.0, 0.0]),
         None,
     );
+    let player_uuid = player.uuid();
     current_world.add_entity(Box::new(player));
 
     let mut camera = view::Camera::new(
@@ -114,6 +106,8 @@ fn main() {
         }
 
         current_world.update(&input_state, dt);
+        // Move camera towards player
+        camera.set_target(current_world.get_entity(player_uuid).unwrap().position());
         camera.update(dt);
 
         shader_program.set_uniform("camera_view", camera.view());

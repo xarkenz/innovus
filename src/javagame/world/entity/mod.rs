@@ -21,3 +21,7 @@ pub trait Entity {
 
     fn destroy(&mut self, physics: &mut phys::Physics);
 }
+
+pub struct EntityRenderer {
+    //
+}
