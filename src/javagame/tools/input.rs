@@ -1,8 +1,7 @@
 use glfw::{Action, Modifiers, WindowEvent};
-use innovus::{Application, WindowEventReceiver};
+use innovus::{Application, WindowEventReceiver, tools::Vector};
 
 pub use glfw::{Key, MouseButton, MouseButtonLeft, MouseButtonRight, MouseButtonMiddle};
-use innovus::tools::Vector;
 
 const FIRST_KEY_VALUE: usize = glfw::ffi::KEY_SPACE as usize;
 const LAST_KEY_VALUE: usize = glfw::ffi::KEY_LAST as usize;
@@ -15,7 +14,8 @@ const fn get_key_index(key: Key) -> Option<usize> {
     let key = key as usize;
     if FIRST_KEY_VALUE <= key && key <= LAST_KEY_VALUE {
         Some(key - FIRST_KEY_VALUE)
-    } else {
+    }
+    else {
         None
     }
 }
@@ -24,7 +24,8 @@ const fn get_mouse_button_index(button: MouseButton) -> Option<usize> {
     let button = button as usize;
     if FIRST_MOUSE_BUTTON_VALUE <= button && button <= LAST_MOUSE_BUTTON_VALUE {
         Some(button - FIRST_MOUSE_BUTTON_VALUE)
-    } else {
+    }
+    else {
         None
     }
 }

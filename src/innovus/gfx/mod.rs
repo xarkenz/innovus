@@ -1244,9 +1244,10 @@ pub struct Image {
 
 impl Image {
     pub fn new(width: u32, height: u32) -> Self {
-        let size_bytes = (width * height * 4) as usize;
+        let mut data = Vec::with_capacity(width as usize * height as usize * 4);
+        data.resize(data.capacity(), 0);
         Self {
-            data: Vec::from_iter(std::iter::repeat(0).take(size_bytes)),
+            data,
             width,
             height,
         }
@@ -1264,46 +1265,6 @@ impl Image {
         })
     }
 
-    pub fn new_atlas(images: &[Self]) -> (Self, Vec<Vector<u32, 2>>) {
-        let atlas_width = images.iter().map(Self::width).max().map_or(0, |width| width + 2);
-        let atlas_height = images.iter().map(Self::height).sum::<u32>() + 2 * images.len() as u32;
-
-        let mut atlas = Self::new(atlas_width, atlas_height);
-        let mut image_origins = Vec::with_capacity(images.len());
-
-        fn write_row(atlas: &mut Image, offset: usize, data: &[u8]) {
-            atlas.data_mut()[offset - 4 ..offset]
-                .copy_from_slice(&data[0 .. 4]);
-            atlas.data_mut()[offset.. offset + data.len()]
-                .copy_from_slice(data);
-            atlas.data_mut()[offset + data.len() .. offset + data.len() + 4]
-                .copy_from_slice(&data[data.len() - 4 .. data.len()]);
-        }
-
-        let mut origin_y = 1;
-        for image in images {
-            let mut row_offset = ((origin_y - 1) * atlas_width * 4) as usize + 4;
-            for (row_index, row_data) in image.data().chunks_exact((image.width() * 4) as usize).enumerate() {
-                if row_index == 0 {
-                    write_row(&mut atlas, row_offset, row_data);
-                    row_offset += (atlas_width * 4) as usize;
-                }
-
-                write_row(&mut atlas, row_offset, row_data);
-                row_offset += (atlas_width * 4) as usize;
-
-                if row_index == image.height() as usize - 1 {
-                    write_row(&mut atlas, row_offset, row_data);
-                }
-            }
-
-            image_origins.push(Vector([1, origin_y]));
-            origin_y += image.height() + 2;
-        }
-
-        (atlas, image_origins)
-    }
-
     pub fn width(&self) -> u32 {
         self.width
     }
@@ -1318,6 +1279,135 @@ impl Image {
 
     pub fn data_mut(&mut self) -> &mut [u8] {
         &mut self.data
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub enum ImageAtlasFlow {
+    LeftToRight,
+    #[default] // Most efficient to construct
+    TopToBottom,
+}
+
+pub struct ImageAtlas {
+    image: Image,
+    flow: ImageAtlasFlow,
+    flow_x: u32,
+    flow_y: u32,
+}
+
+impl ImageAtlas {
+    pub fn new(flow: ImageAtlasFlow) -> Self {
+        Self {
+            image: Image {
+                data: Vec::new(),
+                width: 0,
+                height: 0,
+            },
+            flow,
+            flow_y: 0,
+            flow_x: 0,
+        }
+    }
+
+    pub fn image(&self) -> &Image {
+        &self.image
+    }
+
+    pub fn image_mut(&mut self) -> &mut Image {
+        &mut self.image
+    }
+
+    pub fn width(&self) -> u32 {
+        self.image.width()
+    }
+
+    pub fn height(&self) -> u32 {
+        self.image.height()
+    }
+
+    pub fn data(&self) -> &[u8] {
+        self.image.data()
+    }
+
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        self.image.data_mut()
+    }
+
+    pub fn add_image(&mut self, image: &Image) -> Vector<u32, 2> {
+        let mut flow_x = self.flow_x;
+        let mut flow_y = self.flow_y;
+
+        // Check bounds and calculate the new flow point
+        match self.flow {
+            ImageAtlasFlow::LeftToRight => {
+                self.flow_x = flow_x.checked_add(image.width()).unwrap_or_else(|| {
+                    // Overflow into a new row
+                    self.flow_y = self.height();
+                    flow_y = self.flow_y;
+                    flow_x = 0;
+                    image.width()
+                })
+            }
+            ImageAtlasFlow::TopToBottom => {
+                self.flow_y = flow_y.checked_add(image.height()).unwrap_or_else(|| {
+                    // Overflow into a new column
+                    self.flow_x = self.width();
+                    flow_x = self.flow_x;
+                    flow_y = 0;
+                    image.height()
+                })
+            }
+        }
+
+        if flow_x + image.width() > self.width() {
+            // Expand the atlas width (and maybe height). Might as well just make a new array, lol
+            let expanded_width = flow_x + image.width();
+            let expanded_height = self.height().max(flow_y + image.height());
+            let mut expanded_data = Vec::with_capacity(expanded_width as usize * expanded_height as usize * 4);
+            expanded_data.resize(expanded_data.capacity(), 0);
+            // Copy from old data to new data, row by row
+            for y in 0 .. self.height() as usize {
+                let src_start = y * self.width() as usize * 4;
+                let dst_start = y * expanded_width as usize * 4;
+                let length = self.width() as usize * 4;
+                expanded_data[dst_start .. dst_start + length]
+                    .copy_from_slice(&self.data()[src_start .. src_start + length]);
+            }
+            // Replace the old image data
+            self.image.data = expanded_data;
+            self.image.width = expanded_width;
+            self.image.height = expanded_height;
+        }
+        else if flow_y + image.height() > self.height() {
+            // Only expand the atlas in the Y direction. No need for mass copying in this case
+            self.image.height = flow_y + image.height();
+            self.image.data.resize(self.width() as usize * self.height() as usize * 4, 0);
+        }
+
+        // Write the new image into place, row by row
+        for y_offset in 0 .. image.height() as usize {
+            let src_start = y_offset * image.width() as usize * 4;
+            let dst_start = ((flow_y as usize + y_offset) * self.width() as usize * 4) + flow_x as usize * 4;
+            let length = image.width() as usize * 4;
+            self.data_mut()[dst_start .. dst_start + length]
+                .copy_from_slice(&image.data()[src_start .. src_start + length]);
+        }
+
+        Vector([flow_x, flow_y])
+    }
+
+    pub fn next_flow(&mut self) {
+        match self.flow {
+            ImageAtlasFlow::LeftToRight => {
+                self.flow_y = self.height();
+                self.flow_x = 0;
+            }
+            ImageAtlasFlow::TopToBottom => {
+                self.flow_x = self.width();
+                self.flow_y = 0;
+            }
+        }
     }
 }
 
@@ -1376,13 +1466,27 @@ impl Texture2D {
     pub fn load_from_image(&mut self, image: &Image) {
         self.bind();
         unsafe {
+            // Allocate a texture whose size is the next power of 2 for each dimension.
+            // This is useful for e.g. texture atlases, where floating-point precision is important.
             gl::TexImage2D(
                 gl::TEXTURE_2D,
                 0,
                 gl::RGBA as GLint,
+                image.width().next_power_of_two() as GLsizei,
+                image.height().next_power_of_two() as GLsizei,
+                0,
+                gl::RGBA,
+                gl::UNSIGNED_BYTE,
+                std::ptr::null(),
+            );
+            // Download the image onto the texture
+            gl::TexSubImage2D(
+                gl::TEXTURE_2D,
+                0,
+                0,
+                0,
                 image.width() as GLsizei,
                 image.height() as GLsizei,
-                0,
                 gl::RGBA,
                 gl::UNSIGNED_BYTE,
                 image.data().as_ptr() as *const GLvoid,
