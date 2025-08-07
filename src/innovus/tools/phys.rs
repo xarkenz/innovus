@@ -1,6 +1,7 @@
 use super::*;
 
 use std::collections::BinaryHeap;
+use crate::tools::arena::{UnboundedArena, ArenaHandle};
 
 // TODO: seems hacky. how else to deal with FP precision?
 pub const COLLISION_TOLERANCE: f32 = 1.0e-5;
@@ -255,154 +256,51 @@ impl Collider {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct ColliderHandle {
-    slot: usize,
-    version: usize,
-}
-
-#[derive(Debug)]
-enum ColliderSlot {
-    Open {
-        next_open_slot_index: Option<usize>,
-        version: usize,
-    },
-    Filled {
-        collider: Collider,
-        version: usize,
-    },
-}
-
-impl ColliderSlot {
-    fn current_collider(&self) -> Option<&Collider> {
-        match self {
-            Self::Open { .. } => None,
-            Self::Filled { collider, .. } => Some(collider),
-        }
-    }
-
-    fn collider(&self, handle_version: usize) -> Option<&Collider> {
-        match self {
-            Self::Open { .. } => None,
-            Self::Filled { collider, version } => {
-                (handle_version == *version).then_some(collider)
-            },
-        }
-    }
-
-    fn current_collider_mut(&mut self) -> Option<&mut Collider> {
-        match self {
-            Self::Open { .. } => None,
-            Self::Filled { collider, .. } => Some(collider),
-        }
-    }
-
-    fn collider_mut(&mut self, handle_version: usize) -> Option<&mut Collider> {
-        match self {
-            Self::Open { .. } => None,
-            Self::Filled { collider, version } => {
-                (handle_version == *version).then_some(collider)
-            },
-        }
-    }
-}
+pub struct ColliderHandle(ArenaHandle);
 
 #[derive(Debug)]
 pub struct Physics {
-    slots: Vec<ColliderSlot>,
-    first_open_slot_index: Option<usize>,
+    arena: UnboundedArena<Collider>,
 }
 
 impl Physics {
     pub fn new() -> Self {
         Self {
-            slots: Vec::new(),
-            first_open_slot_index: None,
+            arena: UnboundedArena::new(),
         }
     }
 
     pub fn add_collider(&mut self, collider: Collider) -> ColliderHandle {
-        if let Some(first_open_slot_index) = self.first_open_slot_index {
-            if let ColliderSlot::Open { next_open_slot_index, version } = self.slots[first_open_slot_index] {
-                let version = version.wrapping_add(1);
-                self.first_open_slot_index = next_open_slot_index;
-                self.slots[first_open_slot_index] = ColliderSlot::Filled {
-                    collider,
-                    version,
-                };
-                ColliderHandle {
-                    slot: first_open_slot_index,
-                    version,
-                }
-            }
-            else {
-                unreachable!("physics collider data found in slot marked as open")
-            }
-        }
-        else {
-            let handle = ColliderHandle {
-                slot: self.slots.len(),
-                version: 0,
-            };
-            self.slots.push(ColliderSlot::Filled {
-                collider,
-                version: 0,
-            });
-            handle
-        }
+        ColliderHandle(self.arena.insert(collider))
     }
 
     pub fn get_collider(&self, handle: &ColliderHandle) -> Option<&Collider> {
-        self.slots.get(handle.slot).and_then(|slot| slot.collider(handle.version))
+        self.arena.get(handle.0)
     }
 
     pub fn get_collider_mut(&mut self, handle: &ColliderHandle) -> Option<&mut Collider> {
-        self.slots.get_mut(handle.slot).and_then(|slot| slot.collider_mut(handle.version))
+        self.arena.get_mut(handle.0)
     }
 
     pub fn remove_collider(&mut self, handle: ColliderHandle) -> Option<Collider> {
-        if handle.slot >= self.slots.len() {
-            None
-        }
-        else if let ColliderSlot::Filled { version, .. } = self.slots[handle.slot] {
-            if handle.version != version {
-                None
-            }
-            else if let ColliderSlot::Filled { collider, .. } = std::mem::replace(
-                &mut self.slots[handle.slot],
-                ColliderSlot::Open {
-                    next_open_slot_index: self.first_open_slot_index,
-                    version,
-                },
-            ) {
-                self.first_open_slot_index = Some(handle.slot);
-                Some(collider)
-            }
-            else {
-                unreachable!()
-            }
-        }
-        else {
-            None
-        }
+        self.arena.remove(handle.0)
     }
 
     pub fn step_simulation(&mut self, dt: f32) {
         // Clear all collider hit flags
-        for slot in &mut self.slots {
-            if let ColliderSlot::Filled { collider, .. } = slot {
-                collider.clear_hit_flags();
-            }
+        for (_, collider) in self.arena.values_mut() {
+            collider.clear_hit_flags();
         }
 
         // Keep track of how much time has been used by advancing to collision sites
-        let mut time_used = Vec::with_capacity(self.slots.len());
-        time_used.resize(self.slots.len(), 0.0);
+        let mut time_used = Vec::with_capacity(self.arena.slots().len());
+        time_used.resize(time_used.capacity(), 0.0);
 
         // Incrementally handle all swept collisions, earliest first
         let mut collisions = self.get_collisions(dt);
         while let Some(collision) = collisions.pop() {
-            let collider_1 = self.slots[collision.index_1].current_collider().unwrap();
-            let collider_2 = self.slots[collision.index_2].current_collider().unwrap();
+            let collider_1 = self.arena.get_current(collision.index_1).unwrap();
+            let collider_2 = self.arena.get_current(collision.index_2).unwrap();
 
             // Double-check that there is still a broad phase intersection between the colliders.
             // This is necessary because the colliders' velocities may have changed since the
@@ -414,7 +312,7 @@ impl Physics {
             let collision_velocity = collider_1.collision_velocity(collider_2);
 
             for index in [collision.index_1, collision.index_2] {
-                let collider = self.slots[index].current_collider_mut().unwrap();
+                let collider = self.arena.get_current_mut(index).unwrap();
 
                 // Advance to the collision site
                 collider.rectangle.shift_by(collider.velocity * (collision.time - time_used[index]));
@@ -448,21 +346,14 @@ impl Physics {
         }
 
         // Advance all colliders to their final position
-        for (index, slot) in self.slots.iter_mut().enumerate() {
-            if let Some(collider) = slot.current_collider_mut() {
-                collider.rectangle.shift_by(collider.velocity * (dt - time_used[index]));
-            }
+        for (index, collider) in self.arena.values_mut() {
+            collider.rectangle.shift_by(collider.velocity * (dt - time_used[index]));
         }
     }
 
     fn get_collisions(&self, dt: f32) -> BinaryHeap<Collision> {
         // TODO: this is a fairly naive approach
-        let indexed_colliders = self.slots.iter()
-            .enumerate()
-            .filter_map(|(index, slot)| slot.current_collider()
-                .map(|collider| (index, collider)));
-
-        indexed_colliders.clone()
+        self.arena.values()
             .enumerate()
             .flat_map(move |(checked_count, (index_1, collider_1))| {
                 // Skipping checked_count + 1 elements starts the below loop right after this one
@@ -470,7 +361,7 @@ impl Physics {
                 // a) no collider is checked against itself
                 // b) there is only one check performed on each pair
                 // c) for each pair (index_1, index_2) it holds that index_1 < index_2
-                indexed_colliders.clone()
+                self.arena.values()
                     .skip(checked_count + 1)
                     .filter_map(move |(index_2, collider_2)| {
                         // Before checking for actual collision between a pair, we will first

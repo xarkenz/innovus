@@ -3,6 +3,7 @@ use innovus::gfx::*;
 
 pub mod movement;
 pub mod types;
+pub mod rendering;
 
 pub trait Entity {
     fn entity_type(&self) -> &'static str;

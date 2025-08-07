@@ -5,6 +5,7 @@ use std::{fmt, ops::*};
 pub use uuid::Uuid;
 
 pub mod phys;
+pub mod arena;
 
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
@@ -882,6 +883,14 @@ impl<T: NumAssign + Copy> Rectangle<T> {
 
     pub fn center(&self) -> Vector<T, 2> {
         (self.min + self.max) / (T::one() + T::one())
+    }
+
+    pub fn flip_x(&mut self) {
+        std::mem::swap(&mut self.min[0], &mut self.max[0]);
+    }
+
+    pub fn flip_y(&mut self) {
+        std::mem::swap(&mut self.min[1], &mut self.max[1]);
     }
 }
 
