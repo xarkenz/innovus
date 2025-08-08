@@ -15,14 +15,12 @@ pub type WindowEventReceiver = Receiver<(f64, WindowEvent)>;
 
 pub struct Application {
     glfw: glfw::Glfw,
-    windows: Vec<Window>,
 }
 
 impl Application {
     pub fn new() -> Result<Application, String> {
         Ok(Application {
             glfw: glfw::init(glfw::FAIL_ON_ERRORS).map_err(|err| err.to_string())?,
-            windows: Vec::new(),
         })
     }
 

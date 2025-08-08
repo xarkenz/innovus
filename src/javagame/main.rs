@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use innovus::{gfx::*, *};
 use crate::tools::*;
 
@@ -20,6 +19,7 @@ fn main() {
     window.set_scroll_polling(true);
 
     let shader_program = Program::from_preset(ProgramPreset::Default2DShader).unwrap();
+    shader_program.set_uniform("tex_atlas", 0_u32);
     screen::set_clear_color(0.6, 0.8, 1.0);
     screen::set_blend(screen::Blend::Transparency);
 
@@ -28,29 +28,29 @@ fn main() {
     let clock = Clock::start();
     let mut prev_time = clock.read();
 
+    let mut assets = asset::AssetPool::new().unwrap();
+
     let mut current_world = world::World::new(Some(Box::new(
         world::gen::types::OverworldGenerator::new(0),
     )));
     current_world.force_get_chunk(Vector([0, -1]));
     current_world.force_get_chunk(Vector([-1, -1]));
+    let player_start = Vector([0.0, 0.0]);
     let player = world::entity::types::Player::new(
-        current_world.physics_mut(),
-        Vector([0.0, 0.0]),
+        player_start,
         None,
     );
     let player_uuid = world::entity::Entity::uuid(&player);
-    current_world.add_entity(Box::new(player));
+    current_world.add_entity(Box::new(player), &mut assets);
 
     let mut camera = view::Camera::new(
-        Vector([0.0, 0.0]),
+        player_start,
         Vector({
             let (width, height) = window.get_size();
             screen::set_viewport(0, 0, width, height);
             [width as f32, height as f32]
         }),
     );
-
-    let block_renderer = asset::BlockGraphics::new().unwrap();
 
     let mut selected_block_index = 0;
 
@@ -110,7 +110,7 @@ fn main() {
         shader_program.set_uniform("camera_proj", camera.projection());
 
         screen::clear();
-        current_world.render(dt, &block_renderer);
+        current_world.render(dt, &mut assets);
         window.swap_buffers();
     }
 }

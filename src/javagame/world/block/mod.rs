@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use innovus::{gfx::*, tools::*};
 use std::fmt::Formatter;
-use crate::tools::asset::BlockGraphics;
+use crate::tools::asset::AssetPool;
 
 pub mod types;
 
@@ -310,7 +310,7 @@ impl Chunk {
         let _ = dt;
     }
 
-    pub fn render(&mut self, dt: f32, gfx: &BlockGraphics, chunk_map: &ChunkMap) {
+    pub fn render(&mut self, dt: f32, assets: &AssetPool, chunk_map: &ChunkMap) {
         let _ = dt;
         if self.geometry.is_empty() {
             let mut vertices = Vec::new();
@@ -341,7 +341,7 @@ impl Chunk {
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     if self.is_dirty_at(x, y) {
-                        self.update_block_vertices(x, y, gfx, chunk_map);
+                        self.update_block_vertices(x, y, assets, chunk_map);
                         self.blocks_dirty[y][x] = false;
                     }
                 }
@@ -353,11 +353,11 @@ impl Chunk {
         self.geometry.render();
     }
 
-    fn update_block_vertices(&mut self, x: usize, y: usize, gfx: &BlockGraphics, chunk_map: &ChunkMap) {
+    fn update_block_vertices(&mut self, x: usize, y: usize, assets: &AssetPool, chunk_map: &ChunkMap) {
         // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
         let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
 
-        if let Some(appearance) = gfx.get_appearance(self.block_at(x, y).block_type) {
+        if let Some(appearance) = assets.get_block_appearance(self.block_at(x, y).block_type) {
             let mut index = first_index;
             let uv_offsets = appearance.get_quad_uv_offsets(chunk_map, self, x, y);
             for (quad_offset, uv_offset) in std::iter::zip(BLOCK_QUAD_OFFSETS, uv_offsets) {

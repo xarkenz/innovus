@@ -237,15 +237,17 @@ impl<'a, T> ArenaValues<'a, T> {
 }
 
 impl<'a, T> Iterator for ArenaValues<'a, T> {
-    type Item = (usize, &'a T);
+    type Item = (ArenaHandle, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let slot = self.next_slot;
             self.next_slot += 1;
             match self.slots.next() {
-                Some(ArenaSlot::Open { .. }) => continue,
-                Some(ArenaSlot::Filled { value, .. }) => break Some((slot, value)),
+                Some(&ArenaSlot::Open { .. }) => continue,
+                Some(&ArenaSlot::Filled { ref value, version }) => {
+                    break Some((ArenaHandle { slot, version }, value))
+                }
                 None => break None,
             }
         }
@@ -267,15 +269,17 @@ impl<'a, T> ArenaValuesMut<'a, T> {
 }
 
 impl<'a, T> Iterator for ArenaValuesMut<'a, T> {
-    type Item = (usize, &'a mut T);
+    type Item = (ArenaHandle, &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let slot = self.next_slot;
             self.next_slot += 1;
             match self.slots.next() {
-                Some(ArenaSlot::Open { .. }) => continue,
-                Some(ArenaSlot::Filled { value, .. }) => break Some((slot, value)),
+                Some(&mut ArenaSlot::Open { .. }) => continue,
+                Some(&mut ArenaSlot::Filled { ref mut value, version }) => {
+                    break Some((ArenaHandle { slot, version }, value))
+                }
                 None => break None,
             }
         }

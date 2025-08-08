@@ -7,7 +7,7 @@ pub use uuid::Uuid;
 pub mod phys;
 pub mod arena;
 
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct Vector<T: NumAssign + Copy, const N: usize>(
     pub [T; N],
@@ -316,7 +316,7 @@ impl<T: NumAssign + Copy, const N: usize> fmt::Debug for Vector<T, N> where T: f
     }
 }
 
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct Matrix<T: Float + NumAssign, const R: usize, const C: usize>(
     pub [Vector<T, R>; C],
@@ -798,6 +798,14 @@ impl<T: NumAssign + Copy> Rectangle<T> {
 
     pub fn max_y(&self) -> T {
         self.max.y()
+    }
+
+    pub fn min_x_max_y(&self) -> Vector<T, 2> {
+        Vector([self.min_x(), self.max_y()])
+    }
+
+    pub fn max_x_min_y(&self) -> Vector<T, 2> {
+        Vector([self.max_x(), self.min_y()])
     }
 
     pub fn size(&self) -> Vector<T, 2> {

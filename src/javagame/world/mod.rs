@@ -2,6 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use crate::tools::*;
+use crate::world::entity::render::EntityRenderer;
 
 pub mod block;
 pub mod entity;
@@ -10,8 +11,9 @@ pub mod gen;
 pub struct World<'world> {
     generator: Option<Box<dyn gen::WorldGenerator>>,
     physics: phys::Physics,
-    entities: HashMap<Uuid, Box<dyn entity::Entity + 'world>>,
     chunks: block::ChunkMap,
+    entities: HashMap<Uuid, Box<dyn entity::Entity + 'world>>,
+    entity_renderer: EntityRenderer,
 }
 
 impl<'world> World<'world> where Self: 'world {
@@ -19,8 +21,9 @@ impl<'world> World<'world> where Self: 'world {
         Self {
             generator,
             physics: phys::Physics::new(),
-            entities: HashMap::new(),
             chunks: block::ChunkMap::new(),
+            entities: HashMap::new(),
+            entity_renderer: EntityRenderer::new(),
         }
     }
 
@@ -78,7 +81,9 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
-    pub fn add_entity(&mut self, entity: Box<dyn entity::Entity>) {
+    pub fn add_entity(&mut self, mut entity: Box<dyn entity::Entity>, assets: &mut asset::AssetPool) {
+        entity.init_collision(&mut self.physics);
+        entity.init_appearance(assets, &mut self.entity_renderer);
         self.entities.insert(entity.uuid(), entity);
     }
 
@@ -92,7 +97,7 @@ impl<'world> World<'world> where Self: 'world {
 
     pub fn destroy_entity(&mut self, uuid: Uuid) -> bool {
         if let Some(mut entity) = self.entities.remove(&uuid) {
-            entity.destroy(&mut self.physics);
+            entity.destroy(&mut self.physics, &mut self.entity_renderer);
             true
         }
         else {
@@ -105,17 +110,17 @@ impl<'world> World<'world> where Self: 'world {
             chunk.borrow_mut().update(dt);
         }
         for entity in self.entities.values_mut() {
-            entity.update(dt, inputs, &mut self.physics);
+            entity.update(dt, inputs, &mut self.physics, &mut self.entity_renderer);
         }
         self.physics.step_simulation(dt);
     }
 
-    pub fn render(&mut self, dt: f32, block_gfx: &asset::BlockGraphics) {
+    pub fn render(&mut self, dt: f32, assets: &asset::AssetPool) {
+        assets.block_texture().bind();
         for chunk in self.chunks.values() {
-            chunk.borrow_mut().render(dt, block_gfx, &self.chunks);
+            chunk.borrow_mut().render(dt, assets, &self.chunks);
         }
-        for entity in self.entities.values_mut() {
-            entity.render(dt);
-        }
+        assets.entity_texture().bind();
+        self.entity_renderer.render_all();
     }
 }

@@ -1,4 +1,4 @@
 #[derive(Debug)]
-struct Resources {
+pub struct Resources {
     //
 }

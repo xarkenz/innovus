@@ -260,47 +260,47 @@ pub struct ColliderHandle(ArenaHandle);
 
 #[derive(Debug)]
 pub struct Physics {
-    arena: UnboundedArena<Collider>,
+    colliders: UnboundedArena<Collider>,
 }
 
 impl Physics {
     pub fn new() -> Self {
         Self {
-            arena: UnboundedArena::new(),
+            colliders: UnboundedArena::new(),
         }
     }
 
     pub fn add_collider(&mut self, collider: Collider) -> ColliderHandle {
-        ColliderHandle(self.arena.insert(collider))
+        ColliderHandle(self.colliders.insert(collider))
     }
 
     pub fn get_collider(&self, handle: &ColliderHandle) -> Option<&Collider> {
-        self.arena.get(handle.0)
+        self.colliders.get(handle.0)
     }
 
     pub fn get_collider_mut(&mut self, handle: &ColliderHandle) -> Option<&mut Collider> {
-        self.arena.get_mut(handle.0)
+        self.colliders.get_mut(handle.0)
     }
 
     pub fn remove_collider(&mut self, handle: ColliderHandle) -> Option<Collider> {
-        self.arena.remove(handle.0)
+        self.colliders.remove(handle.0)
     }
 
     pub fn step_simulation(&mut self, dt: f32) {
         // Clear all collider hit flags
-        for (_, collider) in self.arena.values_mut() {
+        for (_, collider) in self.colliders.values_mut() {
             collider.clear_hit_flags();
         }
 
         // Keep track of how much time has been used by advancing to collision sites
-        let mut time_used = Vec::with_capacity(self.arena.slots().len());
+        let mut time_used = Vec::with_capacity(self.colliders.slots().len());
         time_used.resize(time_used.capacity(), 0.0);
 
         // Incrementally handle all swept collisions, earliest first
         let mut collisions = self.get_collisions(dt);
         while let Some(collision) = collisions.pop() {
-            let collider_1 = self.arena.get_current(collision.index_1).unwrap();
-            let collider_2 = self.arena.get_current(collision.index_2).unwrap();
+            let collider_1 = self.colliders.get_current(collision.index_1).unwrap();
+            let collider_2 = self.colliders.get_current(collision.index_2).unwrap();
 
             // Double-check that there is still a broad phase intersection between the colliders.
             // This is necessary because the colliders' velocities may have changed since the
@@ -312,7 +312,7 @@ impl Physics {
             let collision_velocity = collider_1.collision_velocity(collider_2);
 
             for index in [collision.index_1, collision.index_2] {
-                let collider = self.arena.get_current_mut(index).unwrap();
+                let collider = self.colliders.get_current_mut(index).unwrap();
 
                 // Advance to the collision site
                 collider.rectangle.shift_by(collider.velocity * (collision.time - time_used[index]));
@@ -346,24 +346,24 @@ impl Physics {
         }
 
         // Advance all colliders to their final position
-        for (index, collider) in self.arena.values_mut() {
-            collider.rectangle.shift_by(collider.velocity * (dt - time_used[index]));
+        for (handle, collider) in self.colliders.values_mut() {
+            collider.rectangle.shift_by(collider.velocity * (dt - time_used[handle.slot]));
         }
     }
 
     fn get_collisions(&self, dt: f32) -> BinaryHeap<Collision> {
         // TODO: this is a fairly naive approach
-        self.arena.values()
+        self.colliders.values()
             .enumerate()
-            .flat_map(move |(checked_count, (index_1, collider_1))| {
+            .flat_map(move |(checked_count, (handle_1, collider_1))| {
                 // Skipping checked_count + 1 elements starts the below loop right after this one
-                // within indexed_colliders, which ensures that:
+                // within self.colliders.values(), which ensures that:
                 // a) no collider is checked against itself
                 // b) there is only one check performed on each pair
-                // c) for each pair (index_1, index_2) it holds that index_1 < index_2
-                self.arena.values()
+                // c) for each pair (handle_1, handle_2) it holds that handle_1.slot < handle_2.slot
+                self.colliders.values()
                     .skip(checked_count + 1)
-                    .filter_map(move |(index_2, collider_2)| {
+                    .filter_map(move |(handle_2, collider_2)| {
                         // Before checking for actual collision between a pair, we will first
                         // check if there is broad phase intersection. The broad phase is a
                         // rectangle encompassing the projected motion of a collider, so if their
@@ -371,8 +371,8 @@ impl Physics {
                         if collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
                             // Now, check for an actual collision between the two colliders
                             collider_1.sweep_collision(collider_2, dt).map(|(time, side)| Collision {
-                                index_1,
-                                index_2,
+                                index_1: handle_1.slot,
+                                index_2: handle_2.slot,
                                 time,
                                 side,
                             })

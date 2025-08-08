@@ -49,7 +49,7 @@ impl InputState {
 
     pub fn process_events(&mut self, application: &mut Application) -> Vec<WindowEvent> {
         application.poll_events();
-        let mut events: Vec<_> = glfw::flush_messages(&self.event_receiver)
+        let events: Vec<_> = glfw::flush_messages(&self.event_receiver)
             .map(|(_time, event)| event)
             .collect();
         for event in &events {
@@ -64,6 +64,7 @@ impl InputState {
     }
 
     pub fn handle_key(&mut self, key: Key, action: Action, mods: Modifiers) {
+        let _ = mods;
         if let Some(key_index) = get_key_index(key) {
             match action {
                 Action::Press => self.held_keys[key_index] = true,
@@ -74,6 +75,7 @@ impl InputState {
     }
 
     pub fn handle_mouse_button(&mut self, button: MouseButton, action: Action, mods: Modifiers) {
+        let _ = mods;
         if let Some(button_index) = get_mouse_button_index(button) {
             match action {
                 Action::Press => self.held_mouse_buttons[button_index] = true,

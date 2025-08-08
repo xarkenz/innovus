@@ -1,7 +1,6 @@
 use innovus::tools::*;
 
 use super::*;
-use crate::world::*;
 
 #[derive(Debug)]
 pub struct OverworldGenerator {
