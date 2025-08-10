@@ -1,7 +1,7 @@
 {
   "format": "connected_quads_simple",
-  "texture_size": 16,
-  "textures": [
+  "size": 16,
+  "shapes": [
     "outward_corners",
     "horizontal",
     "vertical",

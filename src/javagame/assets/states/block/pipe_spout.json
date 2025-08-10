@@ -1,0 +1,22 @@
+[
+  {
+    "attribute": "direction",
+    "value": "down",
+    "texture": "block/pipe_spout/direction_down"
+  },
+  {
+    "attribute": "direction",
+    "value": "left",
+    "texture": "block/pipe_spout/direction_left"
+  },
+  {
+    "attribute": "direction",
+    "value": "right",
+    "texture": "block/pipe_spout/direction_right"
+  },
+  {
+    "attribute": "direction",
+    "value": "up",
+    "texture": "block/pipe_spout/direction_up"
+  }
+]

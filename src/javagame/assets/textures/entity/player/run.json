@@ -1,4 +1,9 @@
 {
+  "x": -12,
+  "y": 0,
   "width": 24,
-  "height": 32
+  "height": 32,
+  "animation": {
+    "frametime": 2
+  }
 }

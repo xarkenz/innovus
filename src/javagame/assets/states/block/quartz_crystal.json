@@ -1,0 +1,22 @@
+[
+  {
+    "attribute": "wall",
+    "value": "bottom",
+    "texture": "block/quartz_crystal/wall_bottom"
+  },
+  {
+    "attribute": "wall",
+    "value": "left",
+    "texture": "block/quartz_crystal/wall_left"
+  },
+  {
+    "attribute": "wall",
+    "value": "right",
+    "texture": "block/quartz_crystal/wall_right"
+  },
+  {
+    "attribute": "wall",
+    "value": "top",
+    "texture": "block/quartz_crystal/wall_top"
+  }
+]

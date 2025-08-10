@@ -1,0 +1,17 @@
+[
+  {
+    "attribute": "axis",
+    "value": "x",
+    "texture": "block/oak_log/axis_x"
+  },
+  {
+    "attribute": "axis",
+    "value": "y",
+    "texture": "block/oak_log/axis_y"
+  },
+  {
+    "attribute": "axis",
+    "value": "z",
+    "texture": "block/oak_log/axis_z"
+  }
+]
