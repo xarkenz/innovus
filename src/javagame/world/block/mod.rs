@@ -6,6 +6,8 @@ use crate::tools::asset::AssetPool;
 
 pub mod types;
 
+pub use types::BLOCK_TYPES;
+
 #[derive(Debug)]
 pub enum AttributeType {
     Bool(bool),

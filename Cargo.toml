@@ -28,6 +28,4 @@ gl = "0.14.0"
 glfw = "0.52.0"
 image = "0.24.5"
 uuid = {version = "1.2.2", features = ["v4", "fast-rng"]}
-
-[profile.dev]
-overflow-checks = false
+json = "0.12.4"

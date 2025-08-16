@@ -8,12 +8,15 @@ pub mod block;
 pub mod entity;
 pub mod gen;
 
+pub const SECONDS_PER_TICK: f32 = 0.05;
+
 pub struct World<'world> {
     generator: Option<Box<dyn gen::WorldGenerator>>,
     physics: phys::Physics,
     chunks: block::ChunkMap,
     entities: HashMap<Uuid, Box<dyn entity::Entity + 'world>>,
     entity_renderer: EntityRenderer,
+    seconds_since_last_tick: f32,
 }
 
 impl<'world> World<'world> where Self: 'world {
@@ -24,6 +27,7 @@ impl<'world> World<'world> where Self: 'world {
             chunks: block::ChunkMap::new(),
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
+            seconds_since_last_tick: 0.0,
         }
     }
 
@@ -106,6 +110,13 @@ impl<'world> World<'world> where Self: 'world {
     }
 
     pub fn update(&mut self, inputs: &input::InputState, dt: f32) {
+        self.seconds_since_last_tick += dt;
+        if self.seconds_since_last_tick >= SECONDS_PER_TICK {
+            // Advance one tick
+            self.seconds_since_last_tick -= SECONDS_PER_TICK;
+            // Perform tick actions
+            self.entity_renderer.tick();
+        }
         for chunk in self.chunks.values() {
             chunk.borrow_mut().update(dt);
         }

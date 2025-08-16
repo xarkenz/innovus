@@ -28,11 +28,11 @@ fn main() {
     let clock = Clock::start();
     let mut prev_time = clock.read();
 
-    let mut assets = asset::AssetPool::new().unwrap();
+    let mut assets = asset::AssetPool::new("src/javagame/assets").unwrap();
 
-    let mut current_world = world::World::new(Some(Box::new(
-        world::gen::types::OverworldGenerator::new(0),
-    )));
+    let mut current_world = world::World::new(
+        Some(Box::new(world::gen::types::OverworldGenerator::new(0))),
+    );
     current_world.force_get_chunk(Vector([0, -1]));
     current_world.force_get_chunk(Vector([-1, -1]));
     let player_start = Vector([0.0, 0.0]);
@@ -63,7 +63,7 @@ fn main() {
                 }
                 WindowEvent::Key(Key::Tab, _, Action::Press, _) => {
                     selected_block_index += 1;
-                    selected_block_index %= world::block::types::BLOCK_TYPES.len();
+                    selected_block_index %= world::block::BLOCK_TYPES.len();
                 }
                 WindowEvent::Scroll(dx, dy) => {
                     let _ = dx;

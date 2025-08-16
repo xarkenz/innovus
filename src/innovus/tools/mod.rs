@@ -755,7 +755,7 @@ impl<T: Float + NumAssign, const R: usize, const C: usize> fmt::Debug for Matrix
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, PartialEq, Clone)]
 pub struct Rectangle<T: NumAssign + Copy> {
     min: Vector<T, 2>,
     max: Vector<T, 2>,

@@ -1,7 +1,3 @@
-extern crate gl;
-extern crate glfw;
-extern crate image;
-
 pub mod screen;
 
 use super::tools::{Matrix, Transform3D, Vector};
@@ -12,6 +8,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem::{size_of, swap};
 use std::num::{ParseFloatError, ParseIntError};
+use std::path::Path;
 use std::str::FromStr;
 
 pub enum Color {
@@ -1253,11 +1250,12 @@ impl Image {
         }
     }
 
-    pub fn from_file(path: &str) -> Result<Self, String> {
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, String> {
+        let path = path.as_ref();
         let input = image::io::Reader::open(path)
-            .map_err(|err| format!("Image::from_file(): failed to open '{path}'. ({err})"))?
+            .map_err(|err| format!("Image::from_file(): failed to open '{}'. ({err})", path.display()))?
             .decode()
-            .map_err(|err| format!("Image::from_file(): failed to decode '{path}'. ({err})"))?;
+            .map_err(|err| format!("Image::from_file(): failed to decode '{}'. ({err})", path.display()))?;
         Ok(Self {
             data: input.to_rgba8().to_vec(),
             width: input.width(),

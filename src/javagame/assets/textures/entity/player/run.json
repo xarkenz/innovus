@@ -4,6 +4,7 @@
   "width": 24,
   "height": 32,
   "animation": {
-    "frametime": 2
+    "frame_count": 6,
+    "frame_time": 2
   }
 }

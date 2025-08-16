@@ -1,15 +1,15 @@
 use crate::tools::*;
 use innovus::tools::phys::Physics;
 use crate::tools::asset::AssetPool;
+use crate::tools::asset::entity::EntityImage;
 use crate::tools::input::{InputState, Key};
 use crate::world::entity::{movement, Entity};
-use crate::world::entity::render::{EntityImage, EntityImageHandle, EntityRenderer};
+use crate::world::entity::render::{EntityPiece, EntityPieceHandle, EntityRenderer};
 
 struct PlayerAppearance {
-    uv_idle: Rectangle<u32>,
-    uv_run: Rectangle<u32>,
-    body_image: EntityImageHandle,
-    frame_timer: f32,
+    idle_image: EntityImage,
+    run_image: EntityImage,
+    body: EntityPieceHandle,
 }
 
 const JUMP_COOLDOWN_SECONDS: f32 = 0.5;
@@ -86,22 +86,15 @@ impl Entity for Player {
 
     fn init_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
         if self.appearance.is_none() {
-            let uv_idle = assets.get_entity_image_uv("player/idle").unwrap();
-            let mut uv_run = assets.get_entity_image_uv("player/run").unwrap();
-            uv_run.set_max_y(uv_run.min_y() + uv_idle.height());
+            let idle_image = assets.get_entity_image("player/idle").unwrap();
+            let run_image = assets.get_entity_image("player/run").unwrap();
 
-            let body_image = EntityImage::new(
-                self.position,
-                Rectangle::from_size(Vector([-0.75, 0.0]), Vector([1.5, 2.0])),
-                true,
-                uv_idle,
-            );
+            let body = EntityPiece::new(self.position, idle_image.clone());
 
             self.appearance = Some(PlayerAppearance {
-                uv_idle,
-                uv_run,
-                body_image: renderer.add_image(body_image),
-                frame_timer: 0.0,
+                idle_image,
+                run_image,
+                body: renderer.add_piece(body),
             });
         }
     }
@@ -161,24 +154,15 @@ impl Entity for Player {
         }
 
         if let Some(appearance) = &mut self.appearance {
-            let body_image = renderer.get_image_mut(&appearance.body_image);
-            body_image.set_position(self.position);
+            let body = renderer.get_piece_mut(&appearance.body);
+            body.set_world_position(self.position);
 
             if velocity.x() == 0.0 {
-                body_image.set_uv_base(appearance.uv_idle);
-                body_image.set_frame(0);
-                appearance.frame_timer = 0.1;
+                body.set_image(&appearance.idle_image);
             }
             else {
-                body_image.set_uv_base(appearance.uv_run);
-                body_image.set_flip_x(velocity.x() < 0.0);
-                if appearance.frame_timer <= 0.0 {
-                    body_image.set_frame((body_image.frame() + 1) % 6);
-                    appearance.frame_timer += 0.1;
-                }
-                else {
-                    appearance.frame_timer -= dt;
-                }
+                body.set_image(&appearance.run_image);
+                body.set_flip_x(velocity.x() < 0.0);
             }
         }
     }
@@ -188,7 +172,7 @@ impl Entity for Player {
             physics.remove_collider(collider);
         }
         if let Some(appearance) = self.appearance.take() {
-            renderer.remove_image(&appearance.body_image);
+            renderer.remove_piece(&appearance.body);
         }
     }
 }
