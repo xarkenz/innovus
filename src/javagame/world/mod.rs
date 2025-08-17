@@ -17,6 +17,8 @@ pub struct World<'world> {
     entities: HashMap<Uuid, Box<dyn entity::Entity + 'world>>,
     entity_renderer: EntityRenderer,
     seconds_since_last_tick: f32,
+    chunk_load_range: Rectangle<i64>,
+    chunk_loader_entity: Option<Uuid>,
 }
 
 impl<'world> World<'world> where Self: 'world {
@@ -27,7 +29,9 @@ impl<'world> World<'world> where Self: 'world {
             chunks: block::ChunkMap::new(),
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
-            seconds_since_last_tick: 0.0,
+            seconds_since_last_tick: SECONDS_PER_TICK,
+            chunk_load_range: Rectangle::new(Vector([-1, -1]), Vector([1, 1])),
+            chunk_loader_entity: None,
         }
     }
 
@@ -47,15 +51,15 @@ impl<'world> World<'world> where Self: 'world {
         self.chunks.get(&location).map(|chunk| chunk.borrow_mut())
     }
 
-    pub fn force_get_chunk(&mut self, location: block::ChunkLocation) -> Ref<block::Chunk> {
-        self.force_get_chunk_cell(location).borrow()
+    pub fn load_chunk(&mut self, location: block::ChunkLocation) -> Ref<block::Chunk> {
+        self.load_chunk_cell(location).borrow()
     }
 
-    pub fn force_get_chunk_mut(&mut self, location: block::ChunkLocation) -> RefMut<block::Chunk> {
-        self.force_get_chunk_cell(location).borrow_mut()
+    pub fn load_chunk_mut(&mut self, location: block::ChunkLocation) -> RefMut<block::Chunk> {
+        self.load_chunk_cell(location).borrow_mut()
     }
 
-    fn force_get_chunk_cell(&mut self, location: block::ChunkLocation) -> &RefCell<block::Chunk> {
+    fn load_chunk_cell(&mut self, location: block::ChunkLocation) -> &RefCell<block::Chunk> {
         if self.chunks.contains_key(&location) {
             &self.chunks[&location]
         }
@@ -69,19 +73,25 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
+    pub fn unload_chunk(&mut self, location: block::ChunkLocation) {
+        if let Some(chunk) = self.chunks.remove(&location) {
+            chunk.into_inner().detach(&mut self.physics);
+        }
+    }
+
     pub fn user_place_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize, block_type: &'static block::BlockType) {
-        self.force_get_chunk_cell(chunk_location);
-        let mut chunk = self.chunks[&chunk_location].borrow_mut();
-        if chunk.block_at(block_x, block_y).block_type == &block::types::AIR {
-            chunk.set_block_at(block_x, block_y, block::Block::new(block_type, 0, 15), &self.chunks, &mut self.physics);
+        if let Some(mut chunk) = self.chunks.get(&chunk_location).map(|chunk| chunk.borrow_mut()) {
+            if chunk.block_at(block_x, block_y).block_type == &block::types::AIR {
+                chunk.set_block_at(block_x, block_y, block::Block::new(block_type, 0, 15), &self.chunks, &mut self.physics);
+            }
         }
     }
 
     pub fn user_destroy_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize) {
-        self.force_get_chunk_cell(chunk_location);
-        let mut chunk = self.chunks[&chunk_location].borrow_mut();
-        if chunk.block_at(block_x, block_y).block_type != &block::types::AIR {
-            chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR, 0, 15), &self.chunks, &mut self.physics);
+        if let Some(mut chunk) = self.chunks.get(&chunk_location).map(|chunk| chunk.borrow_mut()) {
+            if chunk.block_at(block_x, block_y).block_type != &block::types::AIR {
+                chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR, 0, 15), &self.chunks, &mut self.physics);
+            }
         }
     }
 
@@ -109,13 +119,17 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
+    pub fn set_chunk_loader_entity(&mut self, entity: Option<Uuid>) {
+        self.chunk_loader_entity = entity;
+    }
+
     pub fn update(&mut self, inputs: &input::InputState, dt: f32) {
         self.seconds_since_last_tick += dt;
         if self.seconds_since_last_tick >= SECONDS_PER_TICK {
             // Advance one tick
             self.seconds_since_last_tick -= SECONDS_PER_TICK;
             // Perform tick actions
-            self.entity_renderer.tick();
+            self.tick();
         }
         for chunk in self.chunks.values() {
             chunk.borrow_mut().update(dt);
@@ -124,6 +138,47 @@ impl<'world> World<'world> where Self: 'world {
             entity.update(dt, inputs, &mut self.physics, &mut self.entity_renderer);
         }
         self.physics.step_simulation(dt);
+    }
+
+    fn tick(&mut self) {
+        self.entity_renderer.tick();
+
+        let chunk_loader_pos = self.chunk_loader_entity
+            .as_ref()
+            .and_then(|uuid| self.entities.get(uuid))
+            .map(|entity| entity.position());
+
+        let locations_to_unload: Vec<block::ChunkLocation>;
+        if let Some(world_pos) = chunk_loader_pos {
+            let center_chunk_location = Vector([
+                world_pos.x().div_euclid(block::CHUNK_SIZE as f32) as i64,
+                world_pos.y().div_euclid(block::CHUNK_SIZE as f32) as i64,
+            ]);
+            let mut chunk_load_range = self.chunk_load_range;
+            chunk_load_range.shift_by(center_chunk_location);
+            for chunk_y in chunk_load_range.min_y() ..= chunk_load_range.max_y() {
+                for chunk_x in chunk_load_range.min_x() ..= chunk_load_range.max_x() {
+                    self.load_chunk(Vector([chunk_x, chunk_y]));
+                }
+            }
+            // Unload only the chunks that are out of range
+            locations_to_unload = self.chunks
+                .keys()
+                .copied()
+                .filter(|&location| !chunk_load_range.contains_inclusive(location))
+                .collect();
+        }
+        else {
+            // Unload all chunks
+            locations_to_unload = self.chunks
+                .keys()
+                .copied()
+                .collect();
+        }
+
+        for location in locations_to_unload {
+            self.unload_chunk(location);
+        }
     }
 
     pub fn render(&mut self, dt: f32, assets: &asset::AssetPool) {

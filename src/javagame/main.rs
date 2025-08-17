@@ -34,8 +34,6 @@ fn main() {
     let mut current_world = world::World::new(
         Some(Box::new(world::gen::types::OverworldGenerator::new(0))),
     );
-    current_world.force_get_chunk(Vector([0, -1]));
-    current_world.force_get_chunk(Vector([-1, -1]));
     let player_start = Vector([0.0, 0.0]);
     let player = world::entity::types::Player::new(
         player_start,
@@ -43,6 +41,7 @@ fn main() {
     );
     let player_uuid = world::entity::Entity::uuid(&player);
     current_world.add_entity(Box::new(player), &mut assets);
+    current_world.set_chunk_loader_entity(Some(player_uuid));
 
     let mut camera = view::Camera::new(
         player_start,

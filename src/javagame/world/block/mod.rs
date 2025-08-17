@@ -390,4 +390,14 @@ impl Chunk {
             }
         }
     }
+
+    pub fn detach(self, physics: &mut phys::Physics) {
+        for row in self.block_colliders {
+            for colliders in row {
+                for collider in colliders {
+                    physics.remove_collider(collider);
+                }
+            }
+        }
+    }
 }

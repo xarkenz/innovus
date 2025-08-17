@@ -911,7 +911,8 @@ impl<T: NumAssign + Copy> Rectangle<T> where T: PartialOrd {
     pub fn expand_x_toward(&mut self, amount: T) {
         if amount >= T::zero() {
             self.set_max_x(self.max_x() + amount);
-        } else {
+        }
+        else {
             self.set_min_x(self.min_x() + amount);
         }
     }
@@ -919,9 +920,20 @@ impl<T: NumAssign + Copy> Rectangle<T> where T: PartialOrd {
     pub fn expand_y_toward(&mut self, amount: T) {
         if amount >= T::zero() {
             self.set_max_y(self.max_y() + amount);
-        } else {
+        }
+        else {
             self.set_min_y(self.min_y() + amount);
         }
+    }
+
+    pub fn contains_inclusive(&self, point: Vector<T, 2>) -> bool {
+        point.x() >= self.min_x() && point.x() <= self.max_x()
+            && point.y() >= self.min_y() && point.y() <= self.max_y()
+    }
+
+    pub fn contains_exclusive(&self, point: Vector<T, 2>) -> bool {
+        point.x() > self.min_x() && point.x() < self.max_x()
+            && point.y() > self.min_y() && point.y() < self.max_y()
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
