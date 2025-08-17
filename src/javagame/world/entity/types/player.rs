@@ -110,10 +110,12 @@ impl Entity for Player {
 
     fn update(&mut self, dt: f32, inputs: &InputState, physics: &mut Physics, renderer: &mut EntityRenderer) {
         let mut velocity = Vector::zero();
+        let mut touching_ground = true;
 
         if let Some(collider) = &self.collider {
             let collider = physics.get_collider_mut(collider).unwrap();
             velocity = collider.velocity;
+            touching_ground = collider.hit_bottom;
 
             if collider.rectangle.min_y() < -128.0 {
                 collider.rectangle.shift_min_to(Vector([-0.375, 0.0]));
@@ -124,7 +126,7 @@ impl Entity for Player {
                 self.jump_cooldown = 0.0;
             }
             if self.jump_cooldown <= 0.0 {
-                if inputs.key_is_held(Key::Space) && collider.hit_bottom {
+                if inputs.key_is_held(Key::Space) && touching_ground {
                     collider.velocity.set_y(self.jump_speed);
                     self.jump_cooldown += JUMP_COOLDOWN_SECONDS;
                 }
@@ -142,7 +144,7 @@ impl Entity for Player {
                 collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.625); // 26 px
             }
 
-            let speed_multiplier = if self.crouching && collider.hit_bottom {
+            let speed_multiplier = if self.crouching && touching_ground {
                 0.5
             } else {
                 1.0
@@ -170,21 +172,25 @@ impl Entity for Player {
                 body.set_flip_x(velocity.x() < 0.0);
             }
 
-            if velocity.y() > 0.0 {
-                body.set_image(&appearance.jump_ascend_image);
-            }
-            else if velocity.y() < 0.0 {
-                body.set_image(&appearance.jump_descend_image);
-            }
-            else if velocity.x() != 0.0 {
-                body.set_image(&appearance.run_image);
-            }
-            else {
-                if self.crouching {
-                    body.set_image(&appearance.crouch_idle_image);
+            if touching_ground {
+                if velocity.x() != 0.0 {
+                    body.set_image(&appearance.run_image);
                 }
                 else {
-                    body.set_image(&appearance.idle_image);
+                    if self.crouching {
+                        body.set_image(&appearance.crouch_idle_image);
+                    }
+                    else {
+                        body.set_image(&appearance.idle_image);
+                    }
+                }
+            }
+            else {
+                if velocity.y() > 0.0 {
+                    body.set_image(&appearance.jump_ascend_image);
+                }
+                else {
+                    body.set_image(&appearance.jump_descend_image);
                 }
             }
         }
