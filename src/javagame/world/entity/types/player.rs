@@ -9,6 +9,9 @@ use crate::world::entity::render::{EntityPiece, EntityPieceHandle, EntityRendere
 struct PlayerAppearance {
     idle_image: EntityImage,
     run_image: EntityImage,
+    jump_ascend_image: EntityImage,
+    jump_descend_image: EntityImage,
+    crouch_idle_image: EntityImage,
     body: EntityPieceHandle,
 }
 
@@ -79,7 +82,7 @@ impl Entity for Player {
 
     fn init_collision(&mut self, physics: &mut Physics) {
         self.collider = Some(physics.add_collider(phys::Collider::new(
-            Rectangle::from_size(Vector([self.position.x() - 0.375, self.position.y()]), Vector([0.75, 1.6875])),
+            Rectangle::from_size(Vector([self.position.x() - 0.375, self.position.y()]), Vector([0.75, 1.625])),
             Vector::zero(),
         )));
     }
@@ -88,12 +91,18 @@ impl Entity for Player {
         if self.appearance.is_none() {
             let idle_image = assets.get_entity_image("player/idle").unwrap();
             let run_image = assets.get_entity_image("player/run").unwrap();
+            let jump_ascend_image = assets.get_entity_image("player/jump_ascend").unwrap();
+            let jump_descend_image = assets.get_entity_image("player/jump_descend").unwrap();
+            let crouch_idle_image = assets.get_entity_image("player/crouch_idle").unwrap();
 
             let body = EntityPiece::new(self.position, idle_image.clone());
 
             self.appearance = Some(PlayerAppearance {
                 idle_image,
                 run_image,
+                jump_ascend_image,
+                jump_descend_image,
+                crouch_idle_image,
                 body: renderer.add_piece(body),
             });
         }
@@ -126,11 +135,11 @@ impl Entity for Player {
 
             if inputs.key_is_held(Key::LeftShift) {
                 self.crouching = true;
-                collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.4375);
+                collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.4375); // 23 px
             }
             else {
                 self.crouching = false;
-                collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.6875);
+                collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.625); // 26 px
             }
 
             let speed_multiplier = if self.crouching && collider.hit_bottom {
@@ -157,12 +166,26 @@ impl Entity for Player {
             let body = renderer.get_piece_mut(&appearance.body);
             body.set_world_position(self.position);
 
-            if velocity.x() == 0.0 {
-                body.set_image(&appearance.idle_image);
+            if velocity.x() != 0.0 {
+                body.set_flip_x(velocity.x() < 0.0);
+            }
+
+            if velocity.y() > 0.0 {
+                body.set_image(&appearance.jump_ascend_image);
+            }
+            else if velocity.y() < 0.0 {
+                body.set_image(&appearance.jump_descend_image);
+            }
+            else if velocity.x() != 0.0 {
+                body.set_image(&appearance.run_image);
             }
             else {
-                body.set_image(&appearance.run_image);
-                body.set_flip_x(velocity.x() < 0.0);
+                if self.crouching {
+                    body.set_image(&appearance.crouch_idle_image);
+                }
+                else {
+                    body.set_image(&appearance.idle_image);
+                }
             }
         }
     }
