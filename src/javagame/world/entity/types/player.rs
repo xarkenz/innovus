@@ -12,6 +12,7 @@ struct PlayerAppearance {
     jump_ascend_image: EntityImage,
     jump_descend_image: EntityImage,
     crouch_idle_image: EntityImage,
+    crouch_walk_image: EntityImage,
     body: EntityPieceHandle,
 }
 
@@ -94,6 +95,7 @@ impl Entity for Player {
             let jump_ascend_image = assets.get_entity_image("player/jump_ascend").unwrap();
             let jump_descend_image = assets.get_entity_image("player/jump_descend").unwrap();
             let crouch_idle_image = assets.get_entity_image("player/crouch_idle").unwrap();
+            let crouch_walk_image = assets.get_entity_image("player/crouch_walk").unwrap();
 
             let body = EntityPiece::new(self.position, idle_image.clone());
 
@@ -103,6 +105,7 @@ impl Entity for Player {
                 jump_ascend_image,
                 jump_descend_image,
                 crouch_idle_image,
+                crouch_walk_image,
                 body: renderer.add_piece(body),
             });
         }
@@ -174,7 +177,12 @@ impl Entity for Player {
 
             if touching_ground {
                 if velocity.x() != 0.0 {
-                    body.set_image(&appearance.run_image);
+                    if self.crouching {
+                        body.set_image(&appearance.crouch_walk_image);
+                    }
+                    else {
+                        body.set_image(&appearance.run_image);
+                    }
                 }
                 else {
                     if self.crouching {
