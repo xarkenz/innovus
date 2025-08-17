@@ -5,6 +5,8 @@ use crate::tools::asset::entity::EntityImage;
 
 #[derive(Debug)]
 pub struct EntityPiece {
+    dirty: bool,
+    atlas_region: Rectangle<u32>,
     world_position: Vector<f32, 2>,
     image: EntityImage,
     visible: bool,
@@ -13,12 +15,13 @@ pub struct EntityPiece {
     flip_y: bool,
     frame: u32,
     frame_timer: u32,
-    dirty: bool,
 }
 
 impl EntityPiece {
     pub fn new(world_position: Vector<f32, 2>, initial_image: EntityImage) -> Self {
         Self {
+            dirty: true,
+            atlas_region: initial_image.atlas_base_region,
             world_position,
             image: initial_image,
             visible: true,
@@ -27,8 +30,19 @@ impl EntityPiece {
             flip_y: true,
             frame: 0,
             frame_timer: 0,
-            dirty: true,
         }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    pub fn set_dirty(&mut self, dirty: bool) {
+        self.dirty = dirty;
+    }
+
+    pub fn atlas_region(&self) -> Rectangle<u32> {
+        self.atlas_region
     }
 
     pub fn set_image(&mut self, image: &EntityImage) {
@@ -97,30 +111,10 @@ impl EntityPiece {
         self.frame = frame;
     }
 
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
-    }
-
-    pub fn set_dirty(&mut self, dirty: bool) {
-        self.dirty = dirty;
-    }
-
     pub fn get_world_bounds(&self) -> Rectangle<f32> {
         let mut bounds = self.image.world_offset;
         bounds.shift_by(self.world_position);
         bounds
-    }
-
-    pub fn get_atlas_region(&self) -> Rectangle<u32> {
-        let mut region = self.image.atlas_base_region;
-        region.shift_y_by(self.frame * region.height());
-        if self.flip_x {
-            region.flip_x();
-        }
-        if self.flip_y {
-            region.flip_y();
-        }
-        region
     }
 
     pub fn tick(&mut self) {
@@ -134,6 +128,17 @@ impl EntityPiece {
                 self.frame_timer = animation.frame_time;
             }
         }
+
+        let mut region = self.image.atlas_base_region;
+        region.shift_y_by(self.frame * region.height());
+        if self.flip_x {
+            region.flip_x();
+        }
+        if self.flip_y {
+            region.flip_y();
+        }
+        self.dirty = self.dirty || region != self.atlas_region;
+        self.atlas_region = region;
     }
 }
 
@@ -268,19 +273,19 @@ impl RendererBatch {
                 any_changed = true;
                 let color = if piece.is_visible() { piece.color() } else { [0.0; 4] };
                 let bounds = piece.get_world_bounds();
-                let uv = piece.get_atlas_region();
+                let atlas_region = piece.atlas_region();
                 let vertices = [
-                    (bounds.min(), uv.min()),
-                    (bounds.min_x_max_y(), uv.min_x_max_y()),
-                    (bounds.max(), uv.max()),
-                    (bounds.max_x_min_y(), uv.max_x_min_y()),
+                    (bounds.min(), atlas_region.min()),
+                    (bounds.min_x_max_y(), atlas_region.min_x_max_y()),
+                    (bounds.max(), atlas_region.max()),
+                    (bounds.max_x_min_y(), atlas_region.max_x_min_y()),
                 ];
                 let mut vertex_index = handle.slot * 4;
-                for (position, uv_offset) in vertices {
+                for (position, uv) in vertices {
                     self.geometry.set_vertex(vertex_index, &Vertex2D::new(
                         [position.x(), position.y(), 1.0],
                         Some(color),
-                        Some([uv_offset.x() as f32, uv_offset.y() as f32]),
+                        Some([uv.x() as f32, uv.y() as f32]),
                     ));
                     vertex_index += 1;
                 }
