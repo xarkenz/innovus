@@ -50,6 +50,8 @@ fn main() {
             screen::set_viewport(0, 0, width, height);
             [width as f32, height as f32]
         }),
+        64.0,
+        5.0,
     );
 
     fn select_block_index(mut index: isize, direction: isize) -> usize {

@@ -11,15 +11,15 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(position: Vector<f32, 2>, size: Vector<f32, 2>) -> Self {
+    pub fn new(position: Vector<f32, 2>, size: Vector<f32, 2>, zoom: f32, speed: f32) -> Self {
         Self {
             view: Transform3D::identity(),
             projection: Transform3D::identity(),
             position,
             target: position,
             size,
-            zoom: 64.0,
-            speed: 3.0,
+            zoom,
+            speed,
         }
     }
 

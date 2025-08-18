@@ -361,22 +361,27 @@ impl Physics {
             // a) no collider is checked against itself (this is what the +1 is for)
             // b) there is only one check performed on each pair
             // c) for each pair (handle_1, handle_2) it holds that handle_1.slot < handle_2.slot
-            // This is still O(n^2), but it cuts the number of checks done in half
+            // This is still O(n^2), but it cuts the number of checks done in half.
             for &(handle_2, collider_2) in colliders.iter().skip(checked_count + 1) {
+                // If both colliders are fixed, they can't possibly collide.
+                if collider_1.fixed && collider_2.fixed {
+                    continue;
+                }
                 // Before checking for actual collision between a pair, we will first
                 // check if there is broad phase intersection. The broad phase is a
                 // rectangle encompassing the projected motion of a collider, so if their
                 // broad phases don't intersect, we can discard the pair.
-                if collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
-                    // Now, check for an actual collision between the two colliders
-                    if let Some((time, side)) = collider_1.sweep_collision(collider_2, dt) {
-                        collisions.push(Collision {
-                            index_1: handle_1.slot,
-                            index_2: handle_2.slot,
-                            time,
-                            side,
-                        });
-                    }
+                if !collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
+                    continue;
+                }
+                // Now, check for an actual collision between the two colliders.
+                if let Some((time, side)) = collider_1.sweep_collision(collider_2, dt) {
+                    collisions.push(Collision {
+                        index_1: handle_1.slot,
+                        index_2: handle_2.slot,
+                        time,
+                        side,
+                    });
                 }
             }
         }
