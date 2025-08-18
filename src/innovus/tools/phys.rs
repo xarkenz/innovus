@@ -352,36 +352,35 @@ impl Physics {
     }
 
     fn get_collisions(&self, dt: f32) -> BinaryHeap<Collision> {
-        // TODO: this is a fairly naive approach
-        self.colliders.values()
-            .enumerate()
-            .flat_map(move |(checked_count, (handle_1, collider_1))| {
-                // Skipping checked_count + 1 elements starts the below loop right after this one
-                // within self.colliders.values(), which ensures that:
-                // a) no collider is checked against itself
-                // b) there is only one check performed on each pair
-                // c) for each pair (handle_1, handle_2) it holds that handle_1.slot < handle_2.slot
-                self.colliders.values()
-                    .skip(checked_count + 1)
-                    .filter_map(move |(handle_2, collider_2)| {
-                        // Before checking for actual collision between a pair, we will first
-                        // check if there is broad phase intersection. The broad phase is a
-                        // rectangle encompassing the projected motion of a collider, so if their
-                        // broad phases don't intersect, we can discard the pair.
-                        if collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
-                            // Now, check for an actual collision between the two colliders
-                            collider_1.sweep_collision(collider_2, dt).map(|(time, side)| Collision {
-                                index_1: handle_1.slot,
-                                index_2: handle_2.slot,
-                                time,
-                                side,
-                            })
-                        }
-                        else {
-                            None
-                        }
-                    })
-            })
-            .collect()
+        // TODO: this is a fairly naive approach which is O(n^2) and very slow
+        let colliders: Vec<_> = self.colliders.values().collect();
+        let mut collisions = BinaryHeap::new();
+
+        for (checked_count, &(handle_1, collider_1)) in colliders.iter().enumerate() {
+            // Skipping checked_count + 1 elements for this inner loop ensures that:
+            // a) no collider is checked against itself (this is what the +1 is for)
+            // b) there is only one check performed on each pair
+            // c) for each pair (handle_1, handle_2) it holds that handle_1.slot < handle_2.slot
+            // This is still O(n^2), but it cuts the number of checks done in half
+            for &(handle_2, collider_2) in colliders.iter().skip(checked_count + 1) {
+                // Before checking for actual collision between a pair, we will first
+                // check if there is broad phase intersection. The broad phase is a
+                // rectangle encompassing the projected motion of a collider, so if their
+                // broad phases don't intersect, we can discard the pair.
+                if collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
+                    // Now, check for an actual collision between the two colliders
+                    if let Some((time, side)) = collider_1.sweep_collision(collider_2, dt) {
+                        collisions.push(Collision {
+                            index_1: handle_1.slot,
+                            index_2: handle_2.slot,
+                            time,
+                            side,
+                        });
+                    }
+                }
+            }
+        }
+
+        collisions
     }
 }

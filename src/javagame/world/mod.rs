@@ -30,7 +30,7 @@ impl<'world> World<'world> where Self: 'world {
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
             seconds_since_last_tick: SECONDS_PER_TICK,
-            chunk_load_range: Rectangle::new(Vector([-1, -1]), Vector([1, 1])),
+            chunk_load_range: Rectangle::new(Vector([-2, -2]), Vector([2, 2])),
             chunk_loader_entity: None,
         }
     }

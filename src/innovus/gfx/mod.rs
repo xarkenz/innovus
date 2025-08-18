@@ -1252,7 +1252,7 @@ impl Image {
 
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, String> {
         let path = path.as_ref();
-        let input = image::io::Reader::open(path)
+        let input = image::ImageReader::open(path)
             .map_err(|err| format!("Image::from_file(): failed to open '{}'. ({err})", path.display()))?
             .decode()
             .map_err(|err| format!("Image::from_file(): failed to decode '{}'. ({err})", path.display()))?;
