@@ -18,6 +18,7 @@ pub struct World<'world> {
     entity_renderer: EntityRenderer,
     seconds_since_last_tick: f32,
     chunk_load_range: Rectangle<i64>,
+    chunk_simulate_range: Rectangle<i64>,
     chunk_loader_entity: Option<Uuid>,
 }
 
@@ -30,7 +31,8 @@ impl<'world> World<'world> where Self: 'world {
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
             seconds_since_last_tick: SECONDS_PER_TICK,
-            chunk_load_range: Rectangle::new(Vector([-2, -2]), Vector([2, 2])),
+            chunk_load_range: Rectangle::new(Vector([-3, -3]), Vector([3, 3])),
+            chunk_simulate_range: Rectangle::new(Vector([-1, -1]), Vector([1, 1])),
             chunk_loader_entity: None,
         }
     }
@@ -43,19 +45,19 @@ impl<'world> World<'world> where Self: 'world {
         &mut self.physics
     }
 
-    pub fn get_chunk(&self, location: block::ChunkLocation) -> Option<Ref<block::Chunk>> {
+    pub fn get_chunk(&self, location: block::ChunkLocation) -> Option<Ref<'_, block::Chunk>> {
         self.chunks.get(&location).map(|chunk| chunk.borrow())
     }
 
-    pub fn get_chunk_mut(&self, location: block::ChunkLocation) -> Option<RefMut<block::Chunk>> {
+    pub fn get_chunk_mut(&self, location: block::ChunkLocation) -> Option<RefMut<'_, block::Chunk>> {
         self.chunks.get(&location).map(|chunk| chunk.borrow_mut())
     }
 
-    pub fn load_chunk(&mut self, location: block::ChunkLocation) -> Ref<block::Chunk> {
+    pub fn load_chunk(&mut self, location: block::ChunkLocation) -> Ref<'_, block::Chunk> {
         self.load_chunk_cell(location).borrow()
     }
 
-    pub fn load_chunk_mut(&mut self, location: block::ChunkLocation) -> RefMut<block::Chunk> {
+    pub fn load_chunk_mut(&mut self, location: block::ChunkLocation) -> RefMut<'_, block::Chunk> {
         self.load_chunk_cell(location).borrow_mut()
     }
 
@@ -75,7 +77,7 @@ impl<'world> World<'world> where Self: 'world {
 
     pub fn unload_chunk(&mut self, location: block::ChunkLocation) {
         if let Some(chunk) = self.chunks.remove(&location) {
-            chunk.into_inner().detach(&mut self.physics);
+            chunk.into_inner().detach_physics(&mut self.physics);
         }
     }
 
@@ -149,11 +151,13 @@ impl<'world> World<'world> where Self: 'world {
             .map(|entity| entity.position());
 
         let locations_to_unload: Vec<block::ChunkLocation>;
+        let locations_to_detach: Vec<block::ChunkLocation>;
         if let Some(world_pos) = chunk_loader_pos {
             let center_chunk_location = Vector([
                 world_pos.x().div_euclid(block::CHUNK_SIZE as f32) as i64,
                 world_pos.y().div_euclid(block::CHUNK_SIZE as f32) as i64,
             ]);
+
             let mut chunk_load_range = self.chunk_load_range;
             chunk_load_range.shift_by(center_chunk_location);
             for chunk_y in chunk_load_range.min_y() ..= chunk_load_range.max_y() {
@@ -161,11 +165,28 @@ impl<'world> World<'world> where Self: 'world {
                     self.load_chunk(Vector([chunk_x, chunk_y]));
                 }
             }
-            // Unload only the chunks that are out of range
+
+            let mut chunk_simulate_range = self.chunk_simulate_range;
+            chunk_simulate_range.shift_by(center_chunk_location);
+            for chunk_y in chunk_simulate_range.min_y() ..= chunk_simulate_range.max_y() {
+                for chunk_x in chunk_simulate_range.min_x() ..= chunk_simulate_range.max_x() {
+                    if let Some(chunk) = self.chunks.get_mut(&Vector([chunk_x, chunk_y])) {
+                        chunk.borrow_mut().attach_physics(&mut self.physics);
+                    }
+                }
+            }
+
+            // Unload the chunks that are out of load range
             locations_to_unload = self.chunks
                 .keys()
                 .copied()
                 .filter(|&location| !chunk_load_range.contains_inclusive(location))
+                .collect();
+            // Detach physics for the chunks that are out of simulate range
+            locations_to_detach = self.chunks
+                .keys()
+                .copied()
+                .filter(|&location| !chunk_simulate_range.contains_inclusive(location))
                 .collect();
         }
         else {
@@ -174,10 +195,17 @@ impl<'world> World<'world> where Self: 'world {
                 .keys()
                 .copied()
                 .collect();
+            // Don't worry about detaching physics, unloading a chunk does that automatically
+            locations_to_detach = Vec::new();
         }
 
         for location in locations_to_unload {
             self.unload_chunk(location);
+        }
+        for location in locations_to_detach {
+            if let Some(chunk) = self.chunks.get_mut(&location) {
+                chunk.borrow_mut().detach_physics(&mut self.physics);
+            }
         }
     }
 

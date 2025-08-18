@@ -362,7 +362,7 @@ impl Physics {
             // b) there is only one check performed on each pair
             // c) for each pair (handle_1, handle_2) it holds that handle_1.slot < handle_2.slot
             // This is still O(n^2), but it cuts the number of checks done in half.
-            for &(handle_2, collider_2) in colliders.iter().skip(checked_count + 1) {
+            for &(handle_2, collider_2) in colliders[checked_count + 1 ..].iter() {
                 // If both colliders are fixed, they can't possibly collide.
                 if collider_1.fixed && collider_2.fixed {
                     continue;

@@ -183,7 +183,7 @@ pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
 pub struct Chunk {
     location: ChunkLocation,
     blocks: [[Block; CHUNK_SIZE]; CHUNK_SIZE],
-    block_colliders: [[Box<[phys::ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE],
+    collision_map: Option<[[Box<[phys::ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE]>,
     blocks_dirty: [[bool; CHUNK_SIZE]; CHUNK_SIZE],
     dirty: bool,
     geometry: Geometry<Vertex2D>,
@@ -194,7 +194,7 @@ impl Chunk {
         Self {
             location,
             blocks: Default::default(),
-            block_colliders: [(); CHUNK_SIZE].map(|_| [(); CHUNK_SIZE].map(|_| Box::from([]))),
+            collision_map: None,
             blocks_dirty: [[true; CHUNK_SIZE]; CHUNK_SIZE],
             dirty: true,
             geometry: Geometry::new_render().unwrap(),
@@ -210,31 +210,13 @@ impl Chunk {
     }
 
     pub fn set_block_at(&mut self, x: usize, y: usize, block: Block, chunk_map: &ChunkMap, physics: &mut phys::Physics) {
-        // Add new physics colliders and remove the old ones
-        let block_origin = Vector([
-            self.location.x() as f32 * CHUNK_SIZE_F32 + x as f32,
-            self.location.y() as f32 * CHUNK_SIZE_F32 + y as f32,
-        ]);
-        let colliders = block.block_type.colliders
-            .iter()
-            .map(|&bounds| {
-                let mut collider_bounds = Rectangle::new(
-                    Vector([
-                        bounds.min_x() as f32 / 32.0,
-                        bounds.min_y() as f32 / 32.0,
-                    ]),
-                    Vector([
-                        bounds.max_x() as f32 / 32.0,
-                        bounds.max_y() as f32 / 32.0,
-                    ]),
-                );
-                collider_bounds.shift_by(block_origin);
-                physics.add_collider(phys::Collider::new_fixed(collider_bounds))
-            })
-            .collect();
-        let old_colliders = std::mem::replace(&mut self.block_colliders[y][x], colliders);
-        for handle in old_colliders {
-            physics.remove_collider(handle);
+        if let Some(collision_map) = &mut self.collision_map {
+            // Add new physics colliders and remove the old ones
+            let new_colliders = Self::create_block_colliders(self.location, x, y, block.block_type, physics);
+            let old_colliders = std::mem::replace(&mut collision_map[y][x], new_colliders);
+            for handle in old_colliders {
+                physics.remove_collider(handle);
+            }
         }
 
         self.blocks[y][x] = block;
@@ -391,13 +373,56 @@ impl Chunk {
         }
     }
 
-    pub fn detach(self, physics: &mut phys::Physics) {
-        for row in self.block_colliders {
-            for colliders in row {
-                for collider in colliders {
-                    physics.remove_collider(collider);
+    pub fn attach_physics(&mut self, physics: &mut phys::Physics) {
+        if self.collision_map.is_none() {
+            let mut y = 0;
+            let collision_map = self.blocks.each_ref().map(|row| {
+                let mut x = 0;
+                let row = row.each_ref().map(|block| {
+                    let colliders = Self::create_block_colliders(self.location, x, y, block.block_type, physics);
+                    x += 1;
+                    colliders
+                });
+                y += 1;
+                row
+            });
+            self.collision_map = Some(collision_map);
+        }
+    }
+
+    pub fn detach_physics(&mut self, physics: &mut phys::Physics) {
+        if let Some(collision_map) = self.collision_map.take() {
+            for row in collision_map {
+                for colliders in row {
+                    for collider in colliders {
+                        physics.remove_collider(collider);
+                    }
                 }
             }
         }
+    }
+
+    fn create_block_colliders(chunk_location: ChunkLocation, x: usize, y: usize, block_type: &'static BlockType, physics: &mut phys::Physics) -> Box<[phys::ColliderHandle]> {
+        let block_origin = Vector([
+            chunk_location.x() as f32 * CHUNK_SIZE_F32 + x as f32,
+            chunk_location.y() as f32 * CHUNK_SIZE_F32 + y as f32,
+        ]);
+        block_type.colliders
+            .iter()
+            .map(|&bounds| {
+                let mut collider_bounds = Rectangle::new(
+                    Vector([
+                        bounds.min_x() as f32 / 32.0,
+                        bounds.min_y() as f32 / 32.0,
+                    ]),
+                    Vector([
+                        bounds.max_x() as f32 / 32.0,
+                        bounds.max_y() as f32 / 32.0,
+                    ]),
+                );
+                collider_bounds.shift_by(block_origin);
+                physics.add_collider(phys::Collider::new_fixed(collider_bounds))
+            })
+            .collect()
     }
 }
