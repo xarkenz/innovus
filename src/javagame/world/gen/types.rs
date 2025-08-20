@@ -1,3 +1,5 @@
+use std::hash::{Hash, Hasher};
+use fnv::FnvHasher;
 use innovus::tools::*;
 
 use super::*;
@@ -12,6 +14,13 @@ impl OverworldGenerator {
         Self {
             seed,
         }
+    }
+
+    pub fn get_chunk_seed(&self, location: block::ChunkLocation) -> u64 {
+        let mut hasher = FnvHasher::with_key(self.seed);
+        location.x().hash(&mut hasher);
+        location.y().hash(&mut hasher);
+        hasher.finish()
     }
 }
 

@@ -3,11 +3,11 @@ use innovus::{Application, WindowEventReceiver, tools::Vector};
 
 pub use glfw::{Key, MouseButton, MouseButtonLeft, MouseButtonRight, MouseButtonMiddle};
 
-const FIRST_KEY_VALUE: usize = glfw::ffi::KEY_SPACE as usize;
-const LAST_KEY_VALUE: usize = glfw::ffi::KEY_LAST as usize;
+const FIRST_KEY_VALUE: usize = Key::Space as usize;
+const LAST_KEY_VALUE: usize = Key::Menu as usize;
 const KEY_ARRAY_SIZE: usize = LAST_KEY_VALUE - FIRST_KEY_VALUE + 1;
-const FIRST_MOUSE_BUTTON_VALUE: usize = glfw::ffi::MOUSE_BUTTON_1 as usize;
-const LAST_MOUSE_BUTTON_VALUE: usize = glfw::ffi::MOUSE_BUTTON_LAST as usize;
+const FIRST_MOUSE_BUTTON_VALUE: usize = MouseButton::Button1 as usize;
+const LAST_MOUSE_BUTTON_VALUE: usize = MouseButton::Button8 as usize;
 const MOUSE_BUTTON_ARRAY_SIZE: usize = LAST_MOUSE_BUTTON_VALUE - FIRST_MOUSE_BUTTON_VALUE + 1;
 
 const fn get_key_index(key: Key) -> Option<usize> {

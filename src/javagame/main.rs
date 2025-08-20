@@ -1,6 +1,8 @@
-use glfw::Modifiers;
-use innovus::{gfx::*, *};
-use crate::tools::*;
+use glfw::{Action, Context, Key, Modifiers, WindowEvent, WindowMode};
+use innovus::Application;
+use innovus::gfx::{screen, Program, ProgramPreset};
+use innovus::tools::{Clock, Vector};
+use crate::tools::{asset, input};
 
 pub mod tools;
 pub mod view;

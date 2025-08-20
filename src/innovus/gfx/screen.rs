@@ -5,7 +5,9 @@ use gl::types::*;
 
 
 pub fn bind_glfw(manager: &glfw::Glfw) {
-    gl::load_with(|s| manager.get_proc_address_raw(s));
+    gl::load_with(|symbol| unsafe {
+        std::mem::transmute(manager.get_proc_address_raw(symbol))
+    });
 }
 
 

@@ -1,17 +1,13 @@
 extern crate glfw;
 
-use std::sync::mpsc::Receiver;
-
-pub use glfw::{
-    Action, Context, Key, MouseButton, SwapInterval, Window, WindowEvent, WindowHint, WindowMode,
-};
+use glfw::{Context, GlfwReceiver, PWindow, SwapInterval, WindowEvent, WindowHint, WindowMode};
 
 pub mod data;
 pub mod gfx;
 pub mod scene;
 pub mod tools;
 
-pub type WindowEventReceiver = Receiver<(f64, WindowEvent)>;
+pub type WindowEventReceiver = GlfwReceiver<(f64, WindowEvent)>;
 
 pub struct Application {
     glfw: glfw::Glfw,
@@ -19,8 +15,9 @@ pub struct Application {
 
 impl Application {
     pub fn new() -> Result<Application, String> {
+        use glfw::fail_on_errors;
         Ok(Application {
-            glfw: glfw::init(glfw::FAIL_ON_ERRORS).map_err(|err| err.to_string())?,
+            glfw: glfw::init(glfw::fail_on_errors!()).map_err(|err| err.to_string())?,
         })
     }
 
@@ -30,7 +27,7 @@ impl Application {
         height: u32,
         title: &str,
         mode: WindowMode<'_>,
-    ) -> Option<(Window, WindowEventReceiver)> {
+    ) -> Option<(PWindow, WindowEventReceiver)> {
         let mut created = self.glfw.create_window(width, height, title, mode);
         if let Some((window, _)) = &mut created {
             window.make_current();

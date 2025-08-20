@@ -25,7 +25,8 @@ path = "src/stratego/main.rs"
 [dependencies]
 num = "0.4.0"
 gl = "0.14.0"
-glfw = "0.52.0"
+glfw = "0.60.0"
 image = "0.25.6"
 uuid = {version = "1.2.2", features = ["v4", "fast-rng"]}
 json = "0.12.4"
+fnv = "1.0.7"

@@ -31,7 +31,7 @@ impl<'world> World<'world> where Self: 'world {
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
             seconds_since_last_tick: SECONDS_PER_TICK,
-            chunk_load_range: Rectangle::new(Vector([-3, -3]), Vector([3, 3])),
+            chunk_load_range: Rectangle::new(Vector([-2, -2]), Vector([2, 2])),
             chunk_simulate_range: Rectangle::new(Vector([-1, -1]), Vector([1, 1])),
             chunk_loader_entity: None,
         }
@@ -84,7 +84,7 @@ impl<'world> World<'world> where Self: 'world {
     pub fn user_place_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize, block_type: &'static block::BlockType) {
         if let Some(mut chunk) = self.chunks.get(&chunk_location).map(|chunk| chunk.borrow_mut()) {
             if chunk.block_at(block_x, block_y).block_type == &block::types::AIR {
-                chunk.set_block_at(block_x, block_y, block::Block::new(block_type, 0, 15), &self.chunks, &mut self.physics);
+                chunk.set_block_at(block_x, block_y, block::Block::new(block_type, 0, 0), &self.chunks, &mut self.physics);
             }
         }
     }
@@ -92,7 +92,7 @@ impl<'world> World<'world> where Self: 'world {
     pub fn user_destroy_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize) {
         if let Some(mut chunk) = self.chunks.get(&chunk_location).map(|chunk| chunk.borrow_mut()) {
             if chunk.block_at(block_x, block_y).block_type != &block::types::AIR {
-                chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR, 0, 15), &self.chunks, &mut self.physics);
+                chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR, 0, 0), &self.chunks, &mut self.physics);
             }
         }
     }

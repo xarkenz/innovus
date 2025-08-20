@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use innovus::{gfx::*, tools::*};
 use std::fmt::Formatter;
 use crate::tools::asset::AssetPool;
@@ -165,19 +165,13 @@ pub const CHUNK_SIZE: usize = 16;
 const CHUNK_SIZE_F32: f32 = CHUNK_SIZE as f32;
 
 fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
-    if value < 0 {
-        (-1, (value + CHUNK_SIZE as isize) as usize)
-    }
-    else if value >= CHUNK_SIZE as isize {
-        (1, (value - CHUNK_SIZE as isize) as usize)
-    }
-    else {
-        (0, value as usize)
-    }
+    (value.div_euclid(CHUNK_SIZE as isize) as i64, value.rem_euclid(CHUNK_SIZE as isize) as usize)
 }
 
 pub type ChunkLocation = Vector<i64, 2>;
 pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
+
+const ADJACENT_OFFSETS: [(isize, isize); 4] = [(0, 1), (0, -1), (-1, 0), (1, 0)];
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -185,7 +179,7 @@ pub struct Chunk {
     blocks: [[Block; CHUNK_SIZE]; CHUNK_SIZE],
     collision_map: Option<[[Box<[phys::ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE]>,
     blocks_dirty: [[bool; CHUNK_SIZE]; CHUNK_SIZE],
-    dirty: bool,
+    all_dirty: bool,
     geometry: Geometry<Vertex2D>,
 }
 
@@ -196,7 +190,7 @@ impl Chunk {
             blocks: Default::default(),
             collision_map: None,
             blocks_dirty: [[true; CHUNK_SIZE]; CHUNK_SIZE],
-            dirty: true,
+            all_dirty: true,
             geometry: Geometry::new_render().unwrap(),
         }
     }
@@ -223,6 +217,8 @@ impl Chunk {
         self.set_dirty_at(x, y, true);
         // Propagate the dirty flag to the surrounding blocks in order to update their appearances
         self.propagate_dirty(x, y, chunk_map);
+        // Update lighting around the block
+        self.update_light(x as isize, y as isize, chunk_map);
     }
 
     pub fn with_block<F, T>(&self, x: isize, y: isize, chunk_map: &ChunkMap, f: F) -> Option<T>
@@ -236,14 +232,16 @@ impl Chunk {
             Some(f(self.block_at(block_x, block_y)))
         }
         else {
-            let other_chunk_location = Vector([
-                self.location.x() + chunk_offset_x,
-                self.location.y() + chunk_offset_y,
-            ]);
-            chunk_map.get(&other_chunk_location).map(|other_chunk| {
-                f(other_chunk.borrow().block_at(block_x, block_y))
-            })
+            let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
+            Some(f(chunk_map.get(&other_chunk_location)?.borrow().block_at(block_x, block_y)))
         }
+    }
+
+    pub fn relative_chunk_location(&self, chunk_offset_x: i64, chunk_offset_y: i64) -> ChunkLocation {
+        Vector([
+            self.location.x() + chunk_offset_x,
+            self.location.y() + chunk_offset_y,
+        ])
     }
 
     pub fn propagate_dirty(&mut self, x: usize, y: usize, chunk_map: &ChunkMap) {
@@ -259,10 +257,7 @@ impl Chunk {
                 if chunk_offset_x == 0 && chunk_offset_y == 0 {
                     self.set_dirty_at(dirty_x, dirty_y, true);
                 }
-                else if let Some(chunk) = chunk_map.get(&Vector([
-                    self.location.x() + chunk_offset_x,
-                    self.location.y() + chunk_offset_y,
-                ])) {
+                else if let Some(chunk) = chunk_map.get(&self.relative_chunk_location(chunk_offset_x, chunk_offset_y)) {
                     chunk.borrow_mut().set_dirty_at(dirty_x, dirty_y, true);
                 }
             }
@@ -275,18 +270,108 @@ impl Chunk {
 
     pub fn set_dirty_at(&mut self, x: usize, y: usize, dirty: bool) {
         self.blocks_dirty[y][x] = dirty;
-        self.dirty = self.dirty || dirty;
     }
 
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
+    pub fn is_all_dirty(&self) -> bool {
+        self.all_dirty
     }
 
-    pub fn set_dirty(&mut self) {
-        self.dirty = true;
-        // Force a re-render for all blocks in the chunk
-        for row in &mut self.blocks_dirty {
-            row.fill(true);
+    pub fn set_all_dirty(&mut self, dirty: bool) {
+        self.all_dirty = dirty;
+    }
+
+    pub fn update_light(&mut self, start_x: isize, start_y: isize, chunk_map: &ChunkMap) {
+        let mut queue = VecDeque::new();
+        queue.push_back((start_x, start_y, true, true));
+
+        while let Some((x, y, check_block_light, check_sky_light)) = queue.pop_front() {
+            let (chunk_offset_x, block_x) = resolve_relative_coordinate(x);
+            let (chunk_offset_y, block_y) = resolve_relative_coordinate(y);
+
+            let current_block_light;
+            let current_sky_light;
+            let block_type;
+            if chunk_offset_x == 0 && chunk_offset_y == 0 {
+                let block = self.block_at(block_x, block_y);
+                current_block_light = block.block_light;
+                current_sky_light = block.sky_light;
+                block_type = block.block_type;
+            }
+            else {
+                let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
+                let Some(chunk) = chunk_map.get(&other_chunk_location).map(RefCell::borrow) else {
+                    continue;
+                };
+                let block = chunk.block_at(block_x, block_y);
+                current_block_light = block.block_light;
+                current_sky_light = block.sky_light;
+                block_type = block.block_type;
+            }
+
+            let mut new_block_light = None;
+            if check_block_light {
+                let max_surrounding_light = ADJACENT_OFFSETS
+                    .iter()
+                    .filter_map(|&(dx, dy)| {
+                        self.with_block(x + dx, y + dy, chunk_map, |block| block.block_light)
+                    })
+                    .max()
+                    .unwrap();
+                let expected_light = block_type.light_emission.max(max_surrounding_light.saturating_sub(1));
+                new_block_light = (current_block_light != expected_light).then_some(expected_light);
+            }
+
+            let mut new_sky_light = None;
+            if check_sky_light {
+                let mut direct_sky_light = 15;
+                if block_type.is_full_block {
+                    direct_sky_light = 0;
+                }
+                let max_surrounding_light = ADJACENT_OFFSETS
+                    .iter()
+                    .map(|&(dx, dy)| {
+                        let sky_light = self.with_block(x + dx, y + dy, chunk_map, |block| block.sky_light)
+                            .unwrap_or(if dy > 0 { 15 } else { 0 });
+                        if dy > 0 && sky_light < 15 {
+                            direct_sky_light = 0;
+                        }
+                        sky_light
+                    })
+                    .max()
+                    .unwrap();
+                let expected_light = direct_sky_light.max(max_surrounding_light.saturating_sub(1));
+                new_sky_light = (current_sky_light != expected_light).then_some(expected_light);
+            }
+
+            if new_block_light.is_none() && new_sky_light.is_none() {
+                continue;
+            }
+
+            if chunk_offset_x == 0 && chunk_offset_y == 0 {
+                if let Some(new_block_light) = new_block_light {
+                    self.blocks[block_y][block_x].block_light = new_block_light;
+                }
+                if let Some(new_sky_light) = new_sky_light {
+                    self.blocks[block_y][block_x].sky_light = new_sky_light;
+                }
+                self.set_all_dirty(true);
+            }
+            else {
+                let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
+                let mut chunk = chunk_map[&other_chunk_location].borrow_mut();
+                if let Some(new_block_light) = new_block_light {
+                    chunk.blocks[block_y][block_x].block_light = new_block_light;
+                }
+                if let Some(new_sky_light) = new_sky_light {
+                    chunk.blocks[block_y][block_x].sky_light = new_sky_light;
+                }
+                chunk.set_all_dirty(true);
+            }
+
+            // Add adjacent blocks to update queue
+            queue.extend(ADJACENT_OFFSETS.iter().map(|&(dx, dy)| {
+                (x + dx, y + dy, new_block_light.is_some(), new_sky_light.is_some())
+            }));
         }
     }
 
@@ -321,33 +406,74 @@ impl Chunk {
             self.geometry.add(&vertices, &faces);
         }
 
-        if self.is_dirty() {
-            for y in 0..CHUNK_SIZE {
-                for x in 0..CHUNK_SIZE {
-                    if self.is_dirty_at(x, y) {
-                        self.update_block_vertices(x, y, assets, chunk_map);
-                        self.blocks_dirty[y][x] = false;
-                    }
+        for y in 0..CHUNK_SIZE {
+            for x in 0..CHUNK_SIZE {
+                if self.is_all_dirty() || self.is_dirty_at(x, y) {
+                    self.update_block_vertices(x, y, assets, chunk_map);
+                    self.set_dirty_at(x, y, false);
                 }
             }
-            self.geometry.update_vertex_buffer();
-            self.dirty = false;
         }
+        self.geometry.update_vertex_buffer();
+        self.set_all_dirty(false);
 
         self.geometry.render();
     }
 
     fn update_block_vertices(&mut self, x: usize, y: usize, assets: &AssetPool, chunk_map: &ChunkMap) {
+        fn get_light_value(block: &Block) -> f32 {
+            const AMBIENT_LIGHT: f32 = 3.0;
+            let effective_light = block.block_light.max(block.sky_light);
+            (AMBIENT_LIGHT + effective_light as f32) / (AMBIENT_LIGHT + 15.0)
+        }
+
+        let block = &self.blocks[y][x];
         // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
         let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
 
-        if let Some(appearance) = assets.get_block_appearance(self.block_at(x, y).block_type) {
+        if let Some(appearance) = assets.get_block_appearance(block.block_type) {
+            let quadrant_vertex_lights = {
+                let x = x as isize;
+                let y = y as isize;
+                // u = up, d = down, l = left, r = right, c = center (all relative to current block)
+                let block_light_ul = self.with_block(x - 1, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_uc = self.with_block(x + 0, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_ur = self.with_block(x + 1, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_cl = self.with_block(x - 1, y + 0, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_cc = get_light_value(block); // Might as well use what we have
+                let block_light_cr = self.with_block(x + 1, y + 0, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_dl = self.with_block(x - 1, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_dc = self.with_block(x + 0, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_dr = self.with_block(x + 1, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
+
+                let corner_light_ul = (block_light_ul + block_light_uc + block_light_cl + block_light_cc) / 4.0;
+                let corner_light_ur = (block_light_ur + block_light_uc + block_light_cr + block_light_cc) / 4.0;
+                let corner_light_dl = (block_light_dl + block_light_dc + block_light_cl + block_light_cc) / 4.0;
+                let corner_light_dr = (block_light_dr + block_light_dc + block_light_cr + block_light_cc) / 4.0;
+
+                let edge_light_u = (corner_light_ul + corner_light_ur) / 2.0;
+                let edge_light_d = (corner_light_dl + corner_light_dr) / 2.0;
+                let edge_light_l = (corner_light_ul + corner_light_dl) / 2.0;
+                let edge_light_r = (corner_light_ur + corner_light_dr) / 2.0;
+
+                // Outer array (block quadrant): up left, up right, down left, down right
+                // Inner array (quadrant vertices): down left, up left, up right, down right
+                [
+                    [edge_light_l, corner_light_ul, edge_light_u, block_light_cc],
+                    [block_light_cc, edge_light_u, corner_light_ur, edge_light_r],
+                    [corner_light_dl, edge_light_l, block_light_cc, edge_light_d],
+                    [edge_light_d, block_light_cc, edge_light_r, corner_light_dr],
+                ]
+            };
+
             let mut index = first_index;
             let uv_offsets = appearance.get_quad_uv_offsets(chunk_map, self, x, y);
-            for (quad_offset, uv_offset) in std::iter::zip(BLOCK_QUAD_OFFSETS, uv_offsets) {
-                for vertex_offset in BLOCK_QUAD_VERTEX_OFFSETS {
+            let quadrant_info = std::iter::zip(BLOCK_QUAD_OFFSETS, uv_offsets).zip(quadrant_vertex_lights);
+            for ((quad_offset, uv_offset), vertex_lights) in quadrant_info {
+                let vertex_info = std::iter::zip(BLOCK_QUAD_VERTEX_OFFSETS, vertex_lights);
+                for (vertex_offset, vertex_light) in vertex_info {
                     let mut vertex = self.geometry.get_vertex(index);
-                    vertex.color = [1.0; 4];
+                    vertex.color = [vertex_light, vertex_light, vertex_light, 1.0];
                     vertex.tex = true;
                     let pos = quad_offset + vertex_offset;
                     vertex.uv = [

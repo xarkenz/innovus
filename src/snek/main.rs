@@ -97,7 +97,8 @@ fn load_snek_geometry(
 }
 
 fn main() {
-    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+    use glfw::fail_on_errors;
+    let mut glfw = glfw::init(glfw::fail_on_errors!()).unwrap();
     glfw.window_hint(glfw::WindowHint::Samples(Some(8)));
 
     let (mut window, events) = glfw
@@ -307,7 +308,7 @@ fn main() {
         shader_program.set_uniform("ambient_color", ambient_color);
         shader_program.set_uniform("pt_light_pos", pt_light_pos);
         shader_program.set_uniform("pt_light_color", pt_light_color);
-        shader_program.set_uniform("pt_light_power", 1.0);
+        shader_program.set_uniform("pt_light_power", 1.0_f32);
         shader_program.set_uniform("tex_atlas", &test_tex);
 
         screen::clear();
