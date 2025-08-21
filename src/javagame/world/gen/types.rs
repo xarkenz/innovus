@@ -66,7 +66,7 @@ impl WorldGenerator for OverworldGenerator {
                         ty,
                     );
 
-                    let block_type = if value < -0.0 {
+                    let block_type = if value < 0.0 {
                         &block::types::STONE
                     } else if value < 0.2 {
                         &block::types::DIRT
@@ -74,6 +74,14 @@ impl WorldGenerator for OverworldGenerator {
                         &block::types::AIR
                     };
                     let block = block::Block::new(block_type, 0, 0);
+                    chunk.set_block_at(x, y, block, chunk_map, physics);
+                }
+            }
+        }
+        else {
+            for y in 0..block::CHUNK_SIZE {
+                for x in 0..block::CHUNK_SIZE {
+                    let block = block::Block::new(&block::types::AIR, 0, 15);
                     chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }

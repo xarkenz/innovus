@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use innovus::{gfx::*, tools::*};
 use std::fmt::Formatter;
 use crate::tools::asset::AssetPool;
@@ -157,7 +157,7 @@ impl Block {
 
 impl Default for Block {
     fn default() -> Self {
-        Self::new(&types::AIR, 0, 15)
+        Self::new(&types::AIR, 0, 0)
     }
 }
 
@@ -281,10 +281,13 @@ impl Chunk {
     }
 
     pub fn update_light(&mut self, start_x: isize, start_y: isize, chunk_map: &ChunkMap) {
-        let mut queue = VecDeque::new();
-        queue.push_back((start_x, start_y, true, true));
+        let mut stack = Vec::new();
+        stack.push((start_x, start_y, true, true));
 
-        while let Some((x, y, check_block_light, check_sky_light)) = queue.pop_front() {
+        let mut compute_count = 0_usize;
+        let mut update_count = 0_usize;
+        let mut unique_update = std::collections::BTreeSet::new();
+        while let Some((x, y, check_block_light, check_sky_light)) = stack.pop() {
             let (chunk_offset_x, block_x) = resolve_relative_coordinate(x);
             let (chunk_offset_y, block_y) = resolve_relative_coordinate(y);
 
@@ -307,6 +310,7 @@ impl Chunk {
                 current_sky_light = block.sky_light;
                 block_type = block.block_type;
             }
+            compute_count += 1;
 
             let mut new_block_light = None;
             if check_block_light {
@@ -343,6 +347,8 @@ impl Chunk {
             if new_block_light.is_none() && new_sky_light.is_none() {
                 continue;
             }
+            update_count += 1;
+            unique_update.insert((x, y));
 
             if chunk_offset_x == 0 && chunk_offset_y == 0 {
                 if let Some(new_block_light) = new_block_light {
@@ -366,9 +372,12 @@ impl Chunk {
             }
 
             // Add adjacent blocks to update queue
-            queue.extend(ADJACENT_OFFSETS.iter().map(|&(dx, dy)| {
+            stack.extend(ADJACENT_OFFSETS.iter().map(|&(dx, dy)| {
                 (x + dx, y + dy, new_block_light.is_some(), new_sky_light.is_some())
             }));
+        }
+        if compute_count > 100 {
+            println!("({}.{start_x}, {}.{start_y}) : {compute_count} computed, {update_count} ({}) updated", self.location.x(), self.location.y(), unique_update.len());
         }
     }
 
