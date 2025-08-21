@@ -323,10 +323,7 @@ impl Chunk {
 
             let mut new_sky_light = None;
             if check_sky_light {
-                let mut direct_sky_light = 15;
-                if block_type.is_full_block {
-                    direct_sky_light = 0;
-                }
+                let mut direct_sky_light = if block_type.is_full_block { 0 } else { 15 };
                 let max_surrounding_light = ADJACENT_OFFSETS
                     .iter()
                     .map(|&(dx, dy)| {

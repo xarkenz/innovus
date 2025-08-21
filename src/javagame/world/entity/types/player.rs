@@ -120,11 +120,6 @@ impl Entity for Player {
             velocity = collider.velocity;
             touching_ground = collider.hit_bottom;
 
-            if collider.rectangle.min_y() < -128.0 {
-                collider.rectangle.shift_min_to(Vector([-0.375, 0.0]));
-                collider.stop();
-            }
-
             if !inputs.key_is_held(Key::Space) {
                 self.jump_cooldown = 0.0;
             }
