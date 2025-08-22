@@ -2,88 +2,88 @@ use innovus::tools::*;
 
 use super::*;
 
-fn smooth_step(a: f32, b: f32, t: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
-    (b - a) * (3.0 - 2.0 * t) * t * t + a
-}
-
-fn scramble(mut n: u64) -> u64 {
-    n ^= n >> 33;
-    n = n.wrapping_mul(0xFF51AFD7ED558CCD);
-    n ^= n >> 33;
-    n = n.wrapping_mul(0xC4CEB9FE1A85EC53);
-    n ^= n >> 33;
-    n
-}
-
 #[derive(Debug)]
 pub struct OverworldGenerator {
-    seed: u64,
+    world_seed: u64,
+    small_terrain: PerlinNoise1D,
+    small_caves: PerlinNoise2D,
+    big_caves: PerlinNoise2D,
 }
 
 impl OverworldGenerator {
-    pub fn new(seed: u64) -> Self {
+    pub fn new(world_seed: u64) -> Self {
+        let scramble_1 = scramble(world_seed);
+        let scramble_2 = scramble(scramble_1);
+        let scramble_3 = scramble(scramble_2);
         Self {
-            seed,
+            world_seed,
+            small_terrain: PerlinNoise1D::new(scramble_1),
+            small_caves: PerlinNoise2D::new(scramble_2),
+            big_caves: PerlinNoise2D::new(scramble_3),
         }
+    }
+
+    pub fn get_terrain_heights(&self, chunk_x: i64) -> Box<[(i64, usize)]> {
+        let small_terrain_cell = self.small_terrain.get_cell(chunk_x);
+
+        (0..block::CHUNK_SIZE)
+            .map(|x_offset| {
+                let small_terrain_value = small_terrain_cell.compute_value(x_offset as f32 / block::CHUNK_SIZE as f32, smooth_step);
+                let raw_height = ((small_terrain_value + 1.0) * 30.0).round() as i64;
+                (
+                    raw_height.div_euclid(block::CHUNK_SIZE as i64),
+                    raw_height.rem_euclid(block::CHUNK_SIZE as i64) as usize,
+                )
+            })
+            .collect()
     }
 }
 
 impl WorldGenerator for OverworldGenerator {
-    fn seed(&self) -> u64 {
-        self.seed
+    fn world_seed(&self) -> u64 {
+        self.world_seed
     }
 
     fn generate_chunk(&self, chunk: &mut block::Chunk, chunk_map: &block::ChunkMap, physics: &mut phys::Physics) -> Vec<Box<dyn entity::Entity>> {
-        if chunk.location().y() < 0 {
-            let seed_dl = self.get_chunk_seed(chunk.location());
-            let seed_dr = self.get_chunk_seed(chunk.location() + Vector([1, 0]));
-            let seed_ul = self.get_chunk_seed(chunk.location() + Vector([0, 1]));
-            let seed_ur = self.get_chunk_seed(chunk.location() + Vector([1, 1]));
+        let terrain_heights = self.get_terrain_heights(chunk.location().x());
 
-            let [grad_dl, grad_dr, grad_ul, grad_ur] = [seed_dl, seed_dr, seed_ul, seed_ur].map(|seed| {
-                let theta = scramble(seed) as f32 / u64::MAX as f32 * std::f32::consts::TAU;
-                Vector([theta.cos(), theta.sin()]) / block::CHUNK_SIZE as f32
-            });
+        let big_offset = chunk.location().map(|x| x.rem_euclid(2) as f32 / 2.0);
+        let big_location = chunk.location().map(|x| x.div_euclid(2));
 
-            for y in 0..block::CHUNK_SIZE {
-                for x in 0..block::CHUNK_SIZE {
-                    let offset_dl = Vector([x as f32, y as f32]);
-                    let offset_dr = Vector([-((block::CHUNK_SIZE - x) as f32), y as f32]);
-                    let offset_ul = Vector([x as f32, -((block::CHUNK_SIZE - y) as f32)]);
-                    let offset_ur = Vector([-((block::CHUNK_SIZE - x) as f32), -((block::CHUNK_SIZE - y) as f32)]);
+        let small_caves_cell = self.small_caves.get_cell(chunk.location());
+        let big_caves_cell = self.big_caves.get_cell(big_location);
 
-                    let dot_dl = grad_dl.dot(&offset_dl);
-                    let dot_dr = grad_dr.dot(&offset_dr);
-                    let dot_ul = grad_ul.dot(&offset_ul);
-                    let dot_ur = grad_ur.dot(&offset_ur);
+        for y in 0..block::CHUNK_SIZE {
+            for x in 0..block::CHUNK_SIZE {
+                let (height_chunk, height_block) = terrain_heights[x];
+                let block_type;
 
-                    let tx = x as f32 / block::CHUNK_SIZE as f32;
-                    let ty = y as f32 / block::CHUNK_SIZE as f32;
-                    let value = smooth_step(
-                        smooth_step(dot_dl, dot_dr, tx),
-                        smooth_step(dot_ul, dot_ur, tx),
-                        ty,
-                    );
-
-                    let block_type = if value < 0.0 {
-                        &block::types::STONE
-                    } else if value < 0.2 {
-                        &block::types::DIRT
-                    } else {
-                        &block::types::AIR
-                    };
-                    let block = block::Block::new(block_type, 0, 0);
-                    chunk.set_block_at(x, y, block, chunk_map, physics);
+                if chunk.location().y() == height_chunk && y == height_block {
+                    block_type = &block::types::GRASSY_DIRT;
                 }
-            }
-        }
-        else {
-            for y in 0..block::CHUNK_SIZE {
-                for x in 0..block::CHUNK_SIZE {
-                    let block = block::Block::new(&block::types::AIR, 0, 15);
-                    chunk.set_block_at(x, y, block, chunk_map, physics);
+                else if chunk.location().y() < height_chunk || (chunk.location().y() == height_chunk && y < height_block) {
+                    let small_offset = Vector([x as f32, y as f32]) / block::CHUNK_SIZE as f32;
+                    let small_caves_value = small_caves_cell.compute_value(small_offset, smooth_step);
+                    let big_offset = big_offset + Vector([x as f32, y as f32]) / (block::CHUNK_SIZE as f32 * 2.0);
+                    let big_caves_value = big_caves_cell.compute_value(big_offset, smooth_step);
+                    let value = 0.8 * small_caves_value + 0.5 * big_caves_value;
+
+                    if value < 0.0 {
+                        block_type = &block::types::SLATE;
+                    }
+                    else if value < 0.2 {
+                        block_type = &block::types::STONE;
+                    }
+                    else {
+                        block_type = &block::types::AIR;
+                    }
                 }
+                else {
+                    block_type = &block::types::AIR;
+                }
+
+                let block = block::Block::new(block_type, 0, 0);
+                chunk.set_block_at(x, y, block, chunk_map, physics);
             }
         }
 
@@ -105,7 +105,7 @@ impl TestWorldGenerator {
 }
 
 impl WorldGenerator for TestWorldGenerator {
-    fn seed(&self) -> u64 {
+    fn world_seed(&self) -> u64 {
         self.seed
     }
 

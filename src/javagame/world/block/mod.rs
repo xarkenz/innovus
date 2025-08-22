@@ -371,7 +371,7 @@ impl Chunk {
                 chunk.set_all_dirty(true);
             }
 
-            // Add adjacent blocks to update queue
+            // Add adjacent blocks to update stack
             stack.extend(ADJACENT_OFFSETS.iter().map(|&(dx, dy)| {
                 (x + dx, y + dy, new_block_light.is_some(), new_sky_light.is_some())
             }));

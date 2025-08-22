@@ -17,9 +17,15 @@ pub type Vector2i = Vector<i32, 2>;
 pub type Vector2f = Vector<f32, 2>;
 pub type Vector2d = Vector<f64, 2>;
 
-impl<T: NumAssign + Copy, const N: usize> Eq for Vector<T, N> where T: Eq {}
+impl<T: NumAssign + Copy, const N: usize> Eq for Vector<T, N>
+where
+    T: Eq,
+{}
 
-impl<T: NumAssign + Copy, const N: usize> Ord for Vector<T, N> where T: Ord {
+impl<T: NumAssign + Copy, const N: usize> Ord for Vector<T, N>
+where
+    T: Ord,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         <Self as PartialOrd>::partial_cmp(self, other).unwrap()
     }
@@ -27,11 +33,11 @@ impl<T: NumAssign + Copy, const N: usize> Ord for Vector<T, N> where T: Ord {
 
 impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
     pub fn zero() -> Self {
-        Vector([T::zero(); N])
+        Self([T::zero(); N])
     }
 
     pub fn one() -> Self {
-        Vector([T::one(); N])
+        Self([T::one(); N])
     }
 
     pub fn content(&self) -> [T; N] {
@@ -56,6 +62,14 @@ impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
             dot_product += self.at(index) * rhs.at(index);
         }
         dot_product
+    }
+    
+    pub fn map<F, U>(self, f: F) -> Vector<U, N>
+    where
+        F: FnMut(T) -> U,
+        U: NumAssign + Copy,
+    {
+        Vector(self.0.map(f))
     }
 }
 

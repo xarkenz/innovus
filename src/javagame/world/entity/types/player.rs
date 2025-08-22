@@ -155,8 +155,17 @@ impl Entity for Player {
                 collider.velocity.set_x((collider.velocity.x() + self.movement_accel * dt).min(speed_multiplier * 5.0));
             }
 
-            movement::apply_gravity(collider, dt, movement::DEFAULT_GRAVITY_ACCELERATION, movement::DEFAULT_TERMINAL_VELOCITY);
-            movement::apply_friction(collider, dt, movement::DEFAULT_FRICTION_DECELERATION);
+            collider.velocity.set_y(movement::apply_gravity(
+                collider.velocity.y(),
+                dt,
+                movement::DEFAULT_GRAVITY_ACCELERATION,
+                movement::DEFAULT_TERMINAL_VELOCITY,
+            ));
+            collider.velocity.set_x(movement::apply_friction(
+                collider.velocity.x(),
+                dt,
+                movement::DEFAULT_FRICTION_DECELERATION,
+            ));
 
             self.position.set_x(collider.rectangle.min_x() + 0.375);
             self.position.set_y(collider.rectangle.min_y());
