@@ -171,6 +171,33 @@ fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
 pub type ChunkLocation = Vector<i64, 2>;
 pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct BlockCoord {
+    pub chunk: i64,
+    pub offset: usize,
+}
+
+impl BlockCoord {
+    pub fn new(chunk: i64, offset: usize) -> Self {
+        Self { chunk, offset }
+    }
+}
+
+impl From<i64> for BlockCoord {
+    fn from(value: i64) -> Self {
+        Self {
+            chunk: value.div_euclid(CHUNK_SIZE as i64),
+            offset: value.rem_euclid(CHUNK_SIZE as i64) as usize,
+        }
+    }
+}
+
+impl From<BlockCoord> for i64 {
+    fn from(value: BlockCoord) -> Self {
+        value.chunk * CHUNK_SIZE as i64 + value.offset as i64
+    }
+}
+
 const ADJACENT_OFFSETS: [(isize, isize); 4] = [(0, 1), (0, -1), (-1, 0), (1, 0)];
 
 #[derive(Debug)]
@@ -181,6 +208,7 @@ pub struct Chunk {
     blocks_dirty: [[bool; CHUNK_SIZE]; CHUNK_SIZE],
     all_dirty: bool,
     geometry: Geometry<Vertex2D>,
+    height_map: [i64; CHUNK_SIZE],
 }
 
 impl Chunk {
@@ -192,11 +220,20 @@ impl Chunk {
             blocks_dirty: [[true; CHUNK_SIZE]; CHUNK_SIZE],
             all_dirty: true,
             geometry: Geometry::new_render().unwrap(),
+            height_map: Default::default(),
         }
     }
 
     pub fn location(&self) -> ChunkLocation {
         self.location
+    }
+    
+    pub fn height_map(&self) -> &[i64; CHUNK_SIZE] {
+        &self.height_map
+    }
+
+    pub fn set_height_map(&mut self, height_map: [i64; CHUNK_SIZE]) {
+        self.height_map = height_map;
     }
 
     pub fn block_at(&self, x: usize, y: usize) -> &Block {

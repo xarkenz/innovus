@@ -1,5 +1,5 @@
 use innovus::tools::*;
-
+use crate::world::block::BlockCoord;
 use super::*;
 
 #[derive(Debug)]
@@ -23,19 +23,15 @@ impl OverworldGenerator {
         }
     }
 
-    pub fn get_terrain_heights(&self, chunk_x: i64) -> Box<[(i64, usize)]> {
+    pub fn get_height_map(&self, chunk_x: i64) -> [i64; block::CHUNK_SIZE] {
         let small_terrain_cell = self.small_terrain.get_cell(chunk_x);
 
-        (0..block::CHUNK_SIZE)
-            .map(|x_offset| {
-                let small_terrain_value = small_terrain_cell.compute_value(x_offset as f32 / block::CHUNK_SIZE as f32, smooth_step);
-                let raw_height = ((small_terrain_value + 1.0) * 30.0).round() as i64;
-                (
-                    raw_height.div_euclid(block::CHUNK_SIZE as i64),
-                    raw_height.rem_euclid(block::CHUNK_SIZE as i64) as usize,
-                )
-            })
-            .collect()
+        let mut x_offset = 0;
+        [(); block::CHUNK_SIZE].map(|_| {
+            let small_terrain_value = small_terrain_cell.compute_value(x_offset as f32 / block::CHUNK_SIZE as f32, smooth_step);
+            x_offset += 1;
+            ((small_terrain_value + 1.0) * 30.0).round() as i64
+        })
     }
 }
 
@@ -45,7 +41,8 @@ impl WorldGenerator for OverworldGenerator {
     }
 
     fn generate_chunk(&self, chunk: &mut block::Chunk, chunk_map: &block::ChunkMap, physics: &mut phys::Physics) -> Vec<Box<dyn entity::Entity>> {
-        let terrain_heights = self.get_terrain_heights(chunk.location().x());
+        let height_map = self.get_height_map(chunk.location().x());
+        chunk.set_height_map(height_map);
 
         let big_offset = chunk.location().map(|x| x.rem_euclid(2) as f32 / 2.0);
         let big_location = chunk.location().map(|x| x.div_euclid(2));
@@ -55,20 +52,31 @@ impl WorldGenerator for OverworldGenerator {
 
         for y in 0..block::CHUNK_SIZE {
             for x in 0..block::CHUNK_SIZE {
-                let (height_chunk, height_block) = terrain_heights[x];
-                let block_type;
+                let block_y = i64::from(BlockCoord::new(chunk.location().y(), y));
+                let terrain_height = height_map[x];
 
-                if chunk.location().y() == height_chunk && y == height_block {
+                let block_type;
+                if block_y > terrain_height {
+                    block_type = &block::types::AIR;
+                }
+                else if block_y == terrain_height {
                     block_type = &block::types::GRASSY_DIRT;
                 }
-                else if chunk.location().y() < height_chunk || (chunk.location().y() == height_chunk && y < height_block) {
+                else if terrain_height - block_y <= 4 {
+                    block_type = &block::types::DIRT;
+                }
+                else {
                     let small_offset = Vector([x as f32, y as f32]) / block::CHUNK_SIZE as f32;
                     let small_caves_value = small_caves_cell.compute_value(small_offset, smooth_step);
                     let big_offset = big_offset + Vector([x as f32, y as f32]) / (block::CHUNK_SIZE as f32 * 2.0);
                     let big_caves_value = big_caves_cell.compute_value(big_offset, smooth_step);
-                    let value = 0.8 * small_caves_value + 0.5 * big_caves_value;
+                    let mut value = 0.8 * small_caves_value + 0.5 * big_caves_value;
 
-                    if value < 0.0 {
+                    if terrain_height - block_y <= 25 {
+                        value *= smooth_step(0.0, 1.0, (terrain_height - block_y - 5) as f32 / 20.0);
+                    }
+
+                    if value < -0.1 {
                         block_type = &block::types::SLATE;
                     }
                     else if value < 0.2 {
@@ -77,9 +85,6 @@ impl WorldGenerator for OverworldGenerator {
                     else {
                         block_type = &block::types::AIR;
                     }
-                }
-                else {
-                    block_type = &block::types::AIR;
                 }
 
                 let block = block::Block::new(block_type, 0, 0);
