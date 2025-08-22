@@ -145,19 +145,24 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(block_type: &'static BlockType, block_light: u8, sky_light: u8) -> Self {
+    pub fn new(block_type: &'static BlockType) -> Self {
         Self {
             block_type,
             attributes: block_type.default_attributes(),
-            block_light,
-            sky_light,
+            block_light: 0,
+            sky_light: 0,
         }
+    }
+
+    pub fn inherit_environment(&mut self, predecessor: &Self) {
+        self.block_light = predecessor.block_light;
+        self.sky_light = predecessor.sky_light;
     }
 }
 
 impl Default for Block {
     fn default() -> Self {
-        Self::new(&types::AIR, 0, 0)
+        Self::new(&types::AIR)
     }
 }
 
@@ -227,20 +232,30 @@ impl Chunk {
     pub fn location(&self) -> ChunkLocation {
         self.location
     }
-    
+
     pub fn height_map(&self) -> &[i64; CHUNK_SIZE] {
         &self.height_map
     }
 
     pub fn set_height_map(&mut self, height_map: [i64; CHUNK_SIZE]) {
         self.height_map = height_map;
+
+        // Update sky light
+        for (x, terrain_height) in (0..CHUNK_SIZE).zip(height_map) {
+            let base_y = self.location.y() * CHUNK_SIZE as i64;
+            for y in 0..CHUNK_SIZE {
+                let blocks_to_surface = terrain_height - (base_y + y as i64);
+                let sky_light = 15 - blocks_to_surface.clamp(0, 15) as u8;
+                self.blocks[y][x].sky_light = sky_light;
+            }
+        }
     }
 
     pub fn block_at(&self, x: usize, y: usize) -> &Block {
         &self.blocks[y][x]
     }
 
-    pub fn set_block_at(&mut self, x: usize, y: usize, block: Block, chunk_map: &ChunkMap, physics: &mut phys::Physics) {
+    pub fn set_block_at(&mut self, x: usize, y: usize, mut block: Block, chunk_map: &ChunkMap, physics: &mut phys::Physics) {
         if let Some(collision_map) = &mut self.collision_map {
             // Add new physics colliders and remove the old ones
             let new_colliders = Self::create_block_colliders(self.location, x, y, block.block_type, physics);
@@ -250,12 +265,13 @@ impl Chunk {
             }
         }
 
+        block.inherit_environment(&self.blocks[y][x]);
         self.blocks[y][x] = block;
         self.set_dirty_at(x, y, true);
         // Propagate the dirty flag to the surrounding blocks in order to update their appearances
         self.propagate_dirty(x, y, chunk_map);
         // Update lighting around the block
-        self.update_light(x as isize, y as isize, chunk_map);
+        self.update_lighting(x as isize, y as isize, chunk_map);
     }
 
     pub fn with_block<F, T>(&self, x: isize, y: isize, chunk_map: &ChunkMap, f: F) -> Option<T>
@@ -317,24 +333,19 @@ impl Chunk {
         self.all_dirty = dirty;
     }
 
-    pub fn update_light(&mut self, start_x: isize, start_y: isize, chunk_map: &ChunkMap) {
+    pub fn update_lighting(&mut self, start_x: isize, start_y: isize, chunk_map: &ChunkMap) {
         let mut stack = Vec::new();
-        stack.push((start_x, start_y, true, true));
+        stack.push((start_x, start_y));
 
-        let mut compute_count = 0_usize;
-        let mut update_count = 0_usize;
-        let mut unique_update = std::collections::BTreeSet::new();
-        while let Some((x, y, check_block_light, check_sky_light)) = stack.pop() {
+        while let Some((x, y)) = stack.pop() {
             let (chunk_offset_x, block_x) = resolve_relative_coordinate(x);
             let (chunk_offset_y, block_y) = resolve_relative_coordinate(y);
 
-            let current_block_light;
-            let current_sky_light;
+            let current_light;
             let block_type;
             if chunk_offset_x == 0 && chunk_offset_y == 0 {
                 let block = self.block_at(block_x, block_y);
-                current_block_light = block.block_light;
-                current_sky_light = block.sky_light;
+                current_light = block.block_light;
                 block_type = block.block_type;
             }
             else {
@@ -343,78 +354,36 @@ impl Chunk {
                     continue;
                 };
                 let block = chunk.block_at(block_x, block_y);
-                current_block_light = block.block_light;
-                current_sky_light = block.sky_light;
+                current_light = block.block_light;
                 block_type = block.block_type;
             }
-            compute_count += 1;
 
-            let mut new_block_light = None;
-            if check_block_light {
-                let max_surrounding_light = ADJACENT_OFFSETS
-                    .iter()
-                    .filter_map(|&(dx, dy)| {
-                        self.with_block(x + dx, y + dy, chunk_map, |block| block.block_light)
-                    })
-                    .max()
-                    .unwrap();
-                let expected_light = block_type.light_emission.max(max_surrounding_light.saturating_sub(1));
-                new_block_light = (current_block_light != expected_light).then_some(expected_light);
-            }
+            let max_surrounding_light = ADJACENT_OFFSETS
+                .iter()
+                .filter_map(|&(dx, dy)| {
+                    self.with_block(x + dx, y + dy, chunk_map, |block| block.block_light)
+                })
+                .max()
+                .unwrap();
+            let expected_light = block_type.light_emission.max(max_surrounding_light.saturating_sub(1));
 
-            let mut new_sky_light = None;
-            if check_sky_light {
-                let mut direct_sky_light = if block_type.is_full_block { 0 } else { 15 };
-                let max_surrounding_light = ADJACENT_OFFSETS
-                    .iter()
-                    .map(|&(dx, dy)| {
-                        let sky_light = self.with_block(x + dx, y + dy, chunk_map, |block| block.sky_light)
-                            .unwrap_or(if dy > 0 { 15 } else { 0 });
-                        if dy > 0 && sky_light < 15 {
-                            direct_sky_light = 0;
-                        }
-                        sky_light
-                    })
-                    .max()
-                    .unwrap();
-                let expected_light = direct_sky_light.max(max_surrounding_light.saturating_sub(1));
-                new_sky_light = (current_sky_light != expected_light).then_some(expected_light);
-            }
-
-            if new_block_light.is_none() && new_sky_light.is_none() {
+            if current_light == expected_light {
                 continue;
             }
-            update_count += 1;
-            unique_update.insert((x, y));
 
             if chunk_offset_x == 0 && chunk_offset_y == 0 {
-                if let Some(new_block_light) = new_block_light {
-                    self.blocks[block_y][block_x].block_light = new_block_light;
-                }
-                if let Some(new_sky_light) = new_sky_light {
-                    self.blocks[block_y][block_x].sky_light = new_sky_light;
-                }
+                self.blocks[block_y][block_x].block_light = expected_light;
                 self.set_all_dirty(true);
             }
             else {
                 let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
                 let mut chunk = chunk_map[&other_chunk_location].borrow_mut();
-                if let Some(new_block_light) = new_block_light {
-                    chunk.blocks[block_y][block_x].block_light = new_block_light;
-                }
-                if let Some(new_sky_light) = new_sky_light {
-                    chunk.blocks[block_y][block_x].sky_light = new_sky_light;
-                }
+                chunk.blocks[block_y][block_x].block_light = expected_light;
                 chunk.set_all_dirty(true);
             }
 
             // Add adjacent blocks to update stack
-            stack.extend(ADJACENT_OFFSETS.iter().map(|&(dx, dy)| {
-                (x + dx, y + dy, new_block_light.is_some(), new_sky_light.is_some())
-            }));
-        }
-        if compute_count > 100 {
-            println!("({}.{start_x}, {}.{start_y}) : {compute_count} computed, {update_count} ({}) updated", self.location.x(), self.location.y(), unique_update.len());
+            stack.extend(ADJACENT_OFFSETS.map(|(dx, dy)| (x + dx, y + dy)));
         }
     }
 

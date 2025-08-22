@@ -84,7 +84,7 @@ impl<'world> World<'world> where Self: 'world {
     pub fn user_place_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize, block_type: &'static block::BlockType) {
         if let Some(mut chunk) = self.chunks.get(&chunk_location).map(|chunk| chunk.borrow_mut()) {
             if chunk.block_at(block_x, block_y).block_type == &block::types::AIR {
-                chunk.set_block_at(block_x, block_y, block::Block::new(block_type, 0, 0), &self.chunks, &mut self.physics);
+                chunk.set_block_at(block_x, block_y, block::Block::new(block_type), &self.chunks, &mut self.physics);
             }
         }
     }
@@ -92,7 +92,7 @@ impl<'world> World<'world> where Self: 'world {
     pub fn user_destroy_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize) {
         if let Some(mut chunk) = self.chunks.get(&chunk_location).map(|chunk| chunk.borrow_mut()) {
             if chunk.block_at(block_x, block_y).block_type != &block::types::AIR {
-                chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR, 0, 0), &self.chunks, &mut self.physics);
+                chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR), &self.chunks, &mut self.physics);
             }
         }
     }

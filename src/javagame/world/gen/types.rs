@@ -87,7 +87,7 @@ impl WorldGenerator for OverworldGenerator {
                     }
                 }
 
-                let block = block::Block::new(block_type, 0, 0);
+                let block = block::Block::new(block_type);
                 chunk.set_block_at(x, y, block, chunk_map, physics);
             }
         }
@@ -118,19 +118,19 @@ impl WorldGenerator for TestWorldGenerator {
         if chunk.location().y() == -1 {
             for y in 0..15 {
                 for x in 0..16 {
-                    let block = block::Block::new(&block::types::DIRT, 0, 0);
+                    let block = block::Block::new(&block::types::DIRT);
                     chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }
             for x in 0..16 {
-                let block = block::Block::new(&block::types::GRASSY_DIRT, 0, 0);
+                let block = block::Block::new(&block::types::GRASSY_DIRT);
                 chunk.set_block_at(x, 15, block, chunk_map, physics);
             }
         }
         else if chunk.location().y() < -1 {
             for y in 0..16 {
                 for x in 0..16 {
-                    let block = block::Block::new(&block::types::STONE, 0, 0);
+                    let block = block::Block::new(&block::types::STONE);
                     chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }
@@ -138,7 +138,7 @@ impl WorldGenerator for TestWorldGenerator {
         else {
             for y in 0..16 {
                 for x in 0..16 {
-                    let block = block::Block::new(&block::types::AIR, 0, 0);
+                    let block = block::Block::new(&block::types::AIR);
                     chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }
