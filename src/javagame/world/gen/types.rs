@@ -6,6 +6,7 @@ use super::*;
 pub struct OverworldGenerator {
     world_seed: u64,
     small_terrain: PerlinNoise1D,
+    big_terrain: PerlinNoise1D,
     small_caves: PerlinNoise2D,
     big_caves: PerlinNoise2D,
 }
@@ -15,22 +16,31 @@ impl OverworldGenerator {
         let scramble_1 = scramble(world_seed);
         let scramble_2 = scramble(scramble_1);
         let scramble_3 = scramble(scramble_2);
+        let scramble_4 = scramble(scramble_3);
         Self {
             world_seed,
             small_terrain: PerlinNoise1D::new(scramble_1),
-            small_caves: PerlinNoise2D::new(scramble_2),
-            big_caves: PerlinNoise2D::new(scramble_3),
+            big_terrain: PerlinNoise1D::new(scramble_2),
+            small_caves: PerlinNoise2D::new(scramble_3),
+            big_caves: PerlinNoise2D::new(scramble_4),
         }
     }
 
     pub fn get_height_map(&self, chunk_x: i64) -> [i64; block::CHUNK_SIZE] {
-        let small_terrain_cell = self.small_terrain.get_cell(chunk_x);
+        let small_terrain_cell = self.small_terrain.get_cell(chunk_x.div_euclid(2));
+        let small_offset_base = chunk_x.rem_euclid(2) as f32 / 2.0;
+        let big_terrain_cell = self.big_terrain.get_cell(chunk_x.div_euclid(4));
+        let big_offset_base = chunk_x.rem_euclid(4) as f32 / 4.0;
 
         let mut x_offset = 0;
         [(); block::CHUNK_SIZE].map(|_| {
-            let small_terrain_value = small_terrain_cell.compute_value(x_offset as f32 / block::CHUNK_SIZE as f32, smooth_step);
+            let offset = x_offset as f32 / block::CHUNK_SIZE as f32;
+            let small_offset = small_offset_base + offset / 2.0;
+            let small_terrain_value = small_terrain_cell.compute_value(small_offset, smooth_step);
+            let big_offset = big_offset_base + offset / 4.0;
+            let big_terrain_value = big_terrain_cell.compute_value(big_offset, smooth_step);
             x_offset += 1;
-            ((small_terrain_value + 1.0) * 30.0).round() as i64
+            (small_terrain_value * 20.0 + big_terrain_value * 50.0).round() as i64
         })
     }
 }
@@ -44,7 +54,7 @@ impl WorldGenerator for OverworldGenerator {
         let height_map = self.get_height_map(chunk.location().x());
         chunk.set_height_map(height_map);
 
-        let big_offset = chunk.location().map(|x| x.rem_euclid(2) as f32 / 2.0);
+        let big_offset_base = chunk.location().map(|x| x.rem_euclid(2) as f32 / 2.0);
         let big_location = chunk.location().map(|x| x.div_euclid(2));
 
         let small_caves_cell = self.small_caves.get_cell(chunk.location());
@@ -68,7 +78,7 @@ impl WorldGenerator for OverworldGenerator {
                 else {
                     let small_offset = Vector([x as f32, y as f32]) / block::CHUNK_SIZE as f32;
                     let small_caves_value = small_caves_cell.compute_value(small_offset, smooth_step);
-                    let big_offset = big_offset + Vector([x as f32, y as f32]) / (block::CHUNK_SIZE as f32 * 2.0);
+                    let big_offset = big_offset_base + small_offset / 2.0;
                     let big_caves_value = big_caves_cell.compute_value(big_offset, smooth_step);
                     let mut value = 0.8 * small_caves_value + 0.5 * big_caves_value;
 
