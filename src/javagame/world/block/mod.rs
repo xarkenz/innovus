@@ -16,8 +16,10 @@ pub enum AttributeType {
     U32(u32),
     I32(i32),
     String(&'static str),
-    // default variant index, variant display names
-    Enum(u8, &'static [&'static str]),
+    Enum {
+        default_value: u8,
+        value_names: &'static [&'static str],
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -36,11 +38,11 @@ pub struct BlockType {
     pub colliders: &'static [Rectangle<i32>],
     pub is_full_block: bool,
     pub light_emission: u8,
-    pub connector: fn(&Self, &Self) -> bool,
+    pub connector: fn(&Block, &Block) -> bool,
 }
 
 impl BlockType {
-    pub fn default_attributes(&self) -> Vec<AttributeValue> {
+    pub fn default_attributes(&self) -> Box<[AttributeValue]> {
         self.attributes
             .iter()
             .map(|(_, t)| match t {
@@ -50,19 +52,15 @@ impl BlockType {
                 &AttributeType::U32(n) => AttributeValue::U32(n),
                 &AttributeType::I32(n) => AttributeValue::I32(n),
                 &AttributeType::String(s) => AttributeValue::String(s.to_string()),
-                &AttributeType::Enum(n, _) => AttributeValue::U8(n),
+                &AttributeType::Enum { default_value, .. } => AttributeValue::U8(default_value),
             })
             .collect()
-    }
-
-    pub fn connects_to(&self, other: &Self) -> bool {
-        (self.connector)(self, other)
     }
 }
 
 impl PartialEq for BlockType {
     fn eq(&self, other: &Self) -> bool {
-        // Comparing pointers is sufficient
+        // Comparing pointers is sufficient; only the static BlockType objects should be used.
         self as *const Self == other as *const Self
     }
 }
@@ -95,38 +93,43 @@ pub struct BlockAppearance {
 }
 
 impl BlockAppearance {
-    fn get_connect(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: isize, y: isize) -> bool {
-        let other_type = chunk
-            .with_block(x, y, chunk_map, |block| block.block_type)
-            .unwrap_or(&types::AIR);
-        self.block_type.connects_to(other_type)
+    fn get_connect(&self, chunk_map: &ChunkMap, chunk: &Chunk, this_block: &Block, that_x: isize, that_y: isize) -> bool {
+        chunk
+            .with_block(that_x, that_y, chunk_map, |that_block| {
+                this_block.connects_to(that_block)
+            })
+            .unwrap_or(true)
     }
 
-    fn get_quad_type(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: isize, y: isize, x_connect: bool, y_connect: bool) -> u32 {
+    fn get_quad_type(&self, chunk_map: &ChunkMap, chunk: &Chunk, this_block: &Block, that_x: isize, that_y: isize, x_connect: bool, y_connect: bool) -> u32 {
         match (x_connect, y_connect) {
             (false, false) => 0,
             (true, false) => 1,
             (false, true) => 2,
-            (true, true) => if self.get_connect(chunk_map, chunk, x, y) { 4 } else { 3 },
+            (true, true) => {
+                if self.get_connect(chunk_map, chunk, this_block, that_x, that_y) { 4 } else { 3 }
+            }
         }
     }
 
     pub fn get_quad_uv_offsets(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: usize, y: usize) -> [Vector<u32, 2>; 4] {
+        let block = chunk.block_at(x, y);
+        
         let left_x = x as isize - 1;
         let right_x = x as isize + 1;
         let down_y = y as isize - 1;
         let up_y = y as isize + 1;
 
-        let left_connect = self.get_connect(chunk_map, chunk, left_x, y as isize);
-        let right_connect = self.get_connect(chunk_map, chunk, right_x, y as isize);
-        let down_connect = self.get_connect(chunk_map, chunk, x as isize, down_y);
-        let up_connect = self.get_connect(chunk_map, chunk, x as isize, up_y);
+        let left_connect = self.get_connect(chunk_map, chunk, block, left_x, y as isize);
+        let right_connect = self.get_connect(chunk_map, chunk, block, right_x, y as isize);
+        let down_connect = self.get_connect(chunk_map, chunk, block, x as isize, down_y);
+        let up_connect = self.get_connect(chunk_map, chunk, block, x as isize, up_y);
 
         let quad_types: [u32; 4] = [
-            self.get_quad_type(chunk_map, chunk, left_x, up_y, left_connect, up_connect),
-            self.get_quad_type(chunk_map, chunk, right_x, up_y, right_connect, up_connect),
-            self.get_quad_type(chunk_map, chunk, left_x, down_y, left_connect, down_connect),
-            self.get_quad_type(chunk_map, chunk, right_x, down_y, right_connect, down_connect),
+            self.get_quad_type(chunk_map, chunk, block, left_x, up_y, left_connect, up_connect),
+            self.get_quad_type(chunk_map, chunk, block, right_x, up_y, right_connect, up_connect),
+            self.get_quad_type(chunk_map, chunk, block, left_x, down_y, left_connect, down_connect),
+            self.get_quad_type(chunk_map, chunk, block, right_x, down_y, right_connect, down_connect),
         ];
 
         quad_types.map(|quad_type| Vector([
@@ -139,7 +142,7 @@ impl BlockAppearance {
 #[derive(Clone, Debug)]
 pub struct Block {
     pub block_type: &'static BlockType,
-    pub attributes: Vec<AttributeValue>,
+    pub attributes: Box<[AttributeValue]>,
     pub block_light: u8,
     pub sky_light: u8,
 }
@@ -158,6 +161,10 @@ impl Block {
         self.block_light = predecessor.block_light;
         self.sky_light = predecessor.sky_light;
     }
+
+    pub fn connects_to(&self, other: &Self) -> bool {
+        (self.block_type.connector)(self, other)
+    }
 }
 
 impl Default for Block {
@@ -167,7 +174,6 @@ impl Default for Block {
 }
 
 pub const CHUNK_SIZE: usize = 16;
-const CHUNK_SIZE_F32: f32 = CHUNK_SIZE as f32;
 
 fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
     (value.div_euclid(CHUNK_SIZE as isize) as i64, value.rem_euclid(CHUNK_SIZE as isize) as usize)
@@ -403,8 +409,8 @@ impl Chunk {
                         faces.push([index + 0, index + 1, index + 2]);
                         faces.push([index + 2, index + 3, index + 0]);
                         // TODO: obviously lossy
-                        let x = self.location.x() as f32 * CHUNK_SIZE_F32 + block_x as f32 + offset.x();
-                        let y = self.location.y() as f32 * CHUNK_SIZE_F32 + block_y as f32 + offset.y();
+                        let x = self.location.x() as f32 * CHUNK_SIZE as f32 + block_x as f32 + offset.x();
+                        let y = self.location.y() as f32 * CHUNK_SIZE as f32 + block_y as f32 + offset.y();
                         for vertex_offset in BLOCK_QUAD_VERTEX_OFFSETS {
                             vertices.push(Vertex2D::new(
                                 [x + vertex_offset.x(), y + vertex_offset.y(), 0.0],
@@ -542,8 +548,8 @@ impl Chunk {
 
     fn create_block_colliders(chunk_location: ChunkLocation, x: usize, y: usize, block_type: &'static BlockType, physics: &mut phys::Physics) -> Box<[phys::ColliderHandle]> {
         let block_origin = Vector([
-            chunk_location.x() as f32 * CHUNK_SIZE_F32 + x as f32,
-            chunk_location.y() as f32 * CHUNK_SIZE_F32 + y as f32,
+            chunk_location.x() as f32 * CHUNK_SIZE as f32 + x as f32,
+            chunk_location.y() as f32 * CHUNK_SIZE as f32 + y as f32,
         ]);
         block_type.colliders
             .iter()

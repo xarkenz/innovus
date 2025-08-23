@@ -5,6 +5,7 @@ use crate::tools::asset::entity::EntityImage;
 use crate::tools::input::{InputState, Key};
 use crate::world::entity::{movement, Entity};
 use crate::world::entity::render::{EntityPiece, EntityPieceHandle, EntityRenderer};
+use crate::world::entity::types::pixels;
 
 struct PlayerAppearance {
     idle_image: EntityImage,
@@ -17,6 +18,7 @@ struct PlayerAppearance {
 }
 
 const JUMP_COOLDOWN_SECONDS: f32 = 0.5;
+const COYOTE_TIME_SECONDS: f32 = 0.1;
 
 pub struct Player {
     uuid: Uuid,
@@ -29,6 +31,7 @@ pub struct Player {
     movement_accel: f32,
     jump_speed: f32,
     jump_cooldown: f32,
+    coyote_time: f32,
 }
 
 impl Player {
@@ -42,8 +45,9 @@ impl Player {
             crouching: false,
             spawn_point: None,
             movement_accel: 32.0,
-            jump_speed: 12.5,
+            jump_speed: 15.0,
             jump_cooldown: 0.0,
+            coyote_time: COYOTE_TIME_SECONDS,
         }
     }
 
@@ -83,7 +87,10 @@ impl Entity for Player {
 
     fn init_collision(&mut self, physics: &mut Physics) {
         self.collider = Some(physics.add_collider(phys::Collider::new(
-            Rectangle::from_size(Vector([self.position.x() - 0.375, self.position.y()]), Vector([0.75, 1.625])),
+            Rectangle::from_size(
+                Vector([self.position.x() - pixels(5), self.position.y()]),
+                Vector([pixels(10), pixels(26)]),
+            ),
             Vector::zero(),
         )));
     }
@@ -118,28 +125,40 @@ impl Entity for Player {
         if let Some(collider) = &self.collider {
             let collider = physics.get_collider_mut(collider).unwrap();
             velocity = collider.velocity;
-            touching_ground = collider.hit_bottom;
 
-            if !inputs.key_is_held(Key::Space) {
+            if collider.hit_bottom {
+                self.coyote_time = COYOTE_TIME_SECONDS;
+            }
+            else if self.coyote_time > 0.0 {
+                self.coyote_time -= dt;
+            }
+            else {
+                touching_ground = false;
+            }
+
+            let jump_held = inputs.key_is_held(Key::W) || inputs.key_is_held(Key::Space);
+            if !jump_held {
                 self.jump_cooldown = 0.0;
             }
             if self.jump_cooldown <= 0.0 {
-                if inputs.key_is_held(Key::Space) && touching_ground {
+                if jump_held && touching_ground {
                     collider.velocity.set_y(self.jump_speed);
                     self.jump_cooldown += JUMP_COOLDOWN_SECONDS;
+                    self.coyote_time = 0.0;
                 }
             }
             else {
                 self.jump_cooldown -= dt;
             }
 
-            if inputs.key_is_held(Key::LeftShift) {
+            let crouch_held = inputs.key_is_held(Key::S) || inputs.key_is_held(Key::LeftShift);
+            if crouch_held {
                 self.crouching = true;
-                collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.4375); // 23 px
+                collider.rectangle.set_max_y(collider.rectangle.min_y() + pixels(23));
             }
             else {
                 self.crouching = false;
-                collider.rectangle.set_max_y(collider.rectangle.min_y() + 1.625); // 26 px
+                collider.rectangle.set_max_y(collider.rectangle.min_y() + pixels(26));
             }
 
             let speed_multiplier = if self.crouching && touching_ground {
@@ -167,7 +186,7 @@ impl Entity for Player {
                 movement::DEFAULT_FRICTION_DECELERATION,
             ));
 
-            self.position.set_x(collider.rectangle.min_x() + 0.375);
+            self.position.set_x(collider.rectangle.min_x() + pixels(5));
             self.position.set_y(collider.rectangle.min_y());
         }
 

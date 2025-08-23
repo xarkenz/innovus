@@ -4,24 +4,24 @@ use super::*;
 
 pub const BLOCK_RECT: Rectangle<i32> = Rectangle::new(Vector([0, 0]), Vector([32, 32]));
 
-pub fn connect_never(this: &BlockType, that: &BlockType) -> bool {
+pub fn connect_never(this: &Block, that: &Block) -> bool {
     let _ = (this, that);
     false
 }
 
-pub fn connect_full_block(this: &BlockType, that: &BlockType) -> bool {
+pub fn connect_full_block(this: &Block, that: &Block) -> bool {
     let _ = this;
-    that.is_full_block
+    that.block_type.is_full_block
 }
 
-pub fn connect_same(this: &BlockType, that: &BlockType) -> bool {
-    that.name == this.name
+pub fn connect_same_type(this: &Block, that: &Block) -> bool {
+    that.block_type == this.block_type
 }
 
-pub fn connect_electricity(this: &BlockType, that: &BlockType) -> bool {
+pub fn connect_electricity(this: &Block, that: &Block) -> bool {
     let _ = this;
-    that.name == COPPER_WIRE.name || that.name == COPPER_BLOCK.name ||
-        that.name == GOLD_WIRE.name || that.name == GOLD_BLOCK.name
+    that.block_type == &COPPER_WIRE || that.block_type == &COPPER_BLOCK ||
+        that.block_type == &GOLD_WIRE || that.block_type == &GOLD_BLOCK
 }
 
 pub static BLOCK_TYPES: &[&BlockType] = &[
@@ -78,7 +78,7 @@ pub static ALUMINUM_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static AMETHYST_BLOCK: BlockType = BlockType {
     name: "amethyst_block",
@@ -86,7 +86,7 @@ pub static AMETHYST_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static AMPLIFITE_BLOCK: BlockType = BlockType {
     name: "amplifite_block",
@@ -94,7 +94,7 @@ pub static AMPLIFITE_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static COAL_BLOCK: BlockType = BlockType {
     name: "coal_block",
@@ -102,7 +102,7 @@ pub static COAL_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static COBALT_BLOCK: BlockType = BlockType {
     name: "cobalt_block",
@@ -110,7 +110,7 @@ pub static COBALT_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static COBBLES: BlockType = BlockType {
     name: "cobbles",
@@ -126,7 +126,7 @@ pub static COPPER_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static COPPER_WIRE: BlockType = BlockType {
     name: "copper_wire",
@@ -142,7 +142,7 @@ pub static CORRUPTITE_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static DIAMOND_BLOCK: BlockType = BlockType {
     name: "diamond_block",
@@ -150,7 +150,7 @@ pub static DIAMOND_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static DIRT: BlockType = BlockType {
     name: "dirt",
@@ -166,7 +166,7 @@ pub static EMERALD_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static FLAMARITE_BLOCK: BlockType = BlockType {
     name: "flamarite_block",
@@ -174,7 +174,7 @@ pub static FLAMARITE_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static FRIGIDITE_BLOCK: BlockType = BlockType {
     name: "frigidite_block",
@@ -182,7 +182,7 @@ pub static FRIGIDITE_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static GLASS: BlockType = BlockType {
     name: "glass",
@@ -190,7 +190,7 @@ pub static GLASS: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static GOLD_BLOCK: BlockType = BlockType {
     name: "gold_block",
@@ -198,7 +198,7 @@ pub static GOLD_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static GOLD_WIRE: BlockType = BlockType {
     name: "gold_wire",
@@ -222,7 +222,7 @@ pub static HONEY_CRYSTAL_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static IRON_BLOCK: BlockType = BlockType {
     name: "iron_block",
@@ -230,7 +230,7 @@ pub static IRON_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static LUMINITE_BLOCK: BlockType = BlockType {
     name: "luminite_block",
@@ -238,7 +238,7 @@ pub static LUMINITE_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static MAGMIUM_BLOCK: BlockType = BlockType {
     name: "magmium_block",
@@ -246,7 +246,7 @@ pub static MAGMIUM_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static OBSIDIAN_BLOCK: BlockType = BlockType {
     name: "obsidian_block",
@@ -270,7 +270,7 @@ pub static PIPE: BlockType = BlockType {
     colliders: &[],
     is_full_block: false,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static PLATINUM_BLOCK: BlockType = BlockType {
     name: "platinum_block",
@@ -278,7 +278,7 @@ pub static PLATINUM_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static QUARTZ_BLOCK: BlockType = BlockType {
     name: "quartz_block",
@@ -286,7 +286,7 @@ pub static QUARTZ_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static SAND: BlockType = BlockType {
     name: "sand",
@@ -318,7 +318,7 @@ pub static STEEL_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static STONE: BlockType = BlockType {
     name: "stone",
@@ -334,7 +334,7 @@ pub static TITANIUM_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static TURQUOISE_BLOCK: BlockType = BlockType {
     name: "turquoise_block",
@@ -342,7 +342,7 @@ pub static TURQUOISE_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static VERSATILIUM_BLOCK: BlockType = BlockType {
     name: "versatilium_block",
@@ -350,7 +350,7 @@ pub static VERSATILIUM_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };
 pub static VOLTAGITE_BLOCK: BlockType = BlockType {
     name: "voltagite_block",
@@ -358,5 +358,5 @@ pub static VOLTAGITE_BLOCK: BlockType = BlockType {
     colliders: &[BLOCK_RECT],
     is_full_block: true,
     light_emission: 0,
-    connector: connect_same,
+    connector: connect_same_type,
 };

@@ -37,7 +37,7 @@ fn main() {
         Some(Box::new(world::gen::types::OverworldGenerator::new(0))),
     );
     let player_start = Vector([0.5, 0.0]);
-    let player = world::entity::types::Spectator::new(
+    let player = world::entity::types::Player::new(
         player_start,
         None,
     );
