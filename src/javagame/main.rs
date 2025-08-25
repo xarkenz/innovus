@@ -31,7 +31,7 @@ fn main() {
     let clock = Clock::start();
     let mut prev_time = clock.read();
 
-    let mut assets = asset::AssetPool::new("src/javagame/assets").unwrap();
+    let mut assets = asset::AssetPool::load("src/javagame/assets").unwrap();
 
     let mut current_world = world::World::new(
         Some(Box::new(world::gen::types::OverworldGenerator::new(0))),

@@ -1,5 +1,5 @@
 {
-  "format": "connected_quads_layered",
+  "format": "connected_layered",
   "shapes": [
     "outward_corners",
     "horizontal",

@@ -22,7 +22,23 @@ pub enum AttributeType {
     },
 }
 
-#[derive(Clone, Debug)]
+impl AttributeType {
+    pub fn description(&self) -> String {
+        match *self {
+            Self::Bool(..) => "a boolean".into(),
+            Self::U8(..) => "a small unsigned integer".into(),
+            Self::I8(..) => "a small signed integer".into(),
+            Self::U32(..) => "an unsigned integer".into(),
+            Self::I32(..) => "a signed integer".into(),
+            Self::String(..) => "a string".into(),
+            Self::Enum { value_names, .. } => {
+                format!("a string matching one of: '{}'", value_names.join("', '"))
+            }
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub enum AttributeValue {
     Bool(bool),
     U8(u8),
@@ -42,6 +58,15 @@ pub struct BlockType {
 }
 
 impl BlockType {
+    pub fn get_attribute_info(&self, name: &str) -> Option<(usize, &AttributeType)> {
+        self.attributes
+            .iter()
+            .enumerate()
+            .find_map(|(index, &(attribute_name, ref attribute_type))| {
+                (name == attribute_name).then_some((index, attribute_type))
+            })
+    }
+
     pub fn default_attributes(&self) -> Box<[AttributeValue]> {
         self.attributes
             .iter()
@@ -71,73 +96,19 @@ impl std::fmt::Debug for BlockType {
     }
 }
 
-pub const BLOCK_QUAD_OFFSETS: [Vector2f; 4] = [
+pub const QUADRANT_OFFSETS: [Vector2f; 4] = [
     Vector([0.0, 0.5]), // Top left
     Vector([0.5, 0.5]), // Top right
     Vector([0.0, 0.0]), // Bottom left
     Vector([0.5, 0.0]), // Bottom right
 ];
-pub const BLOCK_QUAD_VERTEX_OFFSETS: [Vector2f; 4] = [
+pub const QUADRANT_VERTEX_OFFSETS: [Vector2f; 4] = [
     Vector([0.0, 0.0]), // Bottom left
     Vector([0.0, 0.5]), // Top left
     Vector([0.5, 0.5]), // Top right
     Vector([0.5, 0.0]), // Bottom right
 ];
-pub const VERTICES_PER_BLOCK: usize = BLOCK_QUAD_OFFSETS.len() * BLOCK_QUAD_VERTEX_OFFSETS.len();
-
-#[derive(Debug)]
-pub struct BlockAppearance {
-    pub block_type: &'static BlockType,
-    pub offset: Vector<u32, 2>,
-    pub resolution: u32,
-}
-
-impl BlockAppearance {
-    fn get_connect(&self, chunk_map: &ChunkMap, chunk: &Chunk, this_block: &Block, that_x: isize, that_y: isize) -> bool {
-        chunk
-            .with_block(that_x, that_y, chunk_map, |that_block| {
-                this_block.connects_to(that_block)
-            })
-            .unwrap_or(true)
-    }
-
-    fn get_quad_type(&self, chunk_map: &ChunkMap, chunk: &Chunk, this_block: &Block, that_x: isize, that_y: isize, x_connect: bool, y_connect: bool) -> u32 {
-        match (x_connect, y_connect) {
-            (false, false) => 0,
-            (true, false) => 1,
-            (false, true) => 2,
-            (true, true) => {
-                if self.get_connect(chunk_map, chunk, this_block, that_x, that_y) { 4 } else { 3 }
-            }
-        }
-    }
-
-    pub fn get_quad_uv_offsets(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: usize, y: usize) -> [Vector<u32, 2>; 4] {
-        let block = chunk.block_at(x, y);
-        
-        let left_x = x as isize - 1;
-        let right_x = x as isize + 1;
-        let down_y = y as isize - 1;
-        let up_y = y as isize + 1;
-
-        let left_connect = self.get_connect(chunk_map, chunk, block, left_x, y as isize);
-        let right_connect = self.get_connect(chunk_map, chunk, block, right_x, y as isize);
-        let down_connect = self.get_connect(chunk_map, chunk, block, x as isize, down_y);
-        let up_connect = self.get_connect(chunk_map, chunk, block, x as isize, up_y);
-
-        let quad_types: [u32; 4] = [
-            self.get_quad_type(chunk_map, chunk, block, left_x, up_y, left_connect, up_connect),
-            self.get_quad_type(chunk_map, chunk, block, right_x, up_y, right_connect, up_connect),
-            self.get_quad_type(chunk_map, chunk, block, left_x, down_y, left_connect, down_connect),
-            self.get_quad_type(chunk_map, chunk, block, right_x, down_y, right_connect, down_connect),
-        ];
-
-        quad_types.map(|quad_type| Vector([
-            self.offset.x() + quad_type * self.resolution,
-            self.offset.y(),
-        ]))
-    }
-}
+pub const VERTICES_PER_BLOCK: usize = QUADRANT_OFFSETS.len() * QUADRANT_VERTEX_OFFSETS.len();
 
 #[derive(Clone, Debug)]
 pub struct Block {
@@ -404,14 +375,14 @@ impl Chunk {
             let mut faces = Vec::new();
             for block_y in 0..CHUNK_SIZE {
                 for block_x in 0..CHUNK_SIZE {
-                    for offset in BLOCK_QUAD_OFFSETS {
+                    for offset in QUADRANT_OFFSETS {
                         let index = vertices.len() as u32;
                         faces.push([index + 0, index + 1, index + 2]);
                         faces.push([index + 2, index + 3, index + 0]);
                         // TODO: obviously lossy
                         let x = self.location.x() as f32 * CHUNK_SIZE as f32 + block_x as f32 + offset.x();
                         let y = self.location.y() as f32 * CHUNK_SIZE as f32 + block_y as f32 + offset.y();
-                        for vertex_offset in BLOCK_QUAD_VERTEX_OFFSETS {
+                        for vertex_offset in QUADRANT_VERTEX_OFFSETS {
                             vertices.push(Vertex2D::new(
                                 [x + vertex_offset.x(), y + vertex_offset.y(), 0.0],
                                 Some([0.0, 0.0, 0.0, 0.0]),
@@ -449,7 +420,7 @@ impl Chunk {
         // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
         let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
 
-        if let Some(appearance) = assets.get_block_appearance(block.block_type) {
+        if let Some(image) = assets.get_block_image(block, self.location(), x, y) {
             let quadrant_vertex_lights = {
                 let x = x as isize;
                 let y = y as isize;
@@ -485,18 +456,18 @@ impl Chunk {
             };
 
             let mut index = first_index;
-            let uv_offsets = appearance.get_quad_uv_offsets(chunk_map, self, x, y);
-            let quadrant_info = std::iter::zip(BLOCK_QUAD_OFFSETS, uv_offsets).zip(quadrant_vertex_lights);
-            for ((quad_offset, uv_offset), vertex_lights) in quadrant_info {
-                let vertex_info = std::iter::zip(BLOCK_QUAD_VERTEX_OFFSETS, vertex_lights);
+            let atlas_offsets = image.get_quadrant_atlas_offsets(chunk_map, self, x, y);
+            let quadrant_info = std::iter::zip(QUADRANT_OFFSETS, atlas_offsets).zip(quadrant_vertex_lights);
+            for ((quadrant_offset, atlas_offset), vertex_lights) in quadrant_info {
+                let vertex_info = std::iter::zip(QUADRANT_VERTEX_OFFSETS, vertex_lights);
                 for (vertex_offset, vertex_light) in vertex_info {
                     let mut vertex = self.geometry.get_vertex(index);
                     vertex.color = [vertex_light, vertex_light, vertex_light, 1.0];
                     vertex.tex = true;
-                    let pos = quad_offset + vertex_offset;
+                    let position = quadrant_offset + vertex_offset;
                     vertex.uv = [
-                        uv_offset.x() as f32 + pos.x() * appearance.resolution as f32,
-                        uv_offset.y() as f32 + (1.0 - pos.y()) * appearance.resolution as f32,
+                        atlas_offset.x() as f32 + position.x() * image.size() as f32,
+                        atlas_offset.y() as f32 + (1.0 - position.y()) * image.size() as f32,
                     ];
                     self.geometry.set_vertex(index, &vertex);
                     index += 1;

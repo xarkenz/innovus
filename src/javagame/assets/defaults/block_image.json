@@ -1,6 +1,6 @@
 {
-  "format": "connected_quads_simple",
   "size": 16,
+  "format": "connected_simple",
   "shapes": [
     "outward_corners",
     "horizontal",

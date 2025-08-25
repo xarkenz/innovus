@@ -116,13 +116,13 @@ fn main() {
 
     let shader_program = Program::from_preset(ProgramPreset::Default3DShader).unwrap();
 
-    let test_image = Image::from_file("src/snek/assets/koopa_red.png").unwrap();
+    let test_image = Image::load_file("src/snek/assets/koopa_red.png").unwrap();
     let mut test_tex = Texture2D::new(0);
     test_tex.set_minify_filter(TextureSampling::Linear);
     test_tex.set_magnify_filter(TextureSampling::Linear);
     test_tex.set_wrap_s(TextureWrap::MirroredRepeat);
     test_tex.set_wrap_t(TextureWrap::MirroredRepeat);
-    test_tex.load_from_image(&test_image);
+    test_tex.upload_image(&test_image);
 
     screen::set_clear_color(0.6, 0.9, 1.0);
     screen::set_blend(screen::Blend::Transparency);

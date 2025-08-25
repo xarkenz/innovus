@@ -97,12 +97,12 @@ impl Entity for Player {
 
     fn init_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
         if self.appearance.is_none() {
-            let idle_image = assets.get_entity_image("player/idle").unwrap();
-            let run_image = assets.get_entity_image("player/run").unwrap();
-            let jump_ascend_image = assets.get_entity_image("player/jump_ascend").unwrap();
-            let jump_descend_image = assets.get_entity_image("player/jump_descend").unwrap();
-            let crouch_idle_image = assets.get_entity_image("player/crouch_idle").unwrap();
-            let crouch_walk_image = assets.get_entity_image("player/crouch_walk").unwrap();
+            let idle_image = assets.get_entity_image("entity/player/idle").unwrap();
+            let run_image = assets.get_entity_image("entity/player/run").unwrap();
+            let jump_ascend_image = assets.get_entity_image("entity/player/jump_ascend").unwrap();
+            let jump_descend_image = assets.get_entity_image("entity/player/jump_descend").unwrap();
+            let crouch_idle_image = assets.get_entity_image("entity/player/crouch_idle").unwrap();
+            let crouch_walk_image = assets.get_entity_image("entity/player/crouch_walk").unwrap();
 
             let body = EntityPiece::new(self.position, idle_image.clone());
 

@@ -24,7 +24,7 @@ pub fn connect_electricity(this: &Block, that: &Block) -> bool {
         that.block_type == &GOLD_WIRE || that.block_type == &GOLD_BLOCK
 }
 
-pub static BLOCK_TYPES: &[&BlockType] = &[
+pub const BLOCK_TYPES: &[&BlockType] = &[
     &AIR,
     &ALUMINUM_BLOCK,
     &AMETHYST_BLOCK,

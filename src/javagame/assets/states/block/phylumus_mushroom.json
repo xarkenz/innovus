@@ -1,22 +1,27 @@
 [
   {
-    "attribute": "shape",
-    "value": "center",
-    "texture": "block/phylumus_mushroom/shape_center_0"
+    "condition": {
+      "shape": "center"
+    },
+    "images": [
+      "block/{block_type}/shape_center_0",
+      "block/{block_type}/shape_center_1"
+    ]
   },
   {
-    "attribute": "shape",
-    "value": "center",
-    "texture": "block/phylumus_mushroom/shape_center_1"
+    "condition": {
+      "shape": "left"
+    },
+    "images": [
+      "block/{block_type}/shape_left"
+    ]
   },
   {
-    "attribute": "shape",
-    "value": "left",
-    "texture": "block/phylumus_mushroom/shape_left"
-  },
-  {
-    "attribute": "shape",
-    "value": "right",
-    "texture": "block/phylumus_mushroom/shape_right"
+    "condition": {
+      "shape": "right"
+    },
+    "images": [
+      "block/{block_type}/shape_right"
+    ]
   }
 ]

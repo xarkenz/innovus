@@ -1250,12 +1250,12 @@ impl Image {
         }
     }
 
-    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, String> {
+    pub fn load_file(path: impl AsRef<Path>) -> Result<Self, String> {
         let path = path.as_ref();
         let input = image::ImageReader::open(path)
-            .map_err(|err| format!("Image::from_file(): failed to open '{}'. ({err})", path.display()))?
+            .map_err(|err| format!("failed to open image at '{}'. ({err})", path.display()))?
             .decode()
-            .map_err(|err| format!("Image::from_file(): failed to decode '{}'. ({err})", path.display()))?;
+            .map_err(|err| format!("failed to decode image at '{}'. ({err})", path.display()))?;
         Ok(Self {
             data: input.to_rgba8().to_vec(),
             width: input.width(),
@@ -1269,6 +1269,10 @@ impl Image {
 
     pub fn height(&self) -> u32 {
         self.height
+    }
+
+    pub fn size(&self) -> Vector<u32, 2> {
+        Vector([self.width, self.height])
     }
 
     pub fn data(&self) -> &[u8] {
@@ -1322,6 +1326,10 @@ impl ImageAtlas {
 
     pub fn height(&self) -> u32 {
         self.image.height()
+    }
+
+    pub fn size(&self) -> Vector<u32, 2> {
+        self.image.size()
     }
 
     pub fn data(&self) -> &[u8] {
@@ -1407,6 +1415,14 @@ impl ImageAtlas {
             }
         }
     }
+
+    pub fn clear(&mut self) {
+        self.image.data.clear();
+        self.image.width = 0;
+        self.image.height = 0;
+        self.flow_x = 0;
+        self.flow_y = 0;
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -1461,7 +1477,7 @@ impl Texture2D {
         self.set_parameter_int(gl::TEXTURE_WRAP_T, wrap as GLint);
     }
 
-    pub fn load_from_image(&mut self, image: &Image) {
+    pub fn upload_image(&mut self, image: &Image) {
         self.bind();
         unsafe {
             // Allocate a texture whose size is the next power of 2 for each dimension.

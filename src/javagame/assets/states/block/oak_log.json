@@ -1,17 +1,26 @@
 [
   {
-    "attribute": "axis",
-    "value": "x",
-    "texture": "block/oak_log/axis_x"
+    "condition": {
+      "axis": "x"
+    },
+    "images": [
+      "block/{block_type}/axis_x"
+    ]
   },
   {
-    "attribute": "axis",
-    "value": "y",
-    "texture": "block/oak_log/axis_y"
+    "condition": {
+      "axis": "y"
+    },
+    "images": [
+      "block/{block_type}/axis_y"
+    ]
   },
   {
-    "attribute": "axis",
-    "value": "z",
-    "texture": "block/oak_log/axis_z"
+    "condition": {
+      "axis": "z"
+    },
+    "images": [
+      "block/{block_type}/axis_z"
+    ]
   }
 ]
