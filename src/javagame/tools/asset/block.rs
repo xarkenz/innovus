@@ -208,8 +208,8 @@ impl BlockImage {
 
     fn get_connect(&self, chunk_map: &ChunkMap, chunk: &Chunk, this_block: &Block, that_x: isize, that_y: isize) -> bool {
         chunk
-            .with_block(that_x, that_y, chunk_map, |that_block| {
-                this_block.connects_to(that_block)
+            .with_block_slot(that_x, that_y, chunk_map, |that_slot| {
+                this_block.connects_to(that_slot.block())
             })
             .unwrap_or(true)
     }
@@ -265,7 +265,7 @@ impl Condition {
         self.attributes
             .iter()
             .all(|&(index, ref accepted_value)| {
-                &block.attributes[index] == accepted_value
+                block.attribute_value(index) == accepted_value
             })
     }
 }

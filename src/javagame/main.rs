@@ -67,6 +67,7 @@ fn main() {
         index
     }
     let mut selected_block_index = select_block_index(0, 1);
+    let mut last_block_pos = None;
 
     while !window.should_close() {
         for event in input_state.process_events(&mut application) {
@@ -91,31 +92,42 @@ fn main() {
         let dt = time - prev_time;
         prev_time = time;
 
-        let cursor_pos = Vector([input_state.cursor_pos().x() as f32, input_state.cursor_pos().y() as f32]);
-        let world_pos = camera.get_world_pos(cursor_pos);
-        let chunk_location = Vector([
-            world_pos.x().div_euclid(world::block::CHUNK_SIZE as f32) as i64,
-            world_pos.y().div_euclid(world::block::CHUNK_SIZE as f32) as i64,
-        ]);
-        let block_x = world_pos.x().rem_euclid(world::block::CHUNK_SIZE as f32) as usize;
-        let block_y = world_pos.y().rem_euclid(world::block::CHUNK_SIZE as f32) as usize;
+        let left_held = input_state.mouse_button_is_held(input::MouseButtonLeft);
+        let right_held = input_state.mouse_button_is_held(input::MouseButtonRight);
+        let middle_held = input_state.mouse_button_is_held(input::MouseButtonMiddle);
+        if left_held || right_held || middle_held {
+            let cursor_pos = Vector([input_state.cursor_pos().x() as f32, input_state.cursor_pos().y() as f32]);
+            let world_pos = camera.get_world_pos(cursor_pos);
+            let chunk_location = Vector([
+                world_pos.x().div_euclid(world::block::CHUNK_SIZE as f32) as i64,
+                world_pos.y().div_euclid(world::block::CHUNK_SIZE as f32) as i64,
+            ]);
+            let block_x = world_pos.x().rem_euclid(world::block::CHUNK_SIZE as f32) as usize;
+            let block_y = world_pos.y().rem_euclid(world::block::CHUNK_SIZE as f32) as usize;
 
-        if window.get_mouse_button(input::MouseButtonMiddle) == Action::Press {
-            let block_type = current_world
-                .get_chunk(chunk_location)
-                .map_or(&world::block::types::AIR, |chunk| {
-                    chunk.block_at(block_x, block_y).block_type
-                });
-            if block_type != &world::block::types::AIR {
-                let block_index = world::block::BLOCK_TYPES.iter().position(|&element| element == block_type).unwrap();
-                selected_block_index = select_block_index(block_index as isize, 1);
+            if last_block_pos.is_none_or(|pos| pos != (block_x, block_y)) {
+                last_block_pos = Some((block_x, block_y));
+                if middle_held {
+                    let block_type = current_world
+                        .get_chunk(chunk_location)
+                        .map_or(&world::block::types::AIR, |chunk| {
+                            chunk.block_at(block_x, block_y).block_type()
+                        });
+                    if block_type != &world::block::types::AIR {
+                        let block_index = world::block::BLOCK_TYPES.iter().position(|&element| element == block_type).unwrap();
+                        selected_block_index = select_block_index(block_index as isize, 1);
+                    }
+                }
+                if left_held {
+                    current_world.user_destroy_block(chunk_location, block_x, block_y);
+                }
+                if right_held {
+                    current_world.user_place_block(chunk_location, block_x, block_y, world::block::types::BLOCK_TYPES[selected_block_index]);
+                }
             }
         }
-        if window.get_mouse_button(input::MouseButtonLeft) == Action::Press {
-            current_world.user_destroy_block(chunk_location, block_x, block_y);
-        }
-        if window.get_mouse_button(input::MouseButtonRight) == Action::Press {
-            current_world.user_place_block(chunk_location, block_x, block_y, world::block::types::BLOCK_TYPES[selected_block_index]);
+        else {
+            last_block_pos = None;
         }
 
         current_world.update(&input_state, dt);

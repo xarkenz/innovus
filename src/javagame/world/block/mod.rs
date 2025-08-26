@@ -52,9 +52,9 @@ pub struct BlockType {
     pub name: &'static str,
     pub attributes: &'static [(&'static str, AttributeType)],
     pub colliders: &'static [Rectangle<i32>],
-    pub is_full_block: bool,
-    pub light_emission: u8,
-    pub connector: fn(&Block, &Block) -> bool,
+    is_full_block: fn(&Block) -> bool,
+    light_emission: fn(&Block) -> u8,
+    connects_to: fn(&Block, &Block) -> bool,
 }
 
 impl BlockType {
@@ -76,7 +76,7 @@ impl BlockType {
                 &AttributeType::I8(n) => AttributeValue::I8(n),
                 &AttributeType::U32(n) => AttributeValue::U32(n),
                 &AttributeType::I32(n) => AttributeValue::I32(n),
-                &AttributeType::String(s) => AttributeValue::String(s.to_string()),
+                &AttributeType::String(s) => AttributeValue::String(s.into()),
                 &AttributeType::Enum { default_value, .. } => AttributeValue::U8(default_value),
             })
             .collect()
@@ -112,10 +112,8 @@ pub const VERTICES_PER_BLOCK: usize = QUADRANT_OFFSETS.len() * QUADRANT_VERTEX_O
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    pub block_type: &'static BlockType,
-    pub attributes: Box<[AttributeValue]>,
-    pub block_light: u8,
-    pub sky_light: u8,
+    block_type: &'static BlockType,
+    attributes: Box<[AttributeValue]>,
 }
 
 impl Block {
@@ -123,18 +121,31 @@ impl Block {
         Self {
             block_type,
             attributes: block_type.default_attributes(),
-            block_light: 0,
-            sky_light: 0,
         }
     }
 
-    pub fn inherit_environment(&mut self, predecessor: &Self) {
-        self.block_light = predecessor.block_light;
-        self.sky_light = predecessor.sky_light;
+    pub fn block_type(&self) -> &'static BlockType {
+        self.block_type
+    }
+
+    pub fn attributes(&self) -> &[AttributeValue] {
+        &self.attributes
+    }
+
+    pub fn attribute_value(&self, index: usize) -> &AttributeValue {
+        &self.attributes[index]
+    }
+
+    pub fn is_full_block(&self) -> bool {
+        (self.block_type.is_full_block)(self)
+    }
+
+    pub fn light_emission(&self) -> u8 {
+        (self.block_type.light_emission)(self)
     }
 
     pub fn connects_to(&self, other: &Self) -> bool {
-        (self.block_type.connector)(self, other)
+        (self.block_type.connects_to)(self, other)
     }
 }
 
@@ -149,9 +160,6 @@ pub const CHUNK_SIZE: usize = 16;
 fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
     (value.div_euclid(CHUNK_SIZE as isize) as i64, value.rem_euclid(CHUNK_SIZE as isize) as usize)
 }
-
-pub type ChunkLocation = Vector<i64, 2>;
-pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct BlockCoord {
@@ -180,15 +188,54 @@ impl From<BlockCoord> for i64 {
     }
 }
 
+pub type ChunkLocation = Vector<i64, 2>;
+pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
+
+#[derive(Clone, Debug)]
+pub struct BlockSlot {
+    block: Block,
+    block_light: u8,
+    sky_light: u8,
+    needs_render: bool,
+}
+
+impl BlockSlot {
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
+    pub fn block_light(&self) -> u8 {
+        self.block_light
+    }
+
+    pub fn sky_light(&self) -> u8 {
+        self.sky_light
+    }
+
+    pub fn needs_render(&self) -> bool {
+        self.needs_render
+    }
+}
+
+impl Default for BlockSlot {
+    fn default() -> Self {
+        Self {
+            block: Default::default(),
+            block_light: 0,
+            sky_light: 0,
+            needs_render: true,
+        }
+    }
+}
+
 const ADJACENT_OFFSETS: [(isize, isize); 4] = [(0, 1), (0, -1), (-1, 0), (1, 0)];
 
 #[derive(Debug)]
 pub struct Chunk {
     location: ChunkLocation,
-    blocks: [[Block; CHUNK_SIZE]; CHUNK_SIZE],
+    block_slots: [[BlockSlot; CHUNK_SIZE]; CHUNK_SIZE],
     collision_map: Option<[[Box<[phys::ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE]>,
-    blocks_dirty: [[bool; CHUNK_SIZE]; CHUNK_SIZE],
-    all_dirty: bool,
+    render_all: bool,
     geometry: Geometry<Vertex2D>,
     height_map: [i64; CHUNK_SIZE],
 }
@@ -197,10 +244,9 @@ impl Chunk {
     pub fn new(location: ChunkLocation) -> Self {
         Self {
             location,
-            blocks: Default::default(),
+            block_slots: Default::default(),
             collision_map: None,
-            blocks_dirty: [[true; CHUNK_SIZE]; CHUNK_SIZE],
-            all_dirty: true,
+            render_all: true,
             geometry: Geometry::new_render().unwrap(),
             height_map: Default::default(),
         }
@@ -223,48 +269,67 @@ impl Chunk {
             for y in 0..CHUNK_SIZE {
                 let blocks_to_surface = terrain_height - (base_y + y as i64);
                 let sky_light = 15 - blocks_to_surface.clamp(0, 15) as u8;
-                self.blocks[y][x].sky_light = sky_light;
+                self.block_slots[y][x].sky_light = sky_light;
             }
         }
     }
 
-    pub fn block_at(&self, x: usize, y: usize) -> &Block {
-        &self.blocks[y][x]
+    pub fn block_slot_at(&self, x: usize, y: usize) -> &BlockSlot {
+        &self.block_slots[y][x]
     }
 
-    pub fn set_block_at(&mut self, x: usize, y: usize, mut block: Block, chunk_map: &ChunkMap, physics: &mut phys::Physics) {
+    pub fn block_at(&self, x: usize, y: usize) -> &Block {
+        self.block_slots[y][x].block()
+    }
+
+    pub fn sky_light_at(&self, x: usize, y: usize) -> u8 {
+        self.block_slots[y][x].sky_light()
+    }
+
+    pub fn block_light_at(&self, x: usize, y: usize) -> u8 {
+        self.block_slots[y][x].block_light()
+    }
+
+    pub fn is_dirty_at(&self, x: usize, y: usize) -> bool {
+        self.block_slots[y][x].needs_render()
+    }
+
+    pub fn set_block_at(&mut self, x: usize, y: usize, block: Block, chunk_map: &ChunkMap, physics: &mut phys::Physics) {
         if let Some(collision_map) = &mut self.collision_map {
             // Add new physics colliders and remove the old ones
-            let new_colliders = Self::create_block_colliders(self.location, x, y, block.block_type, physics);
+            let new_colliders = Self::create_block_colliders(self.location, x, y, &block, physics);
             let old_colliders = std::mem::replace(&mut collision_map[y][x], new_colliders);
             for handle in old_colliders {
                 physics.remove_collider(handle);
             }
         }
 
-        block.inherit_environment(&self.blocks[y][x]);
-        self.blocks[y][x] = block;
-        self.set_dirty_at(x, y, true);
-        // Propagate the dirty flag to the surrounding blocks in order to update their appearances
-        self.propagate_dirty(x, y, chunk_map);
+        self.block_slots[y][x].block = block;
+        self.block_slots[y][x].needs_render = true;
+        // Propagate the render flag to the surrounding blocks in order to update their appearances
+        self.propagate_render_flag(x, y, chunk_map);
         // Update lighting around the block
         self.update_lighting(x as isize, y as isize, chunk_map);
     }
 
-    pub fn with_block<F, T>(&self, x: isize, y: isize, chunk_map: &ChunkMap, f: F) -> Option<T>
+    pub fn with_block_slot<F, T>(&self, x: isize, y: isize, chunk_map: &ChunkMap, f: F) -> Option<T>
     where
-        F: FnOnce(&Block) -> T,
+        F: FnOnce(&BlockSlot) -> T,
     {
         let (chunk_offset_x, block_x) = resolve_relative_coordinate(x);
         let (chunk_offset_y, block_y) = resolve_relative_coordinate(y);
 
         if chunk_offset_x == 0 && chunk_offset_y == 0 {
-            Some(f(self.block_at(block_x, block_y)))
+            Some(f(self.block_slot_at(block_x, block_y)))
         }
         else {
             let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
-            Some(f(chunk_map.get(&other_chunk_location)?.borrow().block_at(block_x, block_y)))
+            Some(f(chunk_map.get(&other_chunk_location)?.borrow().block_slot_at(block_x, block_y)))
         }
+    }
+
+    pub fn set_all_need_render(&mut self) {
+        self.render_all = true;
     }
 
     pub fn relative_chunk_location(&self, chunk_offset_x: i64, chunk_offset_y: i64) -> ChunkLocation {
@@ -274,40 +339,24 @@ impl Chunk {
         ])
     }
 
-    pub fn propagate_dirty(&mut self, x: usize, y: usize, chunk_map: &ChunkMap) {
+    fn propagate_render_flag(&mut self, origin_x: usize, origin_y: usize, chunk_map: &ChunkMap) {
         for dy in [-1, 0, 1] {
             for dx in [-1, 0, 1] {
                 if dx == 0 && dy == 0 {
                     continue;
                 }
 
-                let (chunk_offset_x, dirty_x) = resolve_relative_coordinate(x as isize + dx);
-                let (chunk_offset_y, dirty_y) = resolve_relative_coordinate(y as isize + dy);
+                let (chunk_offset_x, block_x) = resolve_relative_coordinate(origin_x as isize + dx);
+                let (chunk_offset_y, block_y) = resolve_relative_coordinate(origin_y as isize + dy);
 
                 if chunk_offset_x == 0 && chunk_offset_y == 0 {
-                    self.set_dirty_at(dirty_x, dirty_y, true);
+                    self.block_slots[block_y][block_x].needs_render = true;
                 }
                 else if let Some(chunk) = chunk_map.get(&self.relative_chunk_location(chunk_offset_x, chunk_offset_y)) {
-                    chunk.borrow_mut().set_dirty_at(dirty_x, dirty_y, true);
+                    chunk.borrow_mut().block_slots[block_y][block_x].needs_render = true;
                 }
             }
         }
-    }
-
-    pub fn is_dirty_at(&self, x: usize, y: usize) -> bool {
-        self.blocks_dirty[y][x]
-    }
-
-    pub fn set_dirty_at(&mut self, x: usize, y: usize, dirty: bool) {
-        self.blocks_dirty[y][x] = dirty;
-    }
-
-    pub fn is_all_dirty(&self) -> bool {
-        self.all_dirty
-    }
-
-    pub fn set_all_dirty(&mut self, dirty: bool) {
-        self.all_dirty = dirty;
     }
 
     pub fn update_lighting(&mut self, start_x: isize, start_y: isize, chunk_map: &ChunkMap) {
@@ -319,44 +368,44 @@ impl Chunk {
             let (chunk_offset_y, block_y) = resolve_relative_coordinate(y);
 
             let current_light;
-            let block_type;
+            let light_emission;
             if chunk_offset_x == 0 && chunk_offset_y == 0 {
-                let block = self.block_at(block_x, block_y);
-                current_light = block.block_light;
-                block_type = block.block_type;
+                let slot = self.block_slot_at(block_x, block_y);
+                current_light = slot.block_light();
+                light_emission = slot.block().light_emission();
             }
             else {
                 let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
                 let Some(chunk) = chunk_map.get(&other_chunk_location).map(RefCell::borrow) else {
                     continue;
                 };
-                let block = chunk.block_at(block_x, block_y);
-                current_light = block.block_light;
-                block_type = block.block_type;
+                let slot = chunk.block_slot_at(block_x, block_y);
+                current_light = slot.block_light();
+                light_emission = slot.block().light_emission();
             }
 
             let max_surrounding_light = ADJACENT_OFFSETS
                 .iter()
                 .filter_map(|&(dx, dy)| {
-                    self.with_block(x + dx, y + dy, chunk_map, |block| block.block_light)
+                    self.with_block_slot(x + dx, y + dy, chunk_map, BlockSlot::block_light)
                 })
                 .max()
                 .unwrap();
-            let expected_light = block_type.light_emission.max(max_surrounding_light.saturating_sub(1));
+            let expected_light = light_emission.max(max_surrounding_light.saturating_sub(1));
 
             if current_light == expected_light {
                 continue;
             }
 
             if chunk_offset_x == 0 && chunk_offset_y == 0 {
-                self.blocks[block_y][block_x].block_light = expected_light;
-                self.set_all_dirty(true);
+                self.block_slots[block_y][block_x].block_light = expected_light;
+                self.set_all_need_render();
             }
             else {
                 let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
                 let mut chunk = chunk_map[&other_chunk_location].borrow_mut();
-                chunk.blocks[block_y][block_x].block_light = expected_light;
-                chunk.set_all_dirty(true);
+                chunk.block_slots[block_y][block_x].block_light = expected_light;
+                chunk.set_all_need_render();
             }
 
             // Add adjacent blocks to update stack
@@ -397,43 +446,43 @@ impl Chunk {
 
         for y in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
-                if self.is_all_dirty() || self.is_dirty_at(x, y) {
+                if self.render_all || self.block_slot_at(x, y).needs_render() {
                     self.update_block_vertices(x, y, assets, chunk_map);
-                    self.set_dirty_at(x, y, false);
+                    self.block_slots[y][x].needs_render = false;
                 }
             }
         }
         self.geometry.update_vertex_buffer();
-        self.set_all_dirty(false);
+        self.render_all = false;
 
         self.geometry.render();
     }
 
     fn update_block_vertices(&mut self, x: usize, y: usize, assets: &AssetPool, chunk_map: &ChunkMap) {
-        fn get_light_value(block: &Block) -> f32 {
+        fn get_light_value(slot: &BlockSlot) -> f32 {
             const AMBIENT_LIGHT: f32 = 3.0;
-            let effective_light = block.block_light.max(block.sky_light);
+            let effective_light = slot.block_light().max(slot.sky_light());
             (AMBIENT_LIGHT + effective_light as f32) / (AMBIENT_LIGHT + 15.0)
         }
 
-        let block = &self.blocks[y][x];
+        let slot = &self.block_slots[y][x];
         // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
         let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
 
-        if let Some(image) = assets.get_block_image(block, self.location(), x, y) {
+        if let Some(image) = assets.get_block_image(slot.block(), self.location(), x, y) {
             let quadrant_vertex_lights = {
                 let x = x as isize;
                 let y = y as isize;
                 // u = up, d = down, l = left, r = right, c = center (all relative to current block)
-                let block_light_ul = self.with_block(x - 1, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_uc = self.with_block(x + 0, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_ur = self.with_block(x + 1, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_cl = self.with_block(x - 1, y + 0, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_cc = get_light_value(block); // Might as well use what we have
-                let block_light_cr = self.with_block(x + 1, y + 0, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_dl = self.with_block(x - 1, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_dc = self.with_block(x + 0, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_dr = self.with_block(x + 1, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_ul = self.with_block_slot(x - 1, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_uc = self.with_block_slot(x + 0, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_ur = self.with_block_slot(x + 1, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_cl = self.with_block_slot(x - 1, y + 0, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_cc = get_light_value(slot); // Might as well use what we have
+                let block_light_cr = self.with_block_slot(x + 1, y + 0, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_dl = self.with_block_slot(x - 1, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_dc = self.with_block_slot(x + 0, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_dr = self.with_block_slot(x + 1, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
 
                 let corner_light_ul = (block_light_ul + block_light_uc + block_light_cl + block_light_cc) / 4.0;
                 let corner_light_ur = (block_light_ur + block_light_uc + block_light_cr + block_light_cc) / 4.0;
@@ -491,10 +540,10 @@ impl Chunk {
     pub fn attach_physics(&mut self, physics: &mut phys::Physics) {
         if self.collision_map.is_none() {
             let mut y = 0;
-            let collision_map = self.blocks.each_ref().map(|row| {
+            let collision_map = self.block_slots.each_ref().map(|row| {
                 let mut x = 0;
-                let row = row.each_ref().map(|block| {
-                    let colliders = Self::create_block_colliders(self.location, x, y, block.block_type, physics);
+                let row = row.each_ref().map(|slot| {
+                    let colliders = Self::create_block_colliders(self.location, x, y, slot.block(), physics);
                     x += 1;
                     colliders
                 });
@@ -517,12 +566,12 @@ impl Chunk {
         }
     }
 
-    fn create_block_colliders(chunk_location: ChunkLocation, x: usize, y: usize, block_type: &'static BlockType, physics: &mut phys::Physics) -> Box<[phys::ColliderHandle]> {
+    fn create_block_colliders(chunk_location: ChunkLocation, x: usize, y: usize, block: &Block, physics: &mut phys::Physics) -> Box<[phys::ColliderHandle]> {
         let block_origin = Vector([
             chunk_location.x() as f32 * CHUNK_SIZE as f32 + x as f32,
             chunk_location.y() as f32 * CHUNK_SIZE as f32 + y as f32,
         ]);
-        block_type.colliders
+        block.block_type().colliders
             .iter()
             .map(|&bounds| {
                 let mut collider_bounds = Rectangle::new(

@@ -140,7 +140,7 @@ impl AssetPool {
     }
 
     pub fn get_block_image(&self, block: &Block, chunk_location: ChunkLocation, x: usize, y: usize) -> Option<&BlockImage> {
-        self.get_block_appearance(block.block_type).get_image(block, chunk_location, x, y)
+        self.get_block_appearance(block.block_type()).get_image(block, chunk_location, x, y)
     }
 
     pub fn entity_atlas(&self) -> &ImageAtlas {
