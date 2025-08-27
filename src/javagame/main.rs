@@ -55,6 +55,11 @@ fn main() {
         64.0,
         5.0,
     );
+    let mut block_preview = view::block_preview::BlockPreview::new(
+        Vector::zero(),
+        &world::block::types::AIR,
+        0.4,
+    );
 
     fn select_block_index(mut index: isize, direction: isize) -> usize {
         index = index.rem_euclid(world::block::BLOCK_TYPES.len() as isize);
@@ -92,12 +97,12 @@ fn main() {
         let dt = time - prev_time;
         prev_time = time;
 
+        let cursor_pos = input_state.cursor_pos().map(|x| x as f32);
+        let world_pos = camera.get_world_pos(cursor_pos);
         let left_held = input_state.mouse_button_is_held(input::MouseButtonLeft);
         let right_held = input_state.mouse_button_is_held(input::MouseButtonRight);
         let middle_held = input_state.mouse_button_is_held(input::MouseButtonMiddle);
         if left_held || right_held || middle_held {
-            let cursor_pos = Vector([input_state.cursor_pos().x() as f32, input_state.cursor_pos().y() as f32]);
-            let world_pos = camera.get_world_pos(cursor_pos);
             let chunk_location = Vector([
                 world_pos.x().div_euclid(world::block::CHUNK_SIZE as f32) as i64,
                 world_pos.y().div_euclid(world::block::CHUNK_SIZE as f32) as i64,
@@ -122,7 +127,7 @@ fn main() {
                     current_world.user_destroy_block(chunk_location, block_x, block_y);
                 }
                 if right_held {
-                    current_world.user_place_block(chunk_location, block_x, block_y, world::block::types::BLOCK_TYPES[selected_block_index]);
+                    current_world.user_place_block(chunk_location, block_x, block_y, world::block::BLOCK_TYPES[selected_block_index]);
                 }
             }
         }
@@ -131,6 +136,9 @@ fn main() {
         }
 
         current_world.update(&input_state, dt);
+        // Update block preview
+        block_preview.set_position(world_pos);
+        block_preview.set_block_type(world::block::BLOCK_TYPES[selected_block_index]);
         // Move camera towards player
         camera.set_target(current_world.get_entity(player_uuid).unwrap().position());
         camera.update(dt);
@@ -139,7 +147,9 @@ fn main() {
         shader_program.set_uniform("camera_proj", camera.projection());
 
         screen::clear();
-        current_world.render(dt, &mut assets);
+        current_world.render_block_layer(&mut assets);
+        block_preview.render(&assets, &current_world);
+        current_world.render_entity_layer(&mut assets);
         window.swap_buffers();
     }
 }

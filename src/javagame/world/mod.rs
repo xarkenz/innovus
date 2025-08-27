@@ -45,6 +45,10 @@ impl<'world> World<'world> where Self: 'world {
         &mut self.physics
     }
 
+    pub fn chunks(&self) -> &block::ChunkMap {
+        &self.chunks
+    }
+
     pub fn get_chunk(&self, location: block::ChunkLocation) -> Option<Ref<'_, block::Chunk>> {
         self.chunks.get(&location).map(|chunk| chunk.borrow())
     }
@@ -133,9 +137,6 @@ impl<'world> World<'world> where Self: 'world {
             // Perform tick actions
             self.tick();
         }
-        for chunk in self.chunks.values() {
-            chunk.borrow_mut().update(dt);
-        }
         for entity in self.entities.values_mut() {
             entity.update(dt, inputs, &mut self.physics, &mut self.entity_renderer);
         }
@@ -209,11 +210,14 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
-    pub fn render(&mut self, dt: f32, assets: &asset::AssetPool) {
+    pub fn render_block_layer(&mut self, assets: &asset::AssetPool) {
         assets.block_texture().bind();
         for chunk in self.chunks.values() {
-            chunk.borrow_mut().render(dt, assets, &self.chunks);
+            chunk.borrow_mut().render(assets, &self.chunks);
         }
+    }
+
+    pub fn render_entity_layer(&mut self, assets: &asset::AssetPool) {
         assets.entity_texture().bind();
         self.entity_renderer.render_all();
     }

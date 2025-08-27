@@ -413,12 +413,7 @@ impl Chunk {
         }
     }
 
-    pub fn update(&mut self, dt: f32) {
-        let _ = dt;
-    }
-
-    pub fn render(&mut self, dt: f32, assets: &AssetPool, chunk_map: &ChunkMap) {
-        let _ = dt;
+    pub fn render(&mut self, assets: &AssetPool, chunk_map: &ChunkMap) {
         if self.geometry.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
@@ -505,7 +500,7 @@ impl Chunk {
             };
 
             let mut index = first_index;
-            let atlas_offsets = image.get_quadrant_atlas_offsets(chunk_map, self, x, y);
+            let atlas_offsets = image.get_quadrant_atlas_offsets(chunk_map, self, slot.block(), x, y);
             let quadrant_info = std::iter::zip(QUADRANT_OFFSETS, atlas_offsets).zip(quadrant_vertex_lights);
             for ((quadrant_offset, atlas_offset), vertex_lights) in quadrant_info {
                 let vertex_info = std::iter::zip(QUADRANT_VERTEX_OFFSETS, vertex_lights);
@@ -513,10 +508,10 @@ impl Chunk {
                     let mut vertex = self.geometry.get_vertex(index);
                     vertex.color = [vertex_light, vertex_light, vertex_light, 1.0];
                     vertex.tex = true;
-                    let position = quadrant_offset + vertex_offset;
+                    let total_offset = quadrant_offset + vertex_offset;
                     vertex.uv = [
-                        atlas_offset.x() as f32 + position.x() * image.size() as f32,
-                        atlas_offset.y() as f32 + (1.0 - position.y()) * image.size() as f32,
+                        atlas_offset.x() as f32 + total_offset.x() * image.size() as f32,
+                        atlas_offset.y() as f32 + (1.0 - total_offset.y()) * image.size() as f32,
                     ];
                     self.geometry.set_vertex(index, &vertex);
                     index += 1;

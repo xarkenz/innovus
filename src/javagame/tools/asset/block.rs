@@ -151,12 +151,10 @@ impl BlockImage {
         Ok(())
     }
 
-    pub fn get_quadrant_atlas_offsets(&self, chunk_map: &ChunkMap, chunk: &Chunk, x: usize, y: usize) -> [Vector<u32, 2>; 4] {
+    pub fn get_quadrant_atlas_offsets(&self, chunk_map: &ChunkMap, chunk: &Chunk, block: &Block, x: usize, y: usize) -> [Vector<u32, 2>; 4] {
         if let BlockImageFormat::Single = self.format {
             return [self.atlas_offset; 4];
         }
-
-        let block = chunk.block_at(x, y);
 
         let left_x = x as isize - 1;
         let right_x = x as isize + 1;
@@ -181,7 +179,7 @@ impl BlockImage {
         ]))
     }
 
-    fn get_shape_offset(&self, chunk_map: &ChunkMap, chunk: &Chunk, this_block: &Block, that_x: isize, that_y: isize, x_connect: bool, y_connect: bool) -> u32 {
+    fn get_shape_offset(&self, chunk_map: &ChunkMap, chunk: &Chunk, block: &Block, that_x: isize, that_y: isize, x_connect: bool, y_connect: bool) -> u32 {
         match &self.format {
             BlockImageFormat::Single => {
                 0
@@ -192,7 +190,7 @@ impl BlockImage {
                     (true, false) => SimpleShape::Horizontal,
                     (false, true) => SimpleShape::Vertical,
                     (true, true) => {
-                        if self.get_connect(chunk_map, chunk, this_block, that_x, that_y) {
+                        if self.get_connect(chunk_map, chunk, block, that_x, that_y) {
                             SimpleShape::Fill
                         }
                         else {
