@@ -23,8 +23,9 @@ fn main() {
 
     let shader_program = Program::from_preset(ProgramPreset::Default2DShader).unwrap();
     shader_program.set_uniform("tex_atlas", 0_u32);
-    screen::set_clear_color(0.6, 0.8, 1.0);
     screen::set_blend(screen::Blend::Transparency);
+    let mut base_sky_color = Vector([0.6, 0.8, 1.0]);
+    let mut sky_light = 1.0;
 
     let mut input_state = input::InputState::new(event_receiver);
 
@@ -146,6 +147,25 @@ fn main() {
         shader_program.set_uniform("camera_view", camera.view());
         shader_program.set_uniform("camera_proj", camera.projection());
 
+        let target_sky_light = {
+            let camera_pos = camera.position();
+            let chunk_location = Vector([
+                camera_pos.x().div_euclid(world::block::CHUNK_SIZE as f32) as i64,
+                camera_pos.y().div_euclid(world::block::CHUNK_SIZE as f32) as i64,
+            ]);
+            let block_x = camera_pos.x().rem_euclid(world::block::CHUNK_SIZE as f32) as usize;
+            let block_y = camera_pos.y().rem_euclid(world::block::CHUNK_SIZE as f32) as usize;
+            if let Some(chunk) = current_world.get_chunk(chunk_location) {
+                world::block::slot_light_value(chunk.block_slot_at(block_x, block_y))
+            }
+            else {
+                world::block::light_value(15)
+            }
+        };
+        sky_light += (target_sky_light - sky_light) * dt.min(1.0);
+        let sky_color = base_sky_color * sky_light;
+
+        screen::set_clear_color(sky_color.x(), sky_color.y(), sky_color.z());
         screen::clear();
         current_world.render_block_layer(&mut assets);
         block_preview.render(&assets, &current_world);

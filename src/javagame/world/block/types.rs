@@ -19,6 +19,11 @@ fn light_emission_0(this: &Block) -> u8 {
     0
 }
 
+fn light_emission_5(this: &Block) -> u8 {
+    let _ = this;
+    5
+}
+
 fn light_emission_15(this: &Block) -> u8 {
     let _ = this;
     15
@@ -49,6 +54,8 @@ pub const BLOCK_TYPES: &[&BlockType] = &[
     &AIR,
     &ALUMINUM_BLOCK,
     &AMETHYST_BLOCK,
+    &AMETHYST_CRYSTAL,
+    &AMETHYST_ORE,
     &AMPLIFITE_BLOCK,
     &COAL_BLOCK,
     &COBALT_BLOCK,
@@ -109,6 +116,22 @@ pub static AMETHYST_BLOCK: BlockType = BlockType {
     is_full_block: full_block_always,
     light_emission: light_emission_0,
     connects_to: connects_to_same_type,
+};
+pub static AMETHYST_CRYSTAL: BlockType = BlockType {
+    name: "amethyst_crystal",
+    attributes: &[("wall", AttributeType::Enum { default_value: 0, value_names: &["bottom", "left", "right", "top"] })],
+    colliders: &[],
+    is_full_block: full_block_never,
+    light_emission: light_emission_5,
+    connects_to: connects_never,
+};
+pub static AMETHYST_ORE: BlockType = BlockType {
+    name: "amethyst_ore",
+    attributes: &[],
+    colliders: &[BLOCK_RECT],
+    is_full_block: full_block_always,
+    light_emission: light_emission_0,
+    connects_to: connects_to_full_block,
 };
 pub static AMPLIFITE_BLOCK: BlockType = BlockType {
     name: "amplifite_block",

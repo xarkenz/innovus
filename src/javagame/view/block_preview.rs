@@ -56,9 +56,11 @@ impl BlockPreview {
 
         let block_x = self.position.x().rem_euclid(CHUNK_SIZE as f32) as usize;
         let block_y = self.position.y().rem_euclid(CHUNK_SIZE as f32) as usize;
-        if chunk.block_at(block_x, block_y).block_type() != &block::types::AIR {
+        let slot = chunk.block_slot_at(block_x, block_y);
+        if slot.block().block_type() != &block::types::AIR {
             return;
         }
+        let light_value = block::slot_light_value(slot);
 
         let block = Block::new(self.block_type);
         if let Some(image) = assets.get_block_image(&block, chunk_location, block_x, block_y) {
@@ -76,7 +78,7 @@ impl BlockPreview {
                     let vertex_position = block_origin + total_offset;
                     vertices.push(Vertex2D::new(
                         [vertex_position.x(), vertex_position.y(), 0.0],
-                        Some([1.0, 1.0, 1.0, self.opacity]),
+                        Some([light_value, light_value, light_value, self.opacity]),
                         Some([
                             atlas_offset.x() as f32 + total_offset.x() * image.size() as f32,
                             atlas_offset.y() as f32 + (1.0 - total_offset.y()) * image.size() as f32,

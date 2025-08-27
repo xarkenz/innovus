@@ -157,8 +157,17 @@ impl Default for Block {
 
 pub const CHUNK_SIZE: usize = 16;
 
-fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
+pub fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
     (value.div_euclid(CHUNK_SIZE as isize) as i64, value.rem_euclid(CHUNK_SIZE as isize) as usize)
+}
+
+pub fn light_value(effective_light: u8) -> f32 {
+    const AMBIENT_LIGHT: f32 = 3.0;
+    (AMBIENT_LIGHT + effective_light as f32) / (AMBIENT_LIGHT + 15.0)
+}
+
+pub fn slot_light_value(slot: &BlockSlot) -> f32 {
+    light_value(slot.block_light().max(slot.sky_light()))
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -454,12 +463,6 @@ impl Chunk {
     }
 
     fn update_block_vertices(&mut self, x: usize, y: usize, assets: &AssetPool, chunk_map: &ChunkMap) {
-        fn get_light_value(slot: &BlockSlot) -> f32 {
-            const AMBIENT_LIGHT: f32 = 3.0;
-            let effective_light = slot.block_light().max(slot.sky_light());
-            (AMBIENT_LIGHT + effective_light as f32) / (AMBIENT_LIGHT + 15.0)
-        }
-
         let slot = &self.block_slots[y][x];
         // (y * CHUNK_SIZE + x) blocks in, 4 quads per block, 4 vertices per quad
         let first_index = (y * CHUNK_SIZE + x) * VERTICES_PER_BLOCK;
@@ -469,15 +472,15 @@ impl Chunk {
                 let x = x as isize;
                 let y = y as isize;
                 // u = up, d = down, l = left, r = right, c = center (all relative to current block)
-                let block_light_ul = self.with_block_slot(x - 1, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_uc = self.with_block_slot(x + 0, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_ur = self.with_block_slot(x + 1, y + 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_cl = self.with_block_slot(x - 1, y + 0, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_cc = get_light_value(slot); // Might as well use what we have
-                let block_light_cr = self.with_block_slot(x + 1, y + 0, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_dl = self.with_block_slot(x - 1, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_dc = self.with_block_slot(x + 0, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
-                let block_light_dr = self.with_block_slot(x + 1, y - 1, chunk_map, get_light_value).unwrap_or(1.0);
+                let block_light_ul = self.with_block_slot(x - 1, y + 1, chunk_map, slot_light_value).unwrap_or(1.0);
+                let block_light_uc = self.with_block_slot(x + 0, y + 1, chunk_map, slot_light_value).unwrap_or(1.0);
+                let block_light_ur = self.with_block_slot(x + 1, y + 1, chunk_map, slot_light_value).unwrap_or(1.0);
+                let block_light_cl = self.with_block_slot(x - 1, y + 0, chunk_map, slot_light_value).unwrap_or(1.0);
+                let block_light_cc = slot_light_value(slot); // Might as well use what we have
+                let block_light_cr = self.with_block_slot(x + 1, y + 0, chunk_map, slot_light_value).unwrap_or(1.0);
+                let block_light_dl = self.with_block_slot(x - 1, y - 1, chunk_map, slot_light_value).unwrap_or(1.0);
+                let block_light_dc = self.with_block_slot(x + 0, y - 1, chunk_map, slot_light_value).unwrap_or(1.0);
+                let block_light_dr = self.with_block_slot(x + 1, y - 1, chunk_map, slot_light_value).unwrap_or(1.0);
 
                 let corner_light_ul = (block_light_ul + block_light_uc + block_light_cl + block_light_cc) / 4.0;
                 let corner_light_ur = (block_light_ur + block_light_uc + block_light_cr + block_light_cc) / 4.0;
