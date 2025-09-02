@@ -151,6 +151,11 @@ impl AssetPool {
         &self.entity_texture
     }
 
+    pub fn clear_entity_images(&mut self) {
+        self.entity_images.clear();
+        self.entity_atlas.clear();
+    }
+
     pub fn get_entity_image(&mut self, key: &str) -> Result<EntityImage, String> {
         if let Some(entity_image) = self.entity_images.get(key) {
             Ok(entity_image.clone())

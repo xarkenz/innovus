@@ -190,7 +190,7 @@ impl EntityRenderer {
             .expect("attempted to access entity piece after removal")
     }
 
-    pub fn remove_piece(&mut self, handle: &EntityPieceHandle) -> Option<EntityPiece> {
+    pub fn remove_piece(&mut self, handle: EntityPieceHandle) -> Option<EntityPiece> {
         let result = self.batches.get_mut(handle.batch)?.remove_piece(handle.piece);
         if self.batches.get(handle.batch)?.is_empty() {
             self.batches.remove(handle.batch);

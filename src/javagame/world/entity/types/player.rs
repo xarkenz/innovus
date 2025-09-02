@@ -17,7 +17,7 @@ struct PlayerAppearance {
     body: EntityPieceHandle,
 }
 
-const JUMP_COOLDOWN_SECONDS: f32 = 0.5;
+const JUMP_COOLDOWN_SECONDS: f32 = 0.3;
 const COYOTE_TIME_SECONDS: f32 = 0.1;
 
 pub struct Player {
@@ -96,26 +96,28 @@ impl Entity for Player {
     }
 
     fn init_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
-        if self.appearance.is_none() {
-            let idle_image = assets.get_entity_image("entity/player/idle").unwrap();
-            let run_image = assets.get_entity_image("entity/player/run").unwrap();
-            let jump_ascend_image = assets.get_entity_image("entity/player/jump_ascend").unwrap();
-            let jump_descend_image = assets.get_entity_image("entity/player/jump_descend").unwrap();
-            let crouch_idle_image = assets.get_entity_image("entity/player/crouch_idle").unwrap();
-            let crouch_walk_image = assets.get_entity_image("entity/player/crouch_walk").unwrap();
-
-            let body = EntityPiece::new(self.position, idle_image.clone());
-
-            self.appearance = Some(PlayerAppearance {
-                idle_image,
-                run_image,
-                jump_ascend_image,
-                jump_descend_image,
-                crouch_idle_image,
-                crouch_walk_image,
-                body: renderer.add_piece(body),
-            });
+        if let Some(appearance) = self.appearance.take() {
+            renderer.remove_piece(appearance.body);
         }
+
+        let idle_image = assets.get_entity_image("entity/player/idle").unwrap();
+        let run_image = assets.get_entity_image("entity/player/run").unwrap();
+        let jump_ascend_image = assets.get_entity_image("entity/player/jump_ascend").unwrap();
+        let jump_descend_image = assets.get_entity_image("entity/player/jump_descend").unwrap();
+        let crouch_idle_image = assets.get_entity_image("entity/player/crouch_idle").unwrap();
+        let crouch_walk_image = assets.get_entity_image("entity/player/crouch_walk").unwrap();
+
+        let body = EntityPiece::new(self.position, idle_image.clone());
+
+        self.appearance = Some(PlayerAppearance {
+            idle_image,
+            run_image,
+            jump_ascend_image,
+            jump_descend_image,
+            crouch_idle_image,
+            crouch_walk_image,
+            body: renderer.add_piece(body),
+        });
     }
 
     fn update(&mut self, dt: f32, inputs: &InputState, physics: &mut Physics, renderer: &mut EntityRenderer) {
@@ -232,7 +234,7 @@ impl Entity for Player {
             physics.remove_collider(collider);
         }
         if let Some(appearance) = self.appearance.take() {
-            renderer.remove_piece(&appearance.body);
+            renderer.remove_piece(appearance.body);
         }
     }
 }

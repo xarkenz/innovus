@@ -24,7 +24,7 @@ fn main() {
     let shader_program = Program::from_preset(ProgramPreset::Default2DShader).unwrap();
     shader_program.set_uniform("tex_atlas", 0_u32);
     screen::set_blend(screen::Blend::Transparency);
-    let mut base_sky_color = Vector([0.6, 0.8, 1.0]);
+    let base_sky_color = Vector([0.6, 0.8, 1.0]);
     let mut sky_light = 1.0;
 
     let mut input_state = input::InputState::new(event_receiver);
@@ -85,6 +85,15 @@ fn main() {
                 WindowEvent::Key(Key::Tab, _, Action::Press, mods) => {
                     let offset = if mods.contains(Modifiers::Shift) { -1 } else { 1 };
                     selected_block_index = select_block_index(selected_block_index as isize + offset, offset);
+                }
+                WindowEvent::Key(Key::R, _, Action::Press, mods) if mods.contains(Modifiers::Control) => {
+                    if let Err(err) = assets.reload_block_appearances() {
+                        eprintln!("failed to reload: {err}");
+                    }
+                    else {
+                        assets.clear_entity_images();
+                        println!("reloaded");
+                    }
                 }
                 WindowEvent::Scroll(dx, dy) => {
                     let _ = dx;

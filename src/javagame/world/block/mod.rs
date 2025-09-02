@@ -48,6 +48,50 @@ pub enum AttributeValue {
     String(String),
 }
 
+impl AttributeValue {
+    pub fn expect_bool(&self) -> bool {
+        match self {
+            &AttributeValue::Bool(value) => value,
+            _ => panic!("unexpected attribute type")
+        }
+    }
+
+    pub fn expect_u8(&self) -> u8 {
+        match self {
+            &AttributeValue::U8(value) => value,
+            _ => panic!("unexpected attribute type")
+        }
+    }
+
+    pub fn expect_i8(&self) -> i8 {
+        match self {
+            &AttributeValue::I8(value) => value,
+            _ => panic!("unexpected attribute type")
+        }
+    }
+
+    pub fn expect_u32(&self) -> u32 {
+        match self {
+            &AttributeValue::U32(value) => value,
+            _ => panic!("unexpected attribute type")
+        }
+    }
+
+    pub fn expect_i32(&self) -> i32 {
+        match self {
+            &AttributeValue::I32(value) => value,
+            _ => panic!("unexpected attribute type")
+        }
+    }
+
+    pub fn expect_string(&self) -> &str {
+        match self {
+            AttributeValue::String(value) => value,
+            _ => panic!("unexpected attribute type")
+        }
+    }
+}
+
 pub struct BlockType {
     pub name: &'static str,
     pub attributes: &'static [(&'static str, AttributeType)],
@@ -55,6 +99,7 @@ pub struct BlockType {
     is_full_block: fn(&Block) -> bool,
     light_emission: fn(&Block) -> u8,
     connects_to: fn(&Block, &Block) -> bool,
+    right_click: fn(&Block, &'static BlockType) -> Option<Block>,
 }
 
 impl BlockType {
@@ -136,6 +181,10 @@ impl Block {
         &self.attributes[index]
     }
 
+    pub fn set_attribute_value(&mut self, index: usize, value: AttributeValue) {
+        self.attributes[index] = value;
+    }
+
     pub fn is_full_block(&self) -> bool {
         (self.block_type.is_full_block)(self)
     }
@@ -146,6 +195,10 @@ impl Block {
 
     pub fn connects_to(&self, other: &Self) -> bool {
         (self.block_type.connects_to)(self, other)
+    }
+
+    pub fn right_click(&self, hand: &'static BlockType) -> Option<Self> {
+        (self.block_type.right_click)(self, hand)
     }
 }
 
