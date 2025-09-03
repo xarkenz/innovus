@@ -60,7 +60,7 @@ impl BlockPreview {
         if slot.block().block_type() != &block::types::AIR {
             return;
         }
-        let light_value = block::slot_light_value(slot);
+        let light_value = slot.light_value();
 
         let block = Block::new(self.block_type);
         if let Some(image) = assets.get_block_image(&block, chunk_location, block_x, block_y) {

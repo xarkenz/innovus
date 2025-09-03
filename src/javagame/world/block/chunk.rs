@@ -1,8 +1,10 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::BTreeMap;
 use innovus::gfx::{Geometry, Vertex2D};
-use innovus::tools::{phys, Rectangle, Vector};
+use innovus::tools::{Rectangle, Vector};
+use innovus::tools::phys::{Collider, ColliderHandle, Physics};
 use crate::tools::asset::AssetPool;
+use crate::world::gen::WorldGenerator;
 use super::*;
 
 pub const CHUNK_SIZE: usize = 16;
@@ -16,9 +18,7 @@ pub fn light_value(effective_light: u8) -> f32 {
     (AMBIENT_LIGHT + effective_light as f32) / (AMBIENT_LIGHT + 15.0)
 }
 
-pub fn slot_light_value(slot: &BlockSlot) -> f32 {
-    light_value(slot.block_light().max(slot.sky_light()))
-}
+pub type ChunkLocation = Vector<i64, 2>;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct BlockCoord {
@@ -47,9 +47,6 @@ impl From<BlockCoord> for i64 {
     }
 }
 
-pub type ChunkLocation = Vector<i64, 2>;
-pub type ChunkMap = BTreeMap<ChunkLocation, RefCell<Chunk>>;
-
 #[derive(Clone, Debug)]
 pub struct BlockSlot {
     block: Block,
@@ -74,6 +71,10 @@ impl BlockSlot {
     pub fn needs_render(&self) -> bool {
         self.needs_render
     }
+
+    pub fn light_value(&self) -> f32 {
+        light_value(self.block_light.max(self.sky_light))
+    }
 }
 
 impl Default for BlockSlot {
@@ -93,7 +94,7 @@ const ADJACENT_OFFSETS: [(isize, isize); 4] = [(0, 1), (0, -1), (-1, 0), (1, 0)]
 pub struct Chunk {
     location: ChunkLocation,
     block_slots: [[BlockSlot; CHUNK_SIZE]; CHUNK_SIZE],
-    collision_map: Option<[[Box<[phys::ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE]>,
+    collision_map: Option<[[Box<[ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE]>,
     render_all: bool,
     geometry: Geometry<Vertex2D>,
     height_map: [i64; CHUNK_SIZE],
@@ -153,7 +154,7 @@ impl Chunk {
         self.block_slots[y][x].needs_render()
     }
 
-    pub fn set_block_at(&mut self, x: usize, y: usize, block: Block, chunk_map: &ChunkMap, physics: &mut phys::Physics) {
+    pub fn set_block_at(&mut self, x: usize, y: usize, block: Block, chunk_map: &ChunkMap, physics: &mut Physics) {
         if let Some(collision_map) = &mut self.collision_map {
             // Add new physics colliders and remove the old ones
             let new_colliders = Self::create_block_colliders(self.location, x, y, &block, physics);
@@ -183,7 +184,7 @@ impl Chunk {
         }
         else {
             let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
-            Some(f(chunk_map.get(&other_chunk_location)?.borrow().block_slot_at(block_x, block_y)))
+            Some(f(chunk_map.get(other_chunk_location)?.block_slot_at(block_x, block_y)))
         }
     }
 
@@ -211,8 +212,8 @@ impl Chunk {
                 if chunk_offset_x == 0 && chunk_offset_y == 0 {
                     self.block_slots[block_y][block_x].needs_render = true;
                 }
-                else if let Some(chunk) = chunk_map.get(&self.relative_chunk_location(chunk_offset_x, chunk_offset_y)) {
-                    chunk.borrow_mut().block_slots[block_y][block_x].needs_render = true;
+                else if let Some(mut chunk) = chunk_map.get_mut(self.relative_chunk_location(chunk_offset_x, chunk_offset_y)) {
+                    chunk.block_slots[block_y][block_x].needs_render = true;
                 }
             }
         }
@@ -235,7 +236,7 @@ impl Chunk {
             }
             else {
                 let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
-                let Some(chunk) = chunk_map.get(&other_chunk_location).map(RefCell::borrow) else {
+                let Some(chunk) = chunk_map.get(other_chunk_location) else {
                     continue;
                 };
                 let slot = chunk.block_slot_at(block_x, block_y);
@@ -262,7 +263,7 @@ impl Chunk {
             }
             else {
                 let other_chunk_location = self.relative_chunk_location(chunk_offset_x, chunk_offset_y);
-                let mut chunk = chunk_map[&other_chunk_location].borrow_mut();
+                let mut chunk = chunk_map.get_mut(other_chunk_location).unwrap();
                 chunk.block_slots[block_y][block_x].block_light = expected_light;
                 chunk.set_all_need_render();
             }
@@ -322,15 +323,16 @@ impl Chunk {
                 let x = x as isize;
                 let y = y as isize;
                 // u = up, d = down, l = left, r = right, c = center (all relative to current block)
-                let block_light_ul = self.with_block_slot(x - 1, y + 1, chunk_map, slot_light_value).unwrap_or(1.0);
-                let block_light_uc = self.with_block_slot(x + 0, y + 1, chunk_map, slot_light_value).unwrap_or(1.0);
-                let block_light_ur = self.with_block_slot(x + 1, y + 1, chunk_map, slot_light_value).unwrap_or(1.0);
-                let block_light_cl = self.with_block_slot(x - 1, y + 0, chunk_map, slot_light_value).unwrap_or(1.0);
-                let block_light_cc = slot_light_value(slot); // Might as well use what we have
-                let block_light_cr = self.with_block_slot(x + 1, y + 0, chunk_map, slot_light_value).unwrap_or(1.0);
-                let block_light_dl = self.with_block_slot(x - 1, y - 1, chunk_map, slot_light_value).unwrap_or(1.0);
-                let block_light_dc = self.with_block_slot(x + 0, y - 1, chunk_map, slot_light_value).unwrap_or(1.0);
-                let block_light_dr = self.with_block_slot(x + 1, y - 1, chunk_map, slot_light_value).unwrap_or(1.0);
+                let get_light = BlockSlot::light_value;
+                let block_light_cc = slot.light_value(); // Might as well use what we have
+                let block_light_ul = self.with_block_slot(x - 1, y + 1, chunk_map, get_light).unwrap_or(block_light_cc);
+                let block_light_uc = self.with_block_slot(x + 0, y + 1, chunk_map, get_light).unwrap_or(block_light_cc);
+                let block_light_ur = self.with_block_slot(x + 1, y + 1, chunk_map, get_light).unwrap_or(block_light_cc);
+                let block_light_cl = self.with_block_slot(x - 1, y + 0, chunk_map, get_light).unwrap_or(block_light_cc);
+                let block_light_cr = self.with_block_slot(x + 1, y + 0, chunk_map, get_light).unwrap_or(block_light_cc);
+                let block_light_dl = self.with_block_slot(x - 1, y - 1, chunk_map, get_light).unwrap_or(block_light_cc);
+                let block_light_dc = self.with_block_slot(x + 0, y - 1, chunk_map, get_light).unwrap_or(block_light_cc);
+                let block_light_dr = self.with_block_slot(x + 1, y - 1, chunk_map, get_light).unwrap_or(block_light_cc);
 
                 let corner_light_ul = (block_light_ul + block_light_uc + block_light_cl + block_light_cc) / 4.0;
                 let corner_light_ur = (block_light_ur + block_light_uc + block_light_cr + block_light_cc) / 4.0;
@@ -385,7 +387,7 @@ impl Chunk {
         }
     }
 
-    pub fn attach_physics(&mut self, physics: &mut phys::Physics) {
+    pub fn attach_physics(&mut self, physics: &mut Physics) {
         if self.collision_map.is_none() {
             let mut y = 0;
             let collision_map = self.block_slots.each_ref().map(|row| {
@@ -402,7 +404,7 @@ impl Chunk {
         }
     }
 
-    pub fn detach_physics(&mut self, physics: &mut phys::Physics) {
+    pub fn detach_physics(&mut self, physics: &mut Physics) {
         if let Some(collision_map) = self.collision_map.take() {
             for row in collision_map {
                 for colliders in row {
@@ -414,7 +416,7 @@ impl Chunk {
         }
     }
 
-    fn create_block_colliders(chunk_location: ChunkLocation, x: usize, y: usize, block: &Block, physics: &mut phys::Physics) -> Box<[phys::ColliderHandle]> {
+    fn create_block_colliders(chunk_location: ChunkLocation, x: usize, y: usize, block: &Block, physics: &mut Physics) -> Box<[ColliderHandle]> {
         let block_origin = Vector([
             chunk_location.x() as f32 * CHUNK_SIZE as f32 + x as f32,
             chunk_location.y() as f32 * CHUNK_SIZE as f32 + y as f32,
@@ -433,8 +435,130 @@ impl Chunk {
                     ]),
                 );
                 collider_bounds.shift_by(block_origin);
-                physics.add_collider(phys::Collider::new_fixed(collider_bounds))
+                physics.add_collider(Collider::new_fixed(collider_bounds))
             })
             .collect()
+    }
+}
+
+pub struct ChunkMap {
+    generator: Option<Box<dyn WorldGenerator>>,
+    chunks: BTreeMap<ChunkLocation, RefCell<Chunk>>,
+    chunk_load_range: Rectangle<i64>,
+    chunk_simulate_range: Rectangle<i64>,
+}
+
+impl ChunkMap {
+    pub fn new(generator: Option<Box<dyn WorldGenerator>>) -> Self {
+        Self {
+            generator,
+            chunks: BTreeMap::new(),
+            chunk_load_range: Rectangle::new(Vector([-2, -2]), Vector([2, 2])),
+            chunk_simulate_range: Rectangle::new(Vector([-1, -1]), Vector([1, 1])),
+        }
+    }
+
+    pub fn get(&self, location: ChunkLocation) -> Option<Ref<'_, Chunk>> {
+        self.chunks.get(&location).map(|chunk| chunk.borrow())
+    }
+
+    pub fn get_mut(&self, location: ChunkLocation) -> Option<RefMut<'_, Chunk>> {
+        self.chunks.get(&location).map(|chunk| chunk.borrow_mut())
+    }
+
+    pub fn get_or_load(&mut self, location: ChunkLocation, physics: &mut Physics) -> Ref<'_, Chunk> {
+        self.get_or_load_cell(location, physics).borrow()
+    }
+
+    pub fn get_or_load_mut(&mut self, location: ChunkLocation, physics: &mut Physics) -> RefMut<'_, Chunk> {
+        self.get_or_load_cell(location, physics).borrow_mut()
+    }
+
+    fn get_or_load_cell(&mut self, location: ChunkLocation, physics: &mut Physics) -> &RefCell<Chunk> {
+        if self.chunks.contains_key(&location) {
+            &self.chunks[&location]
+        }
+        else {
+            self.chunks.insert(location, RefCell::new(Chunk::new(location)));
+            let cell = &self.chunks[&location];
+            if let Some(generator) = &self.generator {
+                generator.generate_chunk(&mut *cell.borrow_mut(), self, physics);
+            }
+            cell
+        }
+    }
+
+    pub fn unload(&mut self, location: ChunkLocation, physics: &mut Physics) {
+        if let Some(chunk) = self.chunks.remove(&location) {
+            chunk.into_inner().detach_physics(physics);
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Ref<'_, Chunk>> {
+        self.chunks.values().map(RefCell::borrow)
+    }
+
+    pub fn iter_mut(&self) -> impl Iterator<Item = RefMut<'_, Chunk>> {
+        self.chunks.values().map(RefCell::borrow_mut)
+    }
+
+    pub fn locations(&self) -> impl Iterator<Item = ChunkLocation> + '_ {
+        self.chunks.keys().copied()
+    }
+
+    pub fn tick(&mut self, chunk_loader_pos: Option<Vector<f32, 2>>, physics: &mut Physics) {
+        let locations_to_unload: Vec<ChunkLocation>;
+        let locations_to_detach: Vec<ChunkLocation>;
+
+        if let Some(world_pos) = chunk_loader_pos {
+            let center_chunk_location = Vector([
+                world_pos.x().div_euclid(CHUNK_SIZE as f32) as i64,
+                world_pos.y().div_euclid(CHUNK_SIZE as f32) as i64,
+            ]);
+
+            let mut chunk_load_range = self.chunk_load_range;
+            chunk_load_range.shift_by(center_chunk_location);
+            for chunk_y in chunk_load_range.min_y() ..= chunk_load_range.max_y() {
+                for chunk_x in chunk_load_range.min_x() ..= chunk_load_range.max_x() {
+                    self.get_or_load_cell(Vector([chunk_x, chunk_y]), physics);
+                }
+            }
+
+            let mut chunk_simulate_range = self.chunk_simulate_range;
+            chunk_simulate_range.shift_by(center_chunk_location);
+            for chunk_y in chunk_simulate_range.min_y() ..= chunk_simulate_range.max_y() {
+                for chunk_x in chunk_simulate_range.min_x() ..= chunk_simulate_range.max_x() {
+                    if let Some(mut chunk) = self.get_mut(Vector([chunk_x, chunk_y])) {
+                        chunk.attach_physics(physics);
+                    }
+                }
+            }
+
+            // Unload the chunks that are out of load range
+            locations_to_unload = self
+                .locations()
+                .filter(|&location| !chunk_load_range.contains_inclusive(location))
+                .collect();
+            // Detach physics for the chunks that are out of simulate range
+            locations_to_detach = self
+                .locations()
+                .filter(|&location| !chunk_simulate_range.contains_inclusive(location))
+                .collect();
+        }
+        else {
+            // Unload all chunks
+            locations_to_unload = self.locations().collect();
+            // Don't worry about detaching physics, unloading a chunk does that automatically
+            locations_to_detach = Vec::new();
+        }
+
+        for location in locations_to_unload {
+            self.unload(location, physics);
+        }
+        for location in locations_to_detach {
+            if let Some(mut chunk) = self.get_mut(location) {
+                chunk.detach_physics(physics);
+            }
+        }
     }
 }

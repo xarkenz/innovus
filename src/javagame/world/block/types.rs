@@ -92,6 +92,7 @@ pub const BLOCK_TYPES: &[&BlockType] = &[
     &MAGMIUM_BLOCK,
     &OBSIDIAN_BLOCK,
     &PHYLUMUS_BLOCK,
+    &PHYLUMUS_MUSHROOM,
     &PIPE,
     &QUARTZ_BLOCK,
     &QUARTZ_CRYSTAL,
@@ -256,6 +257,25 @@ pub static PHYLUMUS_BLOCK: BlockType = BlockType {
     name: "phylumus_block",
     light_emission: light_emission_15,
     connects_to: connects_to_full_block,
+    ..DEFAULTS
+};
+pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
+    name: "phylumus_mushroom",
+    attributes: &[
+        ("shape", AttributeType::Enum { default_value: 0, value_names: &["center", "left", "right"] }),
+    ],
+    colliders: &[],
+    is_full_block: full_block_never,
+    light_emission: |block| {
+        let shape = block.attribute_value(0).expect_u8();
+        if shape == 0 { 6 } else { 3 }
+    },
+    right_click: |block, _| {
+        let mut block = block.clone();
+        let shape = block.attribute_value(0).expect_u8();
+        block.set_attribute_value(0, AttributeValue::U8((shape + 1) % 3));
+        Some(block)
+    },
     ..DEFAULTS
 };
 pub static PIPE: BlockType = BlockType {

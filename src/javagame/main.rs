@@ -165,7 +165,7 @@ fn main() {
             let block_x = camera_pos.x().rem_euclid(world::block::CHUNK_SIZE as f32) as usize;
             let block_y = camera_pos.y().rem_euclid(world::block::CHUNK_SIZE as f32) as usize;
             if let Some(chunk) = current_world.get_chunk(chunk_location) {
-                world::block::slot_light_value(chunk.block_slot_at(block_x, block_y))
+                world::block::light_value(chunk.block_slot_at(block_x, block_y).sky_light())
             }
             else {
                 world::block::light_value(15)
