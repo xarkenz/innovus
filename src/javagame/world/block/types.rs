@@ -95,6 +95,7 @@ pub const BLOCK_TYPES: &[&BlockType] = &[
     &PIPE,
     &QUARTZ_BLOCK,
     &QUARTZ_CRYSTAL,
+    &QUARTZ_ORE,
     &SAND,
     &SANDSTONE,
     &SLATE,
@@ -283,6 +284,11 @@ pub static QUARTZ_CRYSTAL: BlockType = BlockType {
         block.set_attribute_value(0, AttributeValue::U8((wall + 1) % 4));
         Some(block)
     },
+    ..DEFAULTS
+};
+pub static QUARTZ_ORE: BlockType = BlockType {
+    name: "quartz_ore",
+    connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static SAND: BlockType = BlockType {
