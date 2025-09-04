@@ -1,4 +1,5 @@
 pub mod screen;
+pub mod color;
 
 use super::tools::{Matrix, Transform3D, Vector};
 use gl::types::*;
@@ -10,15 +11,6 @@ use std::mem::{size_of, swap};
 use std::num::{ParseFloatError, ParseIntError};
 use std::path::Path;
 use std::str::FromStr;
-
-pub enum Color {
-    RGB(u8, u8, u8),
-    RGBA(u8, u8, u8, u8),
-    FloatRGB(f32, f32, f32),
-    FloatRGBA(f32, f32, f32, f32),
-    Black,
-    White,
-}
 
 pub enum ShaderType {
     Vertex = gl::VERTEX_SHADER as isize,

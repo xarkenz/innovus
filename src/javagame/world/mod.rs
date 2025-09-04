@@ -2,10 +2,12 @@ use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
 use crate::tools::*;
 use crate::world::entity::render::EntityRenderer;
+use crate::world::particle::ParticleManager;
 
 pub mod block;
 pub mod entity;
 pub mod gen;
+pub mod particle;
 
 pub const SECONDS_PER_TICK: f32 = 0.05;
 
@@ -16,6 +18,7 @@ pub struct World<'world> {
     entity_renderer: EntityRenderer,
     seconds_since_last_tick: f32,
     chunk_loader_entity: Option<Uuid>,
+    particles: ParticleManager,
 }
 
 impl<'world> World<'world> where Self: 'world {
@@ -27,6 +30,7 @@ impl<'world> World<'world> where Self: 'world {
             entity_renderer: EntityRenderer::new(),
             seconds_since_last_tick: SECONDS_PER_TICK,
             chunk_loader_entity: None,
+            particles: ParticleManager::new(),
         }
     }
 
@@ -124,9 +128,10 @@ impl<'world> World<'world> where Self: 'world {
             self.tick();
         }
         for entity in self.entities.values_mut() {
-            entity.update(dt, inputs, &mut self.physics, &mut self.entity_renderer);
+            entity.update(dt, inputs, &mut self.physics, &mut self.entity_renderer, &mut self.particles);
         }
         self.physics.step_simulation(dt);
+        self.particles.update(dt);
     }
 
     fn tick(&mut self) {
@@ -144,6 +149,7 @@ impl<'world> World<'world> where Self: 'world {
         for mut chunk in self.chunks.iter_mut() {
             chunk.render(assets, &self.chunks);
         }
+        self.particles.render();
     }
 
     pub fn render_entity_layer(&mut self, assets: &asset::AssetPool) {

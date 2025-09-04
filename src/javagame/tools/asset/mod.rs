@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use json::JsonValue;
 use innovus::gfx::{Image, ImageAtlas, Texture2D, TextureSampling, TextureWrap};
+use innovus::gfx::color::ColorPalette;
 use innovus::tools::Rectangle;
 use crate::tools::asset::block::{BlockAppearance, BlockImage};
 use crate::tools::asset::entity::EntityImage;
@@ -20,6 +22,7 @@ pub struct AssetPool {
     entity_atlas: ImageAtlas,
     entity_images: HashMap<String, EntityImage>,
     font_texture: Texture2D,
+    color_palettes: HashMap<String, ColorPalette>,
 }
 
 impl AssetPool {
@@ -53,6 +56,7 @@ impl AssetPool {
             entity_atlas: ImageAtlas::new(Default::default()),
             entity_images: HashMap::new(),
             font_texture,
+            color_palettes: HashMap::new(),
         };
 
         // Despite the name of the method, this loads block appearances for the first time
@@ -81,6 +85,14 @@ impl AssetPool {
             .map_err(|err| format!("failed to read JSON asset at '{}': {err}", path.display()))?;
         json::parse(&json_raw)
             .map_err(|err| format!("failed to parse JSON asset at '{}': {err}", path.display()))
+    }
+
+    pub fn reload(&mut self) -> Result<(), String> {
+        self.reload_block_appearances()?;
+        self.clear_entity_images();
+        self.reload_font()?;
+        self.clear_color_palettes();
+        Ok(())
     }
 
     pub fn block_atlas(&self) -> &ImageAtlas {
@@ -160,11 +172,6 @@ impl AssetPool {
         &self.entity_texture
     }
 
-    pub fn clear_entity_images(&mut self) {
-        self.entity_images.clear();
-        self.entity_atlas.clear();
-    }
-
     pub fn get_entity_image(&mut self, key: &str) -> Result<EntityImage, String> {
         if let Some(entity_image) = self.entity_images.get(key) {
             Ok(entity_image.clone())
@@ -185,6 +192,11 @@ impl AssetPool {
         }
     }
 
+    pub fn clear_entity_images(&mut self) {
+        self.entity_images.clear();
+        self.entity_atlas.clear();
+    }
+
     pub fn font_texture(&self) -> &Texture2D {
         &self.font_texture
     }
@@ -193,5 +205,21 @@ impl AssetPool {
         let font_image = self.load_image(self.get_asset_path("images/font/unicode_0"))?;
         self.font_texture.upload_image(&font_image);
         Ok(())
+    }
+
+    pub fn get_color_palette(&mut self, key: &str) -> Result<&ColorPalette, String> {
+        if !self.color_palettes.contains_key(key) {
+            let path = self.get_asset_path(format!("palettes/{key}")).with_extension("gpl");
+            let palette_file = File::open(&path)
+                .map_err(|err| format!("failed to read color palette at '{}': {err}", path.display()))?;
+            let color_palette = ColorPalette::parse_gpl(palette_file)?;
+            self.color_palettes.insert(key.into(), color_palette);
+        }
+
+        Ok(&self.color_palettes[key])
+    }
+
+    pub fn clear_color_palettes(&mut self) {
+        self.color_palettes.clear();
     }
 }

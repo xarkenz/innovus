@@ -3,6 +3,7 @@ use innovus::tools::phys::Physics;
 use crate::tools::input::{InputState, Key};
 use crate::world::entity::{movement, Entity};
 use crate::world::entity::render::{EntityRenderer};
+use crate::world::particle::ParticleManager;
 
 pub struct Spectator {
     uuid: Uuid,
@@ -41,8 +42,8 @@ impl Entity for Spectator {
         self.position
     }
 
-    fn update(&mut self, dt: f32, inputs: &InputState, physics: &mut Physics, renderer: &mut EntityRenderer) {
-        let _ = (physics, renderer);
+    fn update(&mut self, dt: f32, inputs: &InputState, physics: &mut Physics, renderer: &mut EntityRenderer, particles: &mut ParticleManager) {
+        let _ = (physics, renderer, particles);
 
         const SPEED_LIMIT: f32 = 20.0;
 

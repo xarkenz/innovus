@@ -40,19 +40,19 @@ impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
         Self([T::one(); N])
     }
 
-    pub fn content(&self) -> [T; N] {
+    pub const fn content(&self) -> [T; N] {
         self.0
     }
 
-    pub fn at(&self, index: usize) -> T {
+    pub const fn at(&self, index: usize) -> T {
         self.0[index]
     }
 
-    pub fn set(&mut self, index: usize, value: T) {
+    pub const fn set(&mut self, index: usize, value: T) {
         self.0[index] = value;
     }
 
-    pub fn fill(&mut self, value: T) {
+    pub const fn fill(&mut self, value: T) {
         self.0 = [value; N];
     }
 
@@ -63,7 +63,7 @@ impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
         }
         dot_product
     }
-    
+
     pub fn map<F, U>(self, f: F) -> Vector<U, N>
     where
         F: FnMut(T) -> U,
@@ -97,45 +97,45 @@ impl<T: Float + NumAssign, const N: usize> Vector<T, N> {
 }
 
 impl<T: NumAssign + Copy> Vector<T, 2> {
-    pub fn x(&self) -> T {
+    pub const fn x(&self) -> T {
         self.0[0]
     }
 
-    pub fn set_x(&mut self, x: T) {
+    pub const fn set_x(&mut self, x: T) {
         self.0[0] = x;
     }
 
-    pub fn y(&self) -> T {
+    pub const fn y(&self) -> T {
         self.0[1]
     }
 
-    pub fn set_y(&mut self, y: T) {
+    pub const fn set_y(&mut self, y: T) {
         self.0[1] = y;
     }
 }
 
 impl<T: NumAssign + Copy> Vector<T, 3> {
-    pub fn x(&self) -> T {
+    pub const fn x(&self) -> T {
         self.0[0]
     }
 
-    pub fn set_x(&mut self, x: T) {
+    pub const fn set_x(&mut self, x: T) {
         self.0[0] = x;
     }
 
-    pub fn y(&self) -> T {
+    pub const fn y(&self) -> T {
         self.0[1]
     }
 
-    pub fn set_y(&mut self, y: T) {
+    pub const fn set_y(&mut self, y: T) {
         self.0[1] = y;
     }
 
-    pub fn z(&self) -> T {
+    pub const fn z(&self) -> T {
         self.0[2]
     }
 
-    pub fn set_z(&mut self, z: T) {
+    pub const fn set_z(&mut self, z: T) {
         self.0[2] = z;
     }
 
@@ -149,35 +149,35 @@ impl<T: NumAssign + Copy> Vector<T, 3> {
 }
 
 impl<T: NumAssign + Copy> Vector<T, 4> {
-    pub fn x(&self) -> T {
+    pub const fn x(&self) -> T {
         self.0[0]
     }
 
-    pub fn set_x(&mut self, x: T) {
+    pub const fn set_x(&mut self, x: T) {
         self.0[0] = x;
     }
 
-    pub fn y(&self) -> T {
+    pub const fn y(&self) -> T {
         self.0[1]
     }
 
-    pub fn set_y(&mut self, y: T) {
+    pub const fn set_y(&mut self, y: T) {
         self.0[1] = y;
     }
 
-    pub fn z(&self) -> T {
+    pub const fn z(&self) -> T {
         self.0[2]
     }
 
-    pub fn set_z(&mut self, z: T) {
+    pub const fn set_z(&mut self, z: T) {
         self.0[2] = z;
     }
 
-    pub fn w(&self) -> T {
+    pub const fn w(&self) -> T {
         self.0[3]
     }
 
-    pub fn set_w(&mut self, w: T) {
+    pub const fn set_w(&mut self, w: T) {
         self.0[3] = w;
     }
 }

@@ -256,7 +256,7 @@ impl RendererBatch {
         if self.geometry.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
-            for _ in 0..PIECES_PER_BATCH as u32 {
+            for _ in 0..PIECES_PER_BATCH {
                 let index = vertices.len() as u32;
                 for _ in 0..4 {
                     vertices.push(Vertex2D::new([0.0; 3], Some([0.0; 4]), None));
