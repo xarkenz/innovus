@@ -1,6 +1,7 @@
 use innovus::tools::*;
 
 pub mod block_preview;
+pub mod text;
 
 pub struct Camera {
     view: Transform3D,

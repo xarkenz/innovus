@@ -1,7 +1,7 @@
 use glfw::{Action, Context, Key, Modifiers, WindowEvent, WindowMode};
 use innovus::Application;
 use innovus::gfx::{screen, Program, ProgramPreset};
-use innovus::tools::{Clock, Vector};
+use innovus::tools::{Clock, Transform3D, Vector};
 use crate::tools::{asset, input};
 
 pub mod tools;
@@ -37,11 +37,8 @@ fn main() {
     let mut current_world = world::World::new(
         Some(Box::new(world::gen::types::OverworldGenerator::new(0))),
     );
-    let player_start = Vector([0.5, 0.0]);
-    let player = world::entity::types::Player::new(
-        player_start,
-        None,
-    );
+    let player_start = Vector([-0.5, 0.0]);
+    let player = world::entity::types::Player::new(player_start, None);
     let player_uuid = world::entity::Entity::uuid(&player);
     current_world.add_entity(Box::new(player), &mut assets);
     current_world.set_chunk_loader_entity(Some(player_uuid));
@@ -61,6 +58,12 @@ fn main() {
         &world::block::types::AIR,
         0.4,
     );
+    let mut fps_string_renderer = view::text::StringRenderer::new(
+        Vector::zero(),
+        Vector([1.0, 1.0, 1.0, 1.0]),
+        Vector([0.0, 0.0, 0.0, 0.5]),
+        "Gathering data...".into(),
+    );
 
     fn select_block_index(mut index: isize, direction: isize) -> usize {
         index = index.rem_euclid(world::block::BLOCK_TYPES.len() as isize);
@@ -74,6 +77,22 @@ fn main() {
     }
     let mut selected_block_index = select_block_index(0, 1);
     let mut last_block_pos = None;
+
+    let mut fps_tracker = [f32::INFINITY; 120];
+    let mut fps_tracker_index = 0;
+
+    let mut gui_projection = Transform3D::identity();
+    {
+        let (width, height) = window.get_size();
+        gui_projection.orthographic(
+            0.0,
+            width as f32 / camera.zoom(),
+            0.0,
+            height as f32 / camera.zoom(),
+            100.0,
+            -100.0,
+        );
+    }
 
     while !window.should_close() {
         for event in input_state.process_events(&mut application) {
@@ -106,6 +125,9 @@ fn main() {
         let time = clock.read();
         let dt = time - prev_time;
         prev_time = time;
+
+        fps_tracker[fps_tracker_index] = 1.0 / dt;
+        fps_tracker_index = (fps_tracker_index + 1) % fps_tracker.len();
 
         let cursor_pos = input_state.cursor_pos().map(|x| x as f32);
         let world_pos = camera.get_world_pos(cursor_pos);
@@ -153,6 +175,11 @@ fn main() {
         camera.set_target(current_world.get_entity(player_uuid).unwrap().position());
         camera.update(dt);
 
+        let average_fps = fps_tracker.iter().sum::<f32>() / fps_tracker.len() as f32;
+        if average_fps.is_finite() {
+            fps_string_renderer.set_string(format!("Average FPS: {average_fps:.1}"));
+        }
+
         shader_program.set_uniform("camera_view", camera.view());
         shader_program.set_uniform("camera_proj", camera.projection());
 
@@ -176,9 +203,14 @@ fn main() {
 
         screen::set_clear_color(sky_color.x(), sky_color.y(), sky_color.z());
         screen::clear();
+
         current_world.render_block_layer(&mut assets);
         block_preview.render(&assets, &current_world);
         current_world.render_entity_layer(&mut assets);
+        shader_program.set_uniform("camera_view", Transform3D::identity());
+        shader_program.set_uniform("camera_proj", gui_projection);
+        fps_string_renderer.render(&assets);
+
         window.swap_buffers();
     }
 }

@@ -19,6 +19,7 @@ pub struct AssetPool {
     entity_texture: Texture2D,
     entity_atlas: ImageAtlas,
     entity_images: HashMap<String, EntityImage>,
+    font_texture: Texture2D,
 }
 
 impl AssetPool {
@@ -37,6 +38,12 @@ impl AssetPool {
         entity_texture.set_wrap_s(TextureWrap::Repeat);
         entity_texture.set_wrap_t(TextureWrap::Repeat);
 
+        let mut font_texture = Texture2D::new(0);
+        font_texture.set_minify_filter(TextureSampling::Nearest);
+        font_texture.set_magnify_filter(TextureSampling::Nearest);
+        font_texture.set_wrap_s(TextureWrap::Repeat);
+        font_texture.set_wrap_t(TextureWrap::Repeat);
+
         let mut assets = Self {
             assets_path: assets_path.into(),
             block_texture,
@@ -45,10 +52,12 @@ impl AssetPool {
             entity_texture,
             entity_atlas: ImageAtlas::new(Default::default()),
             entity_images: HashMap::new(),
+            font_texture,
         };
 
         // Despite the name of the method, this loads block appearances for the first time
         assets.reload_block_appearances()?;
+        assets.reload_font()?;
 
         Ok(assets)
     }
@@ -174,5 +183,15 @@ impl AssetPool {
             self.entity_images.insert(key.into(), entity_image.clone());
             Ok(entity_image)
         }
+    }
+
+    pub fn font_texture(&self) -> &Texture2D {
+        &self.font_texture
+    }
+
+    pub fn reload_font(&mut self) -> Result<(), String> {
+        let font_image = self.load_image(self.get_asset_path("images/font/unicode_0"))?;
+        self.font_texture.upload_image(&font_image);
+        Ok(())
     }
 }
