@@ -1,8 +1,9 @@
 use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
 use crate::tools::*;
+use crate::world::block::CHUNK_SIZE;
 use crate::world::entity::render::EntityRenderer;
-use crate::world::particle::ParticleManager;
+use crate::world::particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
 
 pub mod block;
 pub mod entity;
@@ -74,10 +75,31 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
-    pub fn user_destroy_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize) {
+    pub fn user_destroy_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize, assets: &mut asset::AssetPool) {
         if let Some(mut chunk) = self.chunks.get_mut(chunk_location) {
-            if chunk.block_at(block_x, block_y).block_type() != &block::types::AIR {
+            let block_type = chunk.block_at(block_x, block_y).block_type();
+            if block_type != &block::types::AIR {
                 chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR), &self.chunks, &mut self.physics);
+                // Create particles coming from the center of the destroyed block
+                if let Some(palette) = block_type.palette_key.and_then(|key| assets.get_color_palette(key).ok()) {
+                    let position = Vector([
+                        chunk_location.x() as f32 * CHUNK_SIZE as f32 + block_x as f32 + 0.5,
+                        chunk_location.y() as f32 * CHUNK_SIZE as f32 + block_y as f32 + 0.5,
+                    ]);
+                    for _ in 0..16 {
+                        let velocity = random_unit_vector() * 3.0 + random_unit_vector() * 1.0;
+                        let Some(&color) = choose_random(palette.colors()) else {
+                            continue;
+                        };
+                        self.particles.create_particle(ParticleInfo {
+                            position,
+                            velocity,
+                            color,
+                            size: 2.0,
+                            ..Default::default()
+                        });
+                    }
+                }
             }
         }
     }

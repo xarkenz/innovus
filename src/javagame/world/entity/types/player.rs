@@ -6,7 +6,7 @@ use crate::tools::input::{InputState, Key};
 use crate::world::entity::{movement, Entity};
 use crate::world::entity::render::{EntityPiece, EntityPieceHandle, EntityRenderer};
 use crate::world::entity::types::pixels;
-use crate::world::particle::{ParticleInfo, ParticleManager};
+use crate::world::particle::ParticleManager;
 
 struct PlayerAppearance {
     idle_image: EntityImage,
@@ -122,6 +122,7 @@ impl Entity for Player {
     }
 
     fn update(&mut self, dt: f32, inputs: &InputState, physics: &mut Physics, renderer: &mut EntityRenderer, particles: &mut ParticleManager) {
+        let _ = particles;
         let mut velocity = Vector::zero();
         let mut touching_ground = true;
 
@@ -146,21 +147,6 @@ impl Entity for Player {
             if self.jump_cooldown <= 0.0 {
                 if jump_held && touching_ground {
                     collider.velocity.set_y(self.jump_speed);
-                    particles.create_particle(ParticleInfo {
-                        position: self.position,
-                        velocity: Vector([3.0, 5.0]),
-                        ..Default::default()
-                    });
-                    particles.create_particle(ParticleInfo {
-                        position: self.position,
-                        velocity: Vector([-5.0, 6.0]),
-                        ..Default::default()
-                    });
-                    particles.create_particle(ParticleInfo {
-                        position: self.position,
-                        velocity: Vector([1.0, 4.0]),
-                        ..Default::default()
-                    });
                     self.jump_cooldown += JUMP_COOLDOWN_SECONDS;
                     self.coyote_time = 0.0;
                 }

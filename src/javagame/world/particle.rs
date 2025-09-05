@@ -1,6 +1,26 @@
 use innovus::gfx::color::RGBColor;
 use innovus::gfx::{Geometry, Vertex2D};
 use innovus::tools::Vector;
+use crate::tools::noise::scramble;
+
+pub fn pseudo_random() -> u64 {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos();
+    scramble(nanos as u64)
+}
+
+pub fn random_unit_vector() -> Vector<f32, 2> {
+    let theta = pseudo_random() as f32 / u64::MAX as f32 * std::f32::consts::TAU;
+    Vector([theta.cos(), theta.sin()])
+}
+
+pub fn choose_random<T>(elements: &[T]) -> Option<&T> {
+    (!elements.is_empty()).then(|| {
+        &elements[pseudo_random() as usize % elements.len()]
+    })
+}
 
 pub struct ParticleInfo {
     pub position: Vector<f32, 2>,
@@ -8,6 +28,7 @@ pub struct ParticleInfo {
     pub acceleration: Vector<f32, 2>,
     pub lifetime: f32,
     pub color: RGBColor,
+    pub size: f32,
 }
 
 impl Default for ParticleInfo {
@@ -18,6 +39,7 @@ impl Default for ParticleInfo {
             acceleration: Vector([0.0, -32.0]),
             lifetime: 1.0,
             color: RGBColor::black(),
+            size: 1.0,
         }
     }
 }
@@ -68,7 +90,7 @@ impl ParticleManager {
             let index = vertices.len() as u32;
             let opacity = particle.lifetime.min(1.0);
             for offset in OFFSETS {
-                let position = particle.position + offset / 16.0;
+                let position = particle.position + offset * particle.size / 16.0;
                 vertices.push(Vertex2D::new(
                     [position.x(), position.y(), 0.0],
                     Some([particle.color.r(), particle.color.g(), particle.color.b(), opacity]),

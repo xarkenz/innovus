@@ -94,6 +94,7 @@ pub struct BlockType {
     pub name: &'static str,
     pub attributes: &'static [(&'static str, AttributeType)],
     pub colliders: &'static [Rectangle<i32>],
+    pub palette_key: Option<&'static str>,
     is_full_block: fn(&Block) -> bool,
     light_emission: fn(&Block) -> u8,
     connects_to: fn(&Block, &Block) -> bool,

@@ -156,7 +156,7 @@ fn main() {
                     }
                 }
                 if left_held {
-                    current_world.user_destroy_block(chunk_location, block_x, block_y);
+                    current_world.user_destroy_block(chunk_location, block_x, block_y, &mut assets);
                 }
                 if right_held {
                     current_world.user_place_block(chunk_location, block_x, block_y, world::block::BLOCK_TYPES[selected_block_index]);

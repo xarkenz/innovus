@@ -59,6 +59,7 @@ const DEFAULTS: BlockType = BlockType {
     name: "invalid",
     attributes: &[],
     colliders: &[BLOCK_RECT],
+    palette_key: None,
     is_full_block: full_block_always,
     light_emission: light_emission_0,
     connects_to: connects_never,
@@ -118,11 +119,13 @@ pub static AIR: BlockType = BlockType {
 };
 pub static ALUMINUM_BLOCK: BlockType = BlockType {
     name: "aluminum_block",
+    palette_key: Some("aluminum"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static AMETHYST_BLOCK: BlockType = BlockType {
     name: "amethyst_block",
+    palette_key: Some("amethyst"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
@@ -132,6 +135,7 @@ pub static AMETHYST_CRYSTAL: BlockType = BlockType {
         ("wall", AttributeType::Enum { default_value: 0, value_names: &["bottom", "left", "right", "top"] }),
     ],
     colliders: &[],
+    palette_key: Some("amethyst"),
     is_full_block: full_block_never,
     light_emission: light_emission_5,
     right_click: |block, _| {
@@ -144,117 +148,139 @@ pub static AMETHYST_CRYSTAL: BlockType = BlockType {
 };
 pub static AMETHYST_ORE: BlockType = BlockType {
     name: "amethyst_ore",
+    palette_key: Some("amethyst"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static AMPLIFITE_BLOCK: BlockType = BlockType {
     name: "amplifite_block",
+    palette_key: Some("amplifite"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static COAL_BLOCK: BlockType = BlockType {
     name: "coal_block",
+    palette_key: Some("coal"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static COBALT_BLOCK: BlockType = BlockType {
     name: "cobalt_block",
+    palette_key: Some("cobalt"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static COBBLES: BlockType = BlockType {
     name: "cobbles",
+    palette_key: Some("stone"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static COPPER_BLOCK: BlockType = BlockType {
     name: "copper_block",
+    palette_key: Some("copper"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static COPPER_WIRE: BlockType = BlockType {
     name: "copper_wire",
     colliders: &[],
+    palette_key: Some("copper"),
     is_full_block: full_block_never,
     connects_to: connects_to_electricity,
     ..DEFAULTS
 };
 pub static CORRUPTITE_BLOCK: BlockType = BlockType {
     name: "corruptite_block",
+    palette_key: Some("corruptite"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static DIAMOND_BLOCK: BlockType = BlockType {
     name: "diamond_block",
+    palette_key: Some("diamond"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static DIRT: BlockType = BlockType {
     name: "dirt",
+    palette_key: Some("dirt"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static EMERALD_BLOCK: BlockType = BlockType {
     name: "emerald_block",
+    palette_key: Some("emerald"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static FLAMARITE_BLOCK: BlockType = BlockType {
     name: "flamarite_block",
+    palette_key: Some("flamarite"),
     light_emission: light_emission_5,
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static FRIGIDITE_BLOCK: BlockType = BlockType {
     name: "frigidite_block",
+    palette_key: Some("frigidite"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static GLASS: BlockType = BlockType {
     name: "glass",
+    palette_key: Some("glass"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static GOLD_BLOCK: BlockType = BlockType {
     name: "gold_block",
+    palette_key: Some("gold"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static GOLD_WIRE: BlockType = BlockType {
     name: "gold_wire",
     colliders: &[],
+    palette_key: Some("gold"),
     is_full_block: full_block_never,
     connects_to: connects_to_electricity,
     ..DEFAULTS
 };
 pub static GRASSY_DIRT: BlockType = BlockType {
     name: "grassy_dirt",
+    palette_key: Some("dirt"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static IRON_BLOCK: BlockType = BlockType {
     name: "iron_block",
+    palette_key: Some("iron"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static LUMINITE_BLOCK: BlockType = BlockType {
     name: "luminite_block",
+    palette_key: Some("luminite"),
     light_emission: light_emission_15,
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static MAGMIUM_BLOCK: BlockType = BlockType {
     name: "magmium_block",
+    palette_key: Some("magmium"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static OBSIDIAN_BLOCK: BlockType = BlockType {
     name: "obsidian_block",
+    palette_key: Some("obsidian"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static PHYLUMUS_BLOCK: BlockType = BlockType {
     name: "phylumus_block",
+    palette_key: Some("phylumus"),
     light_emission: light_emission_15,
     connects_to: connects_to_full_block,
     ..DEFAULTS
@@ -265,6 +291,7 @@ pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
         ("shape", AttributeType::Enum { default_value: 0, value_names: &["center", "left", "right"] }),
     ],
     colliders: &[],
+    palette_key: Some("phylumus"),
     is_full_block: full_block_never,
     light_emission: |block| {
         let shape = block.attribute_value(0).expect_u8();
@@ -281,12 +308,14 @@ pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
 pub static PIPE: BlockType = BlockType {
     name: "pipe",
     colliders: &[],
+    palette_key: Some("aluminum"),
     is_full_block: full_block_never,
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static QUARTZ_BLOCK: BlockType = BlockType {
     name: "quartz_block",
+    palette_key: Some("quartz"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
@@ -296,6 +325,7 @@ pub static QUARTZ_CRYSTAL: BlockType = BlockType {
         ("wall", AttributeType::Enum { default_value: 0, value_names: &["bottom", "left", "right", "top"] }),
     ],
     colliders: &[],
+    palette_key: Some("quartz"),
     is_full_block: full_block_never,
     light_emission: light_emission_5,
     right_click: |block, _| {
@@ -308,36 +338,43 @@ pub static QUARTZ_CRYSTAL: BlockType = BlockType {
 };
 pub static QUARTZ_ORE: BlockType = BlockType {
     name: "quartz_ore",
+    palette_key: Some("quartz"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static SAND: BlockType = BlockType {
     name: "sand",
+    palette_key: Some("sand"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static SANDSTONE: BlockType = BlockType {
     name: "sandstone",
+    palette_key: Some("sand"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static SLATE: BlockType = BlockType {
     name: "slate",
+    palette_key: Some("slate"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static STEEL_BLOCK: BlockType = BlockType {
     name: "steel_block",
+    palette_key: Some("steel"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static STONE: BlockType = BlockType {
     name: "stone",
+    palette_key: Some("stone"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static VERSATILIUM_BLOCK: BlockType = BlockType {
     name: "versatilium_block",
+    palette_key: Some("versatilium"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
@@ -346,6 +383,7 @@ pub static VOLTAGITE_BATTERY: BlockType = BlockType {
     attributes: &[
         ("charge", AttributeType::U8(0)),
     ],
+    palette_key: Some("voltagite"),
     light_emission: |block| block.attribute_value(0).expect_u8(),
     connects_to: connects_to_electricity,
     right_click: |block, _| {
@@ -358,6 +396,7 @@ pub static VOLTAGITE_BATTERY: BlockType = BlockType {
 };
 pub static VOLTAGITE_BLOCK: BlockType = BlockType {
     name: "voltagite_block",
+    palette_key: Some("voltagite"),
     light_emission: light_emission_5,
     connects_to: connects_to_same_type,
     ..DEFAULTS
