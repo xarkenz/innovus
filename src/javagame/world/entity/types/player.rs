@@ -1,12 +1,13 @@
-use crate::tools::*;
 use innovus::tools::phys::Physics;
+use crate::tools::*;
 use crate::tools::asset::AssetPool;
 use crate::tools::asset::entity::EntityImage;
 use crate::tools::input::{InputState, Key};
+use crate::world::block::{BlockType, ChunkMap};
 use crate::world::entity::{movement, Entity};
 use crate::world::entity::render::{EntityPiece, EntityPieceHandle, EntityRenderer};
-use crate::world::entity::types::pixels;
 use crate::world::particle::ParticleManager;
+use super::*;
 
 struct PlayerAppearance {
     idle_image: EntityImage,
@@ -27,6 +28,7 @@ pub struct Player {
     collider: Option<phys::ColliderHandle>,
     appearance: Option<PlayerAppearance>,
     name: String,
+    held_item: &'static BlockType,
     crouching: bool,
     spawn_point: Option<Vector<i64, 2>>,
     movement_accel: f32,
@@ -43,6 +45,7 @@ impl Player {
             collider: None,
             appearance: None,
             name: name.unwrap_or_else(|| "(anonymous)".into()),
+            held_item: &crate::world::block::types::AIR,
             crouching: false,
             spawn_point: None,
             movement_accel: 32.0,
@@ -86,6 +89,14 @@ impl Entity for Player {
         self.collider.as_ref()
     }
 
+    fn held_item(&self) -> &'static BlockType {
+        self.held_item
+    }
+
+    fn set_held_item(&mut self, block_type: &'static BlockType) {
+        self.held_item = block_type;
+    }
+
     fn init_collision(&mut self, physics: &mut Physics) {
         self.collider = Some(physics.add_collider(phys::Collider::new(
             Rectangle::from_size(
@@ -121,8 +132,17 @@ impl Entity for Player {
         });
     }
 
-    fn update(&mut self, dt: f32, inputs: &InputState, physics: &mut Physics, renderer: &mut EntityRenderer, particles: &mut ParticleManager) {
-        let _ = particles;
+    fn update(
+        &mut self,
+        dt: f32,
+        inputs: &InputState,
+        physics: &mut Physics,
+        renderer: &mut EntityRenderer,
+        chunks: &mut ChunkMap,
+        particles: &mut ParticleManager,
+    ) {
+        let _ = (chunks, particles);
+
         let mut velocity = Vector::zero();
         let mut touching_ground = true;
 

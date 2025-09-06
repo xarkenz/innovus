@@ -30,10 +30,29 @@ const fn get_mouse_button_index(button: MouseButton) -> Option<usize> {
     }
 }
 
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+enum ButtonState {
+    Pressed,
+    Held,
+    Released,
+    Idle,
+}
+
+impl ButtonState {
+    fn stabilize(&mut self) {
+        *self = match *self {
+            ButtonState::Pressed => ButtonState::Held,
+            ButtonState::Released => ButtonState::Idle,
+            state => state
+        }
+    }
+}
+
 pub struct InputState {
     event_receiver: WindowEventReceiver,
-    held_keys: [bool; KEY_ARRAY_SIZE],
-    held_mouse_buttons: [bool; MOUSE_BUTTON_ARRAY_SIZE],
+    keys: [ButtonState; KEY_ARRAY_SIZE],
+    mouse_buttons: [ButtonState; MOUSE_BUTTON_ARRAY_SIZE],
     cursor_pos: Vector<f64, 2>,
 }
 
@@ -41,13 +60,20 @@ impl InputState {
     pub fn new(event_receiver: WindowEventReceiver) -> Self {
         Self {
             event_receiver,
-            held_keys: [false; KEY_ARRAY_SIZE],
-            held_mouse_buttons: [false; MOUSE_BUTTON_ARRAY_SIZE],
+            keys: [ButtonState::Idle; KEY_ARRAY_SIZE],
+            mouse_buttons: [ButtonState::Idle; MOUSE_BUTTON_ARRAY_SIZE],
             cursor_pos: Vector::zero(),
         }
     }
 
     pub fn process_events(&mut self, application: &mut Application) -> Vec<WindowEvent> {
+        for state in &mut self.keys {
+            state.stabilize();
+        }
+        for state in &mut self.mouse_buttons {
+            state.stabilize();
+        }
+
         application.poll_events();
         let events: Vec<_> = glfw::flush_messages(&self.event_receiver)
             .map(|(_time, event)| event)
@@ -67,8 +93,8 @@ impl InputState {
         let _ = mods;
         if let Some(key_index) = get_key_index(key) {
             match action {
-                Action::Press => self.held_keys[key_index] = true,
-                Action::Release => self.held_keys[key_index] = false,
+                Action::Press => self.keys[key_index] = ButtonState::Pressed,
+                Action::Release => self.keys[key_index] = ButtonState::Released,
                 _ => {}
             }
         }
@@ -78,8 +104,8 @@ impl InputState {
         let _ = mods;
         if let Some(button_index) = get_mouse_button_index(button) {
             match action {
-                Action::Press => self.held_mouse_buttons[button_index] = true,
-                Action::Release => self.held_mouse_buttons[button_index] = false,
+                Action::Press => self.mouse_buttons[button_index] = ButtonState::Pressed,
+                Action::Release => self.mouse_buttons[button_index] = ButtonState::Released,
                 _ => {}
             }
         }
@@ -90,13 +116,39 @@ impl InputState {
     }
 
     pub fn key_is_held(&self, key: Key) -> bool {
-        get_key_index(key)
-            .is_some_and(|key_index| self.held_keys[key_index])
+        get_key_index(key).is_some_and(|key_index| {
+            matches!(self.keys[key_index], ButtonState::Pressed | ButtonState::Held)
+        })
+    }
+
+    pub fn key_was_pressed(&self, key: Key) -> bool {
+        get_key_index(key).is_some_and(|key_index| {
+            matches!(self.keys[key_index], ButtonState::Pressed)
+        })
+    }
+
+    pub fn key_was_released(&self, key: Key) -> bool {
+        get_key_index(key).is_some_and(|key_index| {
+            matches!(self.keys[key_index], ButtonState::Released)
+        })
     }
 
     pub fn mouse_button_is_held(&self, button: MouseButton) -> bool {
-        get_mouse_button_index(button)
-            .is_some_and(|button_index| self.held_mouse_buttons[button_index])
+        get_mouse_button_index(button).is_some_and(|button_index| {
+            matches!(self.mouse_buttons[button_index], ButtonState::Pressed | ButtonState::Held)
+        })
+    }
+
+    pub fn mouse_button_was_pressed(&self, button: MouseButton) -> bool {
+        get_mouse_button_index(button).is_some_and(|button_index| {
+            matches!(self.mouse_buttons[button_index], ButtonState::Pressed)
+        })
+    }
+
+    pub fn mouse_button_was_released(&self, button: MouseButton) -> bool {
+        get_mouse_button_index(button).is_some_and(|button_index| {
+            matches!(self.mouse_buttons[button_index], ButtonState::Released)
+        })
     }
 
     pub fn cursor_pos(&self) -> Vector<f64, 2> {

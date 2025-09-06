@@ -506,14 +506,14 @@ impl ChunkMap {
         self.chunks.keys().copied()
     }
 
-    pub fn tick(&mut self, chunk_loader_pos: Option<Vector<f32, 2>>, physics: &mut Physics) {
+    pub fn tick(&mut self, player_pos: Option<Vector<f32, 2>>, physics: &mut Physics) {
         let locations_to_unload: Vec<ChunkLocation>;
         let locations_to_detach: Vec<ChunkLocation>;
 
-        if let Some(world_pos) = chunk_loader_pos {
+        if let Some(player_pos) = player_pos {
             let center_chunk_location = Vector([
-                world_pos.x().div_euclid(CHUNK_SIZE as f32) as i64,
-                world_pos.y().div_euclid(CHUNK_SIZE as f32) as i64,
+                player_pos.x().div_euclid(CHUNK_SIZE as f32) as i64,
+                player_pos.y().div_euclid(CHUNK_SIZE as f32) as i64,
             ]);
 
             let mut chunk_load_range = self.chunk_load_range;

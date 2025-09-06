@@ -1,6 +1,7 @@
 use crate::tools::*;
 use innovus::tools::phys::Physics;
 use crate::tools::input::{InputState, Key};
+use crate::world::block::{BlockType, ChunkMap};
 use crate::world::entity::{movement, Entity};
 use crate::world::entity::render::{EntityRenderer};
 use crate::world::particle::ParticleManager;
@@ -10,6 +11,7 @@ pub struct Spectator {
     position: Vector<f32, 2>,
     velocity: Vector<f32, 2>,
     name: String,
+    held_item: &'static BlockType,
     movement_accel: f32,
 }
 
@@ -20,6 +22,7 @@ impl Spectator {
             position,
             velocity: Vector::zero(),
             name: name.unwrap_or_else(|| "(anonymous)".into()),
+            held_item: &crate::world::block::types::AIR,
             movement_accel: 32.0,
         }
     }
@@ -42,8 +45,20 @@ impl Entity for Spectator {
         self.position
     }
 
-    fn update(&mut self, dt: f32, inputs: &InputState, physics: &mut Physics, renderer: &mut EntityRenderer, particles: &mut ParticleManager) {
-        let _ = (physics, renderer, particles);
+    fn held_item(&self) -> &'static BlockType {
+        self.held_item
+    }
+
+    fn update(
+        &mut self,
+        dt: f32,
+        inputs: &InputState,
+        physics: &mut Physics,
+        renderer: &mut EntityRenderer,
+        chunks: &mut ChunkMap,
+        particles: &mut ParticleManager,
+    ) {
+        let _ = (physics, renderer, chunks, particles);
 
         const SPEED_LIMIT: f32 = 20.0;
 

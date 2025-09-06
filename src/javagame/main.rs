@@ -41,7 +41,7 @@ fn main() {
     let player = world::entity::types::Player::new(player_start, None);
     let player_uuid = world::entity::Entity::uuid(&player);
     current_world.add_entity(Box::new(player), &mut assets);
-    current_world.set_chunk_loader_entity(Some(player_uuid));
+    current_world.set_player_entity(Some(player_uuid));
 
     let mut camera = view::Camera::new(
         player_start,
@@ -52,11 +52,6 @@ fn main() {
         }),
         64.0,
         5.0,
-    );
-    let mut block_preview = view::block_preview::BlockPreview::new(
-        Vector::zero(),
-        &world::block::types::AIR,
-        0.4,
     );
     let mut fps_string_renderer = view::text::StringRenderer::new(
         Vector::zero(),
@@ -72,7 +67,6 @@ fn main() {
             index = index.rem_euclid(world::block::BLOCK_TYPES.len() as isize);
         }
         let index = index as usize;
-        println!("placing {}", world::block::BLOCK_TYPES[index].name);
         index
     }
     let mut selected_block_index = select_block_index(0, 1);
@@ -167,13 +161,12 @@ fn main() {
             last_block_pos = None;
         }
 
-        current_world.update(&input_state, dt);
-        // Update block preview
-        block_preview.set_position(world_pos);
-        block_preview.set_block_type(world::block::BLOCK_TYPES[selected_block_index]);
-        // Move camera towards player
-        camera.set_target(current_world.get_entity(player_uuid).unwrap().position());
+        let player = current_world.get_entity_mut(player_uuid).unwrap();
+        player.set_held_item(world::block::BLOCK_TYPES[selected_block_index]);
+        camera.set_target(player.position());
         camera.update(dt);
+        current_world.set_cursor_pos(world_pos);
+        current_world.update(&input_state, dt);
 
         let average_fps = fps_tracker.iter().sum::<f32>() / fps_tracker.len() as f32;
         if average_fps.is_finite() {
@@ -204,9 +197,7 @@ fn main() {
         screen::set_clear_color(sky_color.x(), sky_color.y(), sky_color.z());
         screen::clear();
 
-        current_world.render_block_layer(&mut assets);
-        block_preview.render(&assets, &current_world);
-        current_world.render_entity_layer(&mut assets);
+        current_world.render(&assets);
         shader_program.set_uniform("camera_view", Transform3D::identity());
         shader_program.set_uniform("camera_proj", gui_projection);
         fps_string_renderer.render(&assets);

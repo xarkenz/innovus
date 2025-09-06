@@ -1,8 +1,7 @@
 use innovus::gfx::{Geometry, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::asset::AssetPool;
-use crate::world::block::{self, Block, BlockType, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
-use crate::world::World;
+use crate::world::block::{self, Block, BlockType, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
 
 pub struct BlockPreview {
     position: Vector<f32, 2>,
@@ -45,12 +44,12 @@ impl BlockPreview {
         self.opacity = opacity;
     }
 
-    pub fn render(&mut self, assets: &AssetPool, world: &World) {
+    pub fn render(&mut self, assets: &AssetPool, chunks: &ChunkMap) {
         let chunk_location = Vector([
             self.position.x().div_euclid(CHUNK_SIZE as f32) as i64,
             self.position.y().div_euclid(CHUNK_SIZE as f32) as i64,
         ]);
-        let Some(chunk) = world.get_chunk(chunk_location) else {
+        let Some(chunk) = chunks.get(chunk_location) else {
             return;
         };
 
@@ -64,7 +63,7 @@ impl BlockPreview {
 
         let block = Block::new(self.block_type);
         if let Some(image) = assets.get_block_image(&block, chunk_location, block_x, block_y) {
-            let atlas_offsets = image.get_quadrant_atlas_offsets(world.chunks(), &*chunk, &block, block_x, block_y);
+            let atlas_offsets = image.get_quadrant_atlas_offsets(chunks, &*chunk, &block, block_x, block_y);
             let block_origin = self.position.map(f32::floor);
 
             let mut vertices = Vec::new();

@@ -236,40 +236,63 @@ pub enum ProgramPreset {
 
 pub struct Program {
     id: GLuint,
+    attached_shader_ids: Vec<GLuint>,
 }
 
 impl Program {
-    pub fn from_shaders(shaders: &[Shader]) -> Result<Self, String> {
+    pub fn create() -> Result<Self, String> {
         let id = unsafe { gl::CreateProgram() };
         if id == 0 {
-            return Err("Program::from_shaders(): failed to create GL program.".into());
+            Err("Program::new(): failed to create GL program.".into())
         }
-        let program = Self { id };
-
-        for shader in shaders {
-            unsafe {
-                gl::AttachShader(id, shader.id());
-            }
+        else {
+            Ok(Self {
+                id,
+                attached_shader_ids: Vec::new(),
+            })
         }
+    }
 
+    pub fn attach_shader(&mut self, shader: &Shader) {
+        if self.attached_shader_ids.contains(&shader.id()) {
+            // This would normally generate GL_INVALID_OPERATION, but we can just let it slide
+            return;
+        }
         unsafe {
-            gl::LinkProgram(id);
+            gl::AttachShader(self.id, shader.id());
+        }
+        self.attached_shader_ids.push(shader.id());
+    }
+
+    pub fn link(&mut self) -> Result<(), String> {
+        unsafe {
+            gl::LinkProgram(self.id);
         }
 
         let mut success: GLint = 1;
         unsafe {
-            gl::GetProgramiv(id, gl::LINK_STATUS, &mut success);
+            gl::GetProgramiv(self.id, gl::LINK_STATUS, &mut success);
         }
         if success == 0 {
-            return Err(program.get_info_log());
+            return Err(self.get_info_log());
         }
 
-        for shader in shaders {
+        for &shader_id in &self.attached_shader_ids {
             unsafe {
-                gl::DetachShader(id, shader.id());
+                gl::DetachShader(self.id, shader_id);
             }
         }
+        self.attached_shader_ids = Vec::new();
 
+        Ok(())
+    }
+
+    pub fn with_linked_shaders<'a>(shaders: impl IntoIterator<Item = &'a Shader>) -> Result<Self, String> {
+        let mut program = Self::create()?;
+        for shader in shaders {
+            program.attach_shader(shader);
+        }
+        program.link()?;
         Ok(program)
     }
 
@@ -277,7 +300,7 @@ impl Program {
         let fetch_source = |path| std::fs::read_to_string(path)
             .map_err(|err| err.to_string());
 
-        Self::from_shaders(&match preset {
+        Self::with_linked_shaders(&match preset {
             ProgramPreset::Default2DShader => vec![
                 Shader::create(
                     &fetch_source("./src/innovus/assets/default2d.v.glsl")?,
@@ -342,7 +365,7 @@ impl Program {
             }
 
             // It should be valid UTF-8, but check it to be sure
-            String::from_utf8(info_log).unwrap()
+            String::from_utf8_lossy(&info_log).into()
         }
     }
 

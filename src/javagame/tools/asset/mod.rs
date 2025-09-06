@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use json::JsonValue;
-use innovus::gfx::{Image, ImageAtlas, Texture2D, TextureSampling, TextureWrap};
+use innovus::gfx::{Image, ImageAtlas, Program, ProgramPreset, Shader, ShaderType, Texture2D, TextureSampling, TextureWrap};
 use innovus::gfx::color::ColorPalette;
 use innovus::tools::Rectangle;
 use crate::tools::asset::block::{BlockAppearance, BlockImage};
@@ -15,9 +15,11 @@ pub mod anim;
 
 pub struct AssetPool {
     assets_path: PathBuf,
+    default_shaders: Program,
     block_texture: Texture2D,
     block_atlas: ImageAtlas,
     block_appearances: HashMap<*const BlockType, BlockAppearance>,
+    block_shaders: Program,
     entity_texture: Texture2D,
     entity_atlas: ImageAtlas,
     entity_images: HashMap<String, EntityImage>,
@@ -49,9 +51,11 @@ impl AssetPool {
 
         let mut assets = Self {
             assets_path: assets_path.into(),
+            default_shaders: Program::from_preset(ProgramPreset::Default2DShader)?,
             block_texture,
             block_atlas: ImageAtlas::new(Default::default()),
             block_appearances: HashMap::new(),
+            block_shaders: Program::create()?,
             entity_texture,
             entity_atlas: ImageAtlas::new(Default::default()),
             entity_images: HashMap::new(),
@@ -59,9 +63,8 @@ impl AssetPool {
             color_palettes: HashMap::new(),
         };
 
-        // Despite the name of the method, this loads block appearances for the first time
-        assets.reload_block_appearances()?;
-        assets.reload_font()?;
+        // Despite the name of the method, this loads everything for the first time
+        assets.reload()?;
 
         Ok(assets)
     }
@@ -87,12 +90,21 @@ impl AssetPool {
             .map_err(|err| format!("failed to parse JSON asset at '{}': {err}", path.display()))
     }
 
+    pub fn load_text(&self, path: impl AsRef<Path>) -> Result<String, String> {
+        std::fs::read_to_string(path).map_err(|err| err.to_string())
+    }
+
     pub fn reload(&mut self) -> Result<(), String> {
         self.reload_block_appearances()?;
         self.clear_entity_images();
         self.reload_font()?;
         self.clear_color_palettes();
+        self.reload_shaders()?;
         Ok(())
+    }
+
+    pub fn default_shaders(&self) -> &Program {
+        &self.default_shaders
     }
 
     pub fn block_atlas(&self) -> &ImageAtlas {
@@ -164,6 +176,10 @@ impl AssetPool {
         self.get_block_appearance(block.block_type()).get_image(block, chunk_location, x, y)
     }
 
+    pub fn block_shaders(&self) -> &Program {
+        &self.block_shaders
+    }
+
     pub fn entity_atlas(&self) -> &ImageAtlas {
         &self.entity_atlas
     }
@@ -221,5 +237,19 @@ impl AssetPool {
 
     pub fn clear_color_palettes(&mut self) {
         self.color_palettes.clear();
+    }
+
+    pub fn reload_shaders(&mut self) -> Result<(), String> {
+        self.block_shaders.attach_shader(&Shader::create(
+            &self.load_text(self.get_asset_path("shaders/block.v.glsl"))?,
+            ShaderType::Vertex,
+        )?);
+        self.block_shaders.attach_shader(&Shader::create(
+            &self.load_text(self.get_asset_path("shaders/block.f.glsl"))?,
+            ShaderType::Fragment,
+        )?);
+        self.block_shaders.link()?;
+
+        Ok(())
     }
 }

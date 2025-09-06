@@ -1,6 +1,7 @@
 use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
 use crate::tools::*;
+use crate::view::block_preview::BlockPreview;
 use crate::world::block::CHUNK_SIZE;
 use crate::world::entity::render::EntityRenderer;
 use crate::world::particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
@@ -13,25 +14,27 @@ pub mod particle;
 pub const SECONDS_PER_TICK: f32 = 0.05;
 
 pub struct World<'world> {
+    seconds_since_last_tick: f32,
     physics: phys::Physics,
     chunks: block::ChunkMap,
     entities: HashMap<Uuid, Box<dyn entity::Entity + 'world>>,
     entity_renderer: EntityRenderer,
-    seconds_since_last_tick: f32,
-    chunk_loader_entity: Option<Uuid>,
+    player_entity: Option<Uuid>,
     particles: ParticleManager,
+    block_preview: BlockPreview,
 }
 
 impl<'world> World<'world> where Self: 'world {
     pub fn new(generator: Option<Box<dyn gen::WorldGenerator>>) -> Self {
         Self {
+            seconds_since_last_tick: SECONDS_PER_TICK,
             physics: phys::Physics::new(),
             chunks: block::ChunkMap::new(generator),
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
-            seconds_since_last_tick: SECONDS_PER_TICK,
-            chunk_loader_entity: None,
+            player_entity: None,
             particles: ParticleManager::new(),
+            block_preview: BlockPreview::new(Vector::zero(), &block::types::AIR, 0.4)
         }
     }
 
@@ -128,8 +131,12 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
-    pub fn set_chunk_loader_entity(&mut self, entity: Option<Uuid>) {
-        self.chunk_loader_entity = entity;
+    pub fn set_player_entity(&mut self, entity: Option<Uuid>) {
+        self.player_entity = entity;
+    }
+
+    pub fn set_cursor_pos(&mut self, world_pos: Vector<f32, 2>) {
+        self.block_preview.set_position(world_pos);
     }
 
     pub fn reload_assets(&mut self, assets: &mut asset::AssetPool) {
@@ -150,7 +157,14 @@ impl<'world> World<'world> where Self: 'world {
             self.tick();
         }
         for entity in self.entities.values_mut() {
-            entity.update(dt, inputs, &mut self.physics, &mut self.entity_renderer, &mut self.particles);
+            entity.update(
+                dt,
+                inputs,
+                &mut self.physics,
+                &mut self.entity_renderer,
+                &mut self.chunks,
+                &mut self.particles,
+            );
         }
         self.physics.step_simulation(dt);
         self.particles.update(dt);
@@ -159,22 +173,30 @@ impl<'world> World<'world> where Self: 'world {
     fn tick(&mut self) {
         self.entity_renderer.tick();
 
-        let chunk_loader_pos = self.chunk_loader_entity
+        let player = self.player_entity
             .as_ref()
-            .and_then(|uuid| self.entities.get(uuid))
-            .map(|entity| entity.position());
-        self.chunks.tick(chunk_loader_pos, &mut self.physics);
+            .and_then(|uuid| self.entities.get(uuid));
+
+        if let Some(held_item) = player.map(|player| player.held_item()) {
+            self.block_preview.set_block_type(held_item);
+        }
+        else {
+            self.block_preview.set_block_type(&block::types::AIR);
+        }
+
+        let player_position = player.map(|player| player.position());
+        self.chunks.tick(player_position, &mut self.physics);
     }
 
-    pub fn render_block_layer(&mut self, assets: &asset::AssetPool) {
+    pub fn render(&mut self, assets: &asset::AssetPool) {
         assets.block_texture().bind();
         for mut chunk in self.chunks.iter_mut() {
             chunk.render(assets, &self.chunks);
         }
-        self.particles.render();
-    }
 
-    pub fn render_entity_layer(&mut self, assets: &asset::AssetPool) {
+        self.particles.render();
+        self.block_preview.render(assets, &self.chunks);
+
         assets.entity_texture().bind();
         self.entity_renderer.render_all();
     }
