@@ -10,7 +10,7 @@ pub struct EntityPiece {
     world_position: Vector<f32, 2>,
     image: EntityImage,
     visible: bool,
-    color: [f32; 4],
+    color: Vector<f32, 4>,
     flip_x: bool,
     flip_y: bool,
     frame: u32,
@@ -25,7 +25,7 @@ impl EntityPiece {
             world_position,
             image: initial_image,
             visible: true,
-            color: [1.0; 4],
+            color: Vector::one(),
             flip_x: false,
             flip_y: true,
             frame: 0,
@@ -75,11 +75,11 @@ impl EntityPiece {
         self.visible = visible;
     }
 
-    pub fn color(&self) -> [f32; 4] {
+    pub fn color(&self) -> Vector<f32, 4> {
         self.color
     }
 
-    pub fn set_color(&mut self, color: [f32; 4]) {
+    pub fn set_color(&mut self, color: Vector<f32, 4>) {
         self.dirty = self.dirty || color != self.color;
         self.color = color;
     }
@@ -259,7 +259,7 @@ impl RendererBatch {
             for _ in 0..PIECES_PER_BATCH {
                 let index = vertices.len() as u32;
                 for _ in 0..4 {
-                    vertices.push(Vertex2D::new([0.0; 3], Some([0.0; 4]), None));
+                    vertices.push(Vertex2D::new(Vector::zero(), None, None));
                 }
                 faces.push([index + 0, index + 1, index + 2]);
                 faces.push([index + 2, index + 3, index + 0]);
@@ -271,7 +271,7 @@ impl RendererBatch {
         for (handle, piece) in self.pieces.values_mut() {
             if piece.is_dirty() {
                 any_changed = true;
-                let color = if piece.is_visible() { piece.color() } else { [0.0; 4] };
+                let color = if piece.is_visible() { piece.color() } else { Vector::zero() };
                 let bounds = piece.get_world_bounds();
                 let atlas_region = piece.atlas_region();
                 let vertices = [
@@ -282,11 +282,11 @@ impl RendererBatch {
                 ];
                 let mut vertex_index = handle.slot * 4;
                 for (position, uv) in vertices {
-                    self.geometry.set_vertex(vertex_index, &Vertex2D::new(
-                        [position.x(), position.y(), 1.0],
-                        Some(color),
-                        Some([uv.x() as f32, uv.y() as f32]),
-                    ));
+                    let vertex = self.geometry.vertex_at_mut(vertex_index);
+                    vertex.pos = position.with_z(1.0);
+                    vertex.color = color;
+                    vertex.tex = 1;
+                    vertex.uv = uv.map(|x| x as f32);
                     vertex_index += 1;
                 }
                 piece.set_dirty(false);

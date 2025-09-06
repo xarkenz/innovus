@@ -5,9 +5,7 @@ use super::tools::{Matrix, Transform3D, Vector};
 use gl::types::*;
 use std::error::Error;
 use std::ffi::CString;
-use std::fmt;
-use std::marker::PhantomData;
-use std::mem::{size_of, swap};
+use std::mem::{offset_of, size_of, swap};
 use std::num::{ParseFloatError, ParseIntError};
 use std::path::Path;
 use std::str::FromStr;
@@ -366,153 +364,131 @@ impl Drop for Program {
     }
 }
 
-pub trait Vertex {
-    const SIZE: usize;
-    const ATTRIBUTE_SIZES: &'static [usize];
-
-    fn to_raw_data(&self) -> Vec<f32>;
-    fn from_raw_data(data: &[f32]) -> Self;
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum VertexAttributeType {
+    F32 = gl::FLOAT as isize,
+    I32 = gl::INT as isize,
+    U32 = gl::UNSIGNED_INT as isize,
 }
 
+pub struct VertexAttribute {
+    pub data_type: VertexAttributeType,
+    pub component_count: usize,
+    pub offset: usize,
+}
+
+impl VertexAttribute {
+    pub const fn new(data_type: VertexAttributeType, count: usize, offset: usize) -> Self {
+        Self {
+            data_type,
+            component_count: count,
+            offset,
+        }
+    }
+}
+
+pub trait Vertex : Clone {
+    const ATTRIBUTES: &'static [VertexAttribute];
+}
+
+#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Vertex3D {
-    pub pos: [f32; 3],
-    pub color: [f32; 4],
-    pub tex: bool,
-    pub uv: [f32; 2],
-    pub norm: [f32; 3],
+    pub pos: Vector<f32, 3>,
+    pub color: Vector<f32, 4>,
+    pub tex: u32,
+    pub uv: Vector<f32, 2>,
+    pub norm: Vector<f32, 3>,
 }
 
 impl Vertex3D {
     pub fn new(
-        pos: [f32; 3],
-        color: Option<[f32; 4]>,
-        uv: Option<[f32; 2]>,
-        norm: Option<[f32; 3]>,
-    ) -> Vertex3D {
-        Vertex3D {
+        pos: Vector<f32, 3>,
+        color: Option<Vector<f32, 4>>,
+        uv: Option<Vector<f32, 2>>,
+        norm: Option<Vector<f32, 3>>,
+    ) -> Self {
+        Self {
             pos,
-            color: color.unwrap_or([1.0; 4]),
-            tex: uv.is_some(),
-            uv: uv.unwrap_or([0.0; 2]),
-            norm: norm.unwrap_or([0.0; 3]),
+            color: color.unwrap_or(Vector::one()),
+            tex: uv.is_some() as u32,
+            uv: uv.unwrap_or(Vector::zero()),
+            norm: norm.unwrap_or(Vector::zero()),
         }
     }
 
-    pub fn colored(pos: [f32; 3], color: [f32; 4]) -> Vertex3D {
+    pub fn colored(pos: Vector<f32, 3>, color: Vector<f32, 4>) -> Vertex3D {
         Vertex3D {
             pos,
             color,
-            tex: false,
-            uv: [0.0; 2],
-            norm: [0.0; 3],
+            tex: 0,
+            uv: Vector::zero(),
+            norm: Vector::zero(),
         }
     }
 
-    pub fn textured(pos: [f32; 3], uv: [f32; 2]) -> Vertex3D {
+    pub fn textured(pos: Vector<f32, 3>, uv: Vector<f32, 2>) -> Vertex3D {
         Vertex3D {
             pos,
-            color: [1.0; 4],
-            tex: true,
+            color: Vector::one(),
+            tex: 1,
             uv,
-            norm: [0.0; 3],
+            norm: Vector::zero(),
         }
     }
 
-    pub fn combined(pos: [f32; 3], color: [f32; 4], uv: [f32; 2]) -> Vertex3D {
+    pub fn combined(pos: Vector<f32, 3>, color: Vector<f32, 4>, uv: Vector<f32, 2>) -> Vertex3D {
         Vertex3D {
             pos,
             color,
-            tex: true,
+            tex: 1,
             uv,
-            norm: [0.0; 3],
+            norm: Vector::zero(),
         }
     }
 
     pub fn has_norm(&self) -> bool {
-        self.norm[0] != 0.0 || self.norm[1] != 0.0 || self.norm[2] != 0.0
+        self.norm != Vector::zero()
     }
 }
 
 impl Vertex for Vertex3D {
-    const SIZE: usize = 13;
-    const ATTRIBUTE_SIZES: &'static [usize] = &[3, 4, 1, 2, 3];
-
-    fn to_raw_data(&self) -> Vec<f32> {
-        vec![
-            self.pos[0],
-            self.pos[1],
-            self.pos[2],
-            self.color[0],
-            self.color[1],
-            self.color[2],
-            self.color[3],
-            if self.tex { 1.0 } else { 0.0 },
-            self.uv[0],
-            self.uv[1],
-            self.norm[0],
-            self.norm[1],
-            self.norm[2],
-        ]
-    }
-
-    fn from_raw_data(data: &[f32]) -> Self {
-        Vertex3D {
-            pos: [data[0], data[1], data[2]],
-            color: [data[3], data[4], data[5], data[6]],
-            tex: data[7] != 0.0,
-            uv: [data[8], data[9]],
-            norm: [data[10], data[11], data[12]],
-        }
-    }
+    const ATTRIBUTES: &'static [VertexAttribute] = &[
+        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, pos)),
+        VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
+        VertexAttribute::new(VertexAttributeType::U32, 1, offset_of!(Self, tex)),
+        VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
+        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, norm)),
+    ];
 }
 
+#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Vertex2D {
-    pub pos: [f32; 3],
-    pub color: [f32; 4],
-    pub tex: bool,
-    pub uv: [f32; 2],
+    pub pos: Vector<f32, 3>,
+    pub color: Vector<f32, 4>,
+    pub tex: u32,
+    pub uv: Vector<f32, 2>,
 }
 
 impl Vertex2D {
-    pub fn new(pos: [f32; 3], color: Option<[f32; 4]>, uv: Option<[f32; 2]>) -> Vertex2D {
+    pub fn new(pos: Vector<f32, 3>, color: Option<Vector<f32, 4>>, uv: Option<Vector<f32, 2>>) -> Vertex2D {
         Vertex2D {
             pos,
-            color: color.unwrap_or([1.0; 4]),
-            tex: uv.is_some(),
-            uv: uv.unwrap_or([0.0; 2]),
+            color: color.unwrap_or(Vector::one()),
+            tex: uv.is_some() as u32,
+            uv: uv.unwrap_or(Vector::zero()),
         }
     }
 }
 
 impl Vertex for Vertex2D {
-    const SIZE: usize = 10;
-    const ATTRIBUTE_SIZES: &'static [usize] = &[3, 4, 1, 2];
-
-    fn to_raw_data(&self) -> Vec<f32> {
-        vec![
-            self.pos[0],
-            self.pos[1],
-            self.pos[2],
-            self.color[0],
-            self.color[1],
-            self.color[2],
-            self.color[3],
-            if self.tex { 1.0 } else { 0.0 },
-            self.uv[0],
-            self.uv[1],
-        ]
-    }
-
-    fn from_raw_data(data: &[f32]) -> Self {
-        Vertex2D {
-            pos: [data[0], data[1], data[2]],
-            color: [data[3], data[4], data[5], data[6]],
-            tex: data[7] != 0.0,
-            uv: [data[8], data[9]],
-        }
-    }
+    const ATTRIBUTES: &'static [VertexAttribute] = &[
+        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, pos)),
+        VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
+        VertexAttribute::new(VertexAttributeType::U32, 1, offset_of!(Self, tex)),
+        VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
+    ];
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -528,31 +504,29 @@ pub struct Geometry<V: Vertex> {
     vao: GLuint,
     vbo: GLuint,
     ebo: GLuint,
-    vertices: Vec<f32>,
-    elements: Vec<GLuint>,
-    vertex_count: usize,
-    face_count: usize,
-    vertex_type: PhantomData<*const V>,
+    vertices: Vec<V>,
+    triangles: Vec<[u32; 3]>,
 }
 
 impl<V: Vertex> Geometry<V> {
     pub fn new() -> Self {
-        Geometry {
+        Self {
             vao: 0,
             vbo: 0,
             ebo: 0,
             vertices: Vec::new(),
-            elements: Vec::new(),
-            vertex_count: 0,
-            face_count: 0,
-            vertex_type: PhantomData,
+            triangles: Vec::new(),
         }
     }
 
-    pub fn from_data(vertices: &[V], faces: &[[u32; 3]]) -> Self {
-        let mut geometry = Self::new();
-        geometry.add(vertices, faces);
-        geometry
+    pub fn with_data(vertices: Vec<V>, triangles: Vec<[u32; 3]>) -> Self {
+        Self {
+            vao: 0,
+            vbo: 0,
+            ebo: 0,
+            vertices,
+            triangles,
+        }
     }
 
     pub fn new_render() -> Result<Self, String> {
@@ -591,18 +565,29 @@ impl<V: Vertex> Geometry<V> {
             }
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ebo);
 
-            let mut offset: usize = 0;
-            for (index, &size) in V::ATTRIBUTE_SIZES.iter().enumerate() {
+            for (index, attribute) in V::ATTRIBUTES.iter().enumerate() {
                 gl::EnableVertexAttribArray(index as GLuint);
-                gl::VertexAttribPointer(
-                    index as GLuint,
-                    size as GLint,
-                    gl::FLOAT,
-                    gl::FALSE,
-                    (V::SIZE * size_of::<f32>()) as GLint,
-                    offset as *const GLvoid,
-                );
-                offset += size * size_of::<f32>();
+                match attribute.data_type {
+                    VertexAttributeType::I32 | VertexAttributeType::U32 => {
+                        gl::VertexAttribIPointer(
+                            index as GLuint,
+                            attribute.component_count as GLint,
+                            attribute.data_type as GLenum,
+                            size_of::<V>() as GLsizei,
+                            attribute.offset as *const GLvoid,
+                        );
+                    }
+                    _ => {
+                        gl::VertexAttribPointer(
+                            index as GLuint,
+                            attribute.component_count as GLint,
+                            attribute.data_type as GLenum,
+                            gl::FALSE,
+                            size_of::<V>() as GLsizei,
+                            attribute.offset as *const GLvoid,
+                        );
+                    }
+                }
             }
 
             // Vertex array must be unbound before anything else!
@@ -630,24 +615,24 @@ impl<V: Vertex> Geometry<V> {
         self.ebo
     }
 
-    pub fn vertex_count(&self) -> usize {
-        self.vertex_count
-    }
-
-    pub fn face_count(&self) -> usize {
-        self.face_count
-    }
-
     pub fn is_empty(&self) -> bool {
-        self.vertices.is_empty() && self.elements.is_empty()
+        self.vertices.is_empty() && self.triangles.is_empty()
     }
 
-    pub fn vertex_data(&self) -> Vec<f32> {
-        self.vertices.clone()
+    pub fn vertices(&self) -> &[V] {
+        &self.vertices
     }
 
-    pub fn face_elements(&self) -> Vec<GLuint> {
-        self.elements.clone()
+    pub fn vertices_mut(&mut self) -> &mut [V] {
+        &mut self.vertices
+    }
+
+    pub fn triangles(&self) -> &[[u32; 3]] {
+        &self.triangles
+    }
+
+    pub fn triangles_mut(&mut self) -> &mut [[u32; 3]] {
+        &mut self.triangles
     }
 
     pub fn render(&self) {
@@ -659,7 +644,7 @@ impl<V: Vertex> Geometry<V> {
             gl::BindVertexArray(self.vao);
             gl::DrawElements(
                 gl::TRIANGLES,
-                self.elements.len() as GLsizei,
+                self.triangles.len() as GLsizei * 3,
                 gl::UNSIGNED_INT,
                 std::ptr::null(),
             );
@@ -668,11 +653,8 @@ impl<V: Vertex> Geometry<V> {
     }
 
     pub fn clear(&mut self) {
-        self.vertex_count = 0;
-        self.face_count = 0;
-
         self.vertices.clear();
-        self.elements.clear();
+        self.triangles.clear();
 
         self.update_vertex_buffer();
         self.update_element_buffer();
@@ -684,7 +666,7 @@ impl<V: Vertex> Geometry<V> {
                 gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
                 gl::BufferData(
                     gl::ARRAY_BUFFER,
-                    (self.vertices.len() * size_of::<f32>()) as GLsizeiptr,
+                    (self.vertices.len() * size_of::<V>()) as GLsizeiptr,
                     self.vertices.as_ptr() as *const GLvoid,
                     gl::DYNAMIC_DRAW,
                 );
@@ -699,8 +681,8 @@ impl<V: Vertex> Geometry<V> {
                 gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ebo);
                 gl::BufferData(
                     gl::ELEMENT_ARRAY_BUFFER,
-                    (self.elements.len() * size_of::<GLuint>()) as GLsizeiptr,
-                    self.elements.as_ptr() as *const GLvoid,
+                    (self.triangles.len() * size_of::<[u32; 3]>()) as GLsizeiptr,
+                    self.triangles.as_ptr() as *const GLvoid,
                     gl::DYNAMIC_DRAW,
                 );
                 gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
@@ -710,67 +692,56 @@ impl<V: Vertex> Geometry<V> {
 
     pub fn update_buffer_slice(&self, slice: &GeometrySlice) {
         if slice.vertex_count != 0 {
-            let start = slice.first_vertex * V::SIZE;
-            let size = slice.vertex_count * V::SIZE;
             unsafe {
                 gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
                 gl::BufferSubData(
                     gl::ARRAY_BUFFER,
-                    (start * size_of::<f32>()) as GLintptr,
-                    (size * size_of::<f32>()) as GLsizeiptr,
-                    self.vertices[start..(start + size)].as_ptr() as *const GLvoid,
+                    (slice.first_vertex * size_of::<V>()) as GLintptr,
+                    (slice.vertex_count * size_of::<V>()) as GLsizeiptr,
+                    self.vertices[slice.first_vertex..(slice.first_vertex + slice.vertex_count)]
+                        .as_ptr() as *const GLvoid,
                 );
                 gl::BindBuffer(gl::ARRAY_BUFFER, 0);
             }
         }
         if slice.face_count != 0 {
-            let start = slice.first_face * 3;
-            let size = slice.face_count * 3;
             unsafe {
                 gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ebo);
                 gl::BufferSubData(
                     gl::ELEMENT_ARRAY_BUFFER,
-                    (start * size_of::<GLuint>()) as GLintptr,
-                    (size * size_of::<GLuint>()) as GLsizeiptr,
-                    self.elements[start..(start + size)].as_ptr() as *const GLvoid,
+                    (slice.first_face * size_of::<[u32; 3]>()) as GLintptr,
+                    (slice.face_count * size_of::<[u32; 3]>()) as GLsizeiptr,
+                    self.triangles[slice.first_face..(slice.first_face + slice.face_count)]
+                        .as_ptr() as *const GLvoid,
                 );
                 gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
             }
         }
     }
 
-    pub fn get_vertex(&self, index: usize) -> V {
-        V::from_raw_data(&self.vertices[(index * V::SIZE)..((index + 1) * V::SIZE)])
+    pub fn vertex_at(&self, index: usize) -> &V {
+        &self.vertices[index]
     }
 
-    pub fn set_vertex(&mut self, index: usize, vertex: &V) {
-        self.vertices[(index * V::SIZE)..((index + 1) * V::SIZE)]
-            .copy_from_slice(&vertex.to_raw_data());
+    pub fn vertex_at_mut(&mut self, index: usize) -> &mut V {
+        &mut self.vertices[index]
     }
 
-    pub fn add(&mut self, vertices: &[V], faces: &[[u32; 3]]) -> GeometrySlice {
-        let first_vertex = self.vertex_count;
+    pub fn add(&mut self, vertices: &[V], triangles: &[[u32; 3]]) -> GeometrySlice {
+        let first_vertex = self.vertices.len();
         let vertex_count = vertices.len();
-        let first_face = self.face_count;
-        let face_count = faces.len();
+        let first_face = self.triangles.len();
+        let face_count = triangles.len();
 
-        if !faces.is_empty() {
-            for face in faces {
-                let mut data = face.to_vec();
-                for idx in 0..data.len() {
-                    data[idx] += self.vertex_count as u32;
-                }
-                self.elements.append(&mut data);
-                self.face_count += 1;
+        if !triangles.is_empty() {
+            for &face in triangles {
+                self.triangles.push(face.map(|index| first_vertex as u32 + index))
             }
             self.update_element_buffer();
         }
 
         if !vertices.is_empty() {
-            for vertex in vertices {
-                self.vertices.append(&mut vertex.to_raw_data().to_vec());
-                self.vertex_count += 1;
-            }
+            self.vertices.extend_from_slice(vertices);
             self.update_vertex_buffer();
         }
 
@@ -782,133 +753,103 @@ impl<V: Vertex> Geometry<V> {
         }
     }
 
-    pub fn append(&mut self, geometry: Self) -> GeometrySlice {
-        let first_vertex = self.vertex_count;
-        let vertex_count = geometry.vertex_count();
-        let first_face = self.face_count;
-        let face_count = geometry.face_count();
-
-        let mut vertices = geometry.vertex_data();
-        let mut indices = geometry.face_elements();
-
-        if !indices.is_empty() {
-            for idx in indices.iter_mut() {
-                *idx += self.vertex_count as u32;
-            }
-            self.face_count += indices.len() / 3;
-            self.elements.append(&mut indices);
-            self.update_element_buffer();
-        }
-
-        if !vertices.is_empty() {
-            self.vertex_count += vertices.len() / V::SIZE;
-            self.vertices.append(&mut vertices);
-            self.update_vertex_buffer();
-        }
-
-        GeometrySlice {
-            first_vertex,
-            vertex_count,
-            first_face,
-            face_count,
-        }
+    pub fn add_geometry(&mut self, geometry: &Self) -> GeometrySlice {
+        self.add(geometry.vertices(), geometry.triangles())
     }
 
     pub fn as_slice(&self) -> GeometrySlice {
         GeometrySlice {
             first_vertex: 0,
-            vertex_count: self.vertex_count,
+            vertex_count: self.vertices.len(),
             first_face: 0,
-            face_count: self.face_count,
+            face_count: self.triangles.len(),
         }
     }
 }
 
 impl Geometry<Vertex3D> {
     fn generate_icosahedron(
-        cx: f32,
-        cy: f32,
-        cz: f32,
-        r: f32,
-        color: [f32; 4],
+        center: Vector<f32, 3>,
+        radius: f32,
+        color: Vector<f32, 4>,
     ) -> (Vec<Vertex3D>, Vec<[u32; 3]>) {
         const MINOR: f32 = 0.525731112119133606;
         const MAJOR: f32 = 0.850650808352039932;
-        let minor = MINOR * r;
-        let major = MAJOR * r;
+        let minor = MINOR * radius;
+        let major = MAJOR * radius;
         (
             vec![
                 Vertex3D::new(
-                    [cx - minor, cy, cz + major],
+                    center + Vector([-minor, 0.0, major]),
                     Some(color),
                     None,
-                    Some([-MINOR, 0.0, MAJOR]),
+                    Some(Vector([-MINOR, 0.0, MAJOR])),
                 ),
                 Vertex3D::new(
-                    [cx + minor, cy, cz + major],
+                    center + Vector([minor, 0.0, major]),
                     Some(color),
                     None,
-                    Some([MINOR, 0.0, MAJOR]),
+                    Some(Vector([MINOR, 0.0, MAJOR])),
                 ),
                 Vertex3D::new(
-                    [cx - minor, cy, cz - major],
+                    center + Vector([-minor, 0.0, -major]),
                     Some(color),
                     None,
-                    Some([-MINOR, 0.0, -MAJOR]),
+                    Some(Vector([-MINOR, 0.0, -MAJOR])),
                 ),
                 Vertex3D::new(
-                    [cx + minor, cy, cz - major],
+                    center + Vector([minor, 0.0, -major]),
                     Some(color),
                     None,
-                    Some([MINOR, 0.0, -MAJOR]),
+                    Some(Vector([MINOR, 0.0, -MAJOR])),
                 ),
                 Vertex3D::new(
-                    [cx, cy + major, cz + minor],
+                    center + Vector([0.0, major, minor]),
                     Some(color),
                     None,
-                    Some([0.0, MAJOR, MINOR]),
+                    Some(Vector([0.0, MAJOR, MINOR])),
                 ),
                 Vertex3D::new(
-                    [cx, cy + major, cz - minor],
+                    center + Vector([0.0, major, -minor]),
                     Some(color),
                     None,
-                    Some([0.0, MAJOR, -MINOR]),
+                    Some(Vector([0.0, MAJOR, -MINOR])),
                 ),
                 Vertex3D::new(
-                    [cx, cy - major, cz + minor],
+                    center + Vector([0.0, -major, minor]),
                     Some(color),
                     None,
-                    Some([0.0, -MAJOR, MINOR]),
+                    Some(Vector([0.0, -MAJOR, MINOR])),
                 ),
                 Vertex3D::new(
-                    [cx, cy - major, cz - minor],
+                    center + Vector([0.0, -major, -minor]),
                     Some(color),
                     None,
-                    Some([0.0, -MAJOR, -MINOR]),
+                    Some(Vector([0.0, -MAJOR, -MINOR])),
                 ),
                 Vertex3D::new(
-                    [cx + major, cy + minor, cz],
+                    center + Vector([major, minor, 0.0]),
                     Some(color),
                     None,
-                    Some([MAJOR, MINOR, 0.0]),
+                    Some(Vector([MAJOR, MINOR, 0.0])),
                 ),
                 Vertex3D::new(
-                    [cx - major, cy + minor, cz],
+                    center + Vector([-major, minor, 0.0]),
                     Some(color),
                     None,
-                    Some([-MAJOR, MINOR, 0.0]),
+                    Some(Vector([-MAJOR, MINOR, 0.0])),
                 ),
                 Vertex3D::new(
-                    [cx + major, cy - minor, cz],
+                    center + Vector([major, -minor, 0.0]),
                     Some(color),
                     None,
-                    Some([MAJOR, -MINOR, 0.0]),
+                    Some(Vector([MAJOR, -MINOR, 0.0])),
                 ),
                 Vertex3D::new(
-                    [cx - major, cy - minor, cz],
+                    center + Vector([-major, -minor, 0.0]),
                     Some(color),
                     None,
-                    Some([-MAJOR, -MINOR, 0.0]),
+                    Some(Vector([-MAJOR, -MINOR, 0.0])),
                 ),
             ],
             vec![
@@ -940,25 +881,17 @@ impl Geometry<Vertex3D> {
         &mut self,
         center: Vector<f32, 3>,
         radius: f32,
-        color: [f32; 4],
+        color: Vector<f32, 4>,
         subdivisions: u32,
     ) -> GeometrySlice {
-        let (mut vertices, mut faces) = Geometry::generate_icosahedron(
-            center.at(0),
-            center.at(1),
-            center.at(2),
-            radius,
-            color.clone(),
-        );
+        let (mut vertices, mut faces) = Self::generate_icosahedron(center, radius, color);
 
         for _ in 0..subdivisions {
             let mut add_vertices: Vec<Vertex3D> = Vec::new();
             let mut new_faces: Vec<[u32; 3]> = Vec::new();
             let mut edge_midpoint_map: Vec<((u32, u32), u32)> = Vec::new();
             for face in faces {
-                let mut fetch_midpoint = |v1, v2| {
-                    let mut v1: u32 = v1;
-                    let mut v2: u32 = v2;
+                let mut fetch_midpoint = |mut v1, mut v2| {
                     if v1 > v2 {
                         swap(&mut v1, &mut v2);
                     }
@@ -968,14 +901,12 @@ impl Geometry<Vertex3D> {
                         }
                     }
                     let idx = (vertices.len() + add_vertices.len()) as u32;
-                    let normal = (Vector(vertices[v1 as usize].norm)
-                        + Vector(vertices[v2 as usize].norm))
-                    .normalized();
+                    let normal = (vertices[v1 as usize].norm + vertices[v2 as usize].norm).normalized();
                     add_vertices.push(Vertex3D::new(
-                        (normal * radius + center).content(),
+                        normal * radius + center,
                         Some(color),
                         None,
-                        Some(normal.content()),
+                        Some(normal),
                     ));
                     edge_midpoint_map.push(((v1, v2), idx));
                     idx
@@ -998,14 +929,13 @@ impl Geometry<Vertex3D> {
     }
 
     pub fn transform(&mut self, slice: &GeometrySlice, matrix: Transform3D) {
-        for i in 0..slice.vertex_count {
-            let i = slice.first_vertex + i;
-            let mut vertex = self.get_vertex(i);
-            vertex.pos = (matrix * Vector(vertex.pos)).content();
+        for index in 0..slice.vertex_count {
+            let index = slice.first_vertex + index;
+            let vertex = self.vertex_at_mut(index);
+            vertex.pos = matrix * vertex.pos;
             if vertex.has_norm() {
-                vertex.norm = (matrix.affine() * Vector(vertex.norm)).content();
+                vertex.norm = matrix.affine() * vertex.norm;
             }
-            self.set_vertex(i, &vertex);
         }
         self.update_buffer_slice(slice);
     }
@@ -1042,8 +972,8 @@ pub struct ParseGeometryError {
 
 impl Error for ParseGeometryError {}
 
-impl fmt::Display for ParseGeometryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for ParseGeometryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.message)
     }
 }
@@ -1068,21 +998,21 @@ impl FromStr for Geometry<Vertex3D> {
     type Err = ParseGeometryError;
 
     fn from_str(data: &str) -> Result<Self, Self::Err> {
-        let parse_f32 = |s: &str| {
-            s.parse::<f32>()
-                .map_err(ParseGeometryError::from)
-        };
-        let parse_clamp_f32 = |s: &str| match parse_f32(s)? {
-            num if 0.0 <= num && num <= 1.0 => Ok(num),
-            _ => Err(ParseGeometryError {
-                message: format!("'{}' not in range 0-1", s),
-            }),
-        };
-        let parse_usize = |s: &str| {
-            s.parse::<usize>()
-                .map_err(ParseGeometryError::from)
-        };
-        let parse_face_element = |s: &str| {
+        fn parse_f32(s: &str) -> Result<f32, ParseGeometryError> {
+            s.parse::<f32>().map_err(ParseGeometryError::from)
+        }
+        fn parse_clamp_f32(s: &str) -> Result<f32, ParseGeometryError> {
+            match parse_f32(s)? {
+                num if 0.0 <= num && num <= 1.0 => Ok(num),
+                _ => Err(ParseGeometryError {
+                    message: format!("'{}' not in range 0-1", s),
+                }),
+            }
+        }
+        fn parse_usize(s: &str) -> Result<usize, ParseGeometryError> {
+            s.parse::<usize>().map_err(ParseGeometryError::from)
+        }
+        fn parse_face_element(s: &str) -> Result<[usize; 4], ParseGeometryError> {
             let mut indices: [usize; 4] = [0; 4];
             let mut next_index: usize = 0;
             let mut index_start: Option<usize> = None;
@@ -1091,7 +1021,8 @@ impl FromStr for Geometry<Vertex3D> {
                     if index_start.is_none() {
                         index_start = Some(i);
                     }
-                } else {
+                }
+                else {
                     if index_start.is_some() {
                         indices[next_index] = parse_usize(&s[index_start.unwrap()..i])?;
                         index_start = None;
@@ -1114,60 +1045,48 @@ impl FromStr for Geometry<Vertex3D> {
                 Err(ParseGeometryError {
                     message: "face element index cannot be 0".into(),
                 })
-            } else {
+            }
+            else {
                 Ok(indices)
             }
-        };
+        }
+        fn missing_error<T>() -> Result<T, ParseGeometryError> {
+            Err(ParseGeometryError { message: "missing command argument".into() })
+        }
 
-        let missing_error = ParseGeometryError {
-            message: "missing command argument".into(),
-        };
-
-        let mut positions: Vec<[f32; 3]> = Vec::new();
-        let mut textures: Vec<[f32; 2]> = Vec::new();
-        let mut normals: Vec<[f32; 3]> = Vec::new();
-        let mut colors: Vec<[f32; 4]> = Vec::new();
+        let mut positions: Vec<Vector<f32, 3>> = Vec::new();
+        let mut textures: Vec<Vector<f32, 2>> = Vec::new();
+        let mut normals: Vec<Vector<f32, 3>> = Vec::new();
+        let mut colors: Vec<Vector<f32, 4>> = Vec::new();
         let mut face_elements: Vec<[[usize; 4]; 3]> = Vec::new();
 
         for entry in data.lines() {
             let mut entry = entry.split_whitespace();
             match entry.next() {
-                Some("V") | Some("v") => positions.push([
-                    entry.next().map_or(Err(missing_error.clone()), parse_f32)?,
-                    entry.next().map_or(Err(missing_error.clone()), parse_f32)?,
-                    entry.next().map_or(Err(missing_error.clone()), parse_f32)?,
-                ]),
-                Some("VT") | Some("vt") => textures.push([
-                    entry.next().map_or(Err(missing_error.clone()), parse_f32)?,
-                    entry.next().map_or(Err(missing_error.clone()), parse_f32)?,
-                ]),
-                Some("VN") | Some("vn") => normals.push([
-                    entry.next().map_or(Err(missing_error.clone()), parse_f32)?,
-                    entry.next().map_or(Err(missing_error.clone()), parse_f32)?,
-                    entry.next().map_or(Err(missing_error.clone()), parse_f32)?,
-                ]),
-                Some("VC") | Some("vc") => colors.push([
-                    entry
-                        .next()
-                        .map_or(Err(missing_error.clone()), parse_clamp_f32)?,
-                    entry
-                        .next()
-                        .map_or(Err(missing_error.clone()), parse_clamp_f32)?,
-                    entry
-                        .next()
-                        .map_or(Err(missing_error.clone()), parse_clamp_f32)?,
+                Some("V") | Some("v") => positions.push(Vector([
+                    entry.next().map_or_else(missing_error, parse_f32)?,
+                    entry.next().map_or_else(missing_error, parse_f32)?,
+                    entry.next().map_or_else(missing_error, parse_f32)?,
+                ])),
+                Some("VT") | Some("vt") => textures.push(Vector([
+                    entry.next().map_or_else(missing_error, parse_f32)?,
+                    entry.next().map_or_else(missing_error, parse_f32)?,
+                ])),
+                Some("VN") | Some("vn") => normals.push(Vector([
+                    entry.next().map_or_else(missing_error, parse_f32)?,
+                    entry.next().map_or_else(missing_error, parse_f32)?,
+                    entry.next().map_or_else(missing_error, parse_f32)?,
+                ])),
+                Some("VC") | Some("vc") => colors.push(Vector([
+                    entry.next().map_or_else(missing_error, parse_clamp_f32)?,
+                    entry.next().map_or_else(missing_error, parse_clamp_f32)?,
+                    entry.next().map_or_else(missing_error, parse_clamp_f32)?,
                     entry.next().map_or(Ok(1.0), parse_clamp_f32)?,
-                ]),
+                ])),
                 Some("F") | Some("f") => face_elements.push([
-                    entry
-                        .next()
-                        .map_or(Err(missing_error.clone()), parse_face_element)?,
-                    entry
-                        .next()
-                        .map_or(Err(missing_error.clone()), parse_face_element)?,
-                    entry
-                        .next()
-                        .map_or(Err(missing_error.clone()), parse_face_element)?,
+                    entry.next().map_or_else(missing_error, parse_face_element)?,
+                    entry.next().map_or_else(missing_error, parse_face_element)?,
+                    entry.next().map_or_else(missing_error, parse_face_element)?,
                 ]),
                 _ => {}
             }
@@ -1211,7 +1130,7 @@ impl FromStr for Geometry<Vertex3D> {
             }
         }
 
-        Ok(Self::from_data(&vertices, &faces))
+        Ok(Self::with_data(vertices, faces))
     }
 }
 

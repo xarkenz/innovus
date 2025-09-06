@@ -28,13 +28,11 @@ impl Application {
         title: &str,
         mode: WindowMode<'_>,
     ) -> Option<(PWindow, WindowEventReceiver)> {
-        let mut created = self.glfw.create_window(width, height, title, mode);
-        if let Some((window, _)) = &mut created {
-            window.make_current();
-            gfx::screen::bind_glfw(&self.glfw);
-            self.glfw.set_swap_interval(SwapInterval::Sync(1)); // TODO: user preference
-        }
-        created
+        let (mut window, receiver) = self.glfw.create_window(width, height, title, mode)?;
+        window.make_current();
+        gfx::screen::bind_glfw(&self.glfw);
+        self.glfw.set_swap_interval(SwapInterval::Sync(1)); // TODO: user preference
+        Some((window, receiver))
     }
 
     pub fn set_multisampling(&mut self, samples: Option<u32>) {

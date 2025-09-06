@@ -1,7 +1,7 @@
 extern crate glfw;
 
 use glfw::{Action, Context, Key, MouseButton};
-use innovus::gfx::{self, *};
+use innovus::gfx::*;
 use innovus::tools::{AnimationTimer, Clock, Easing, Transform3D, Vector};
 use std::{collections::VecDeque, f32::consts, str::FromStr};
 
@@ -50,7 +50,7 @@ fn load_snek_geometry(
     nodes: &VecDeque<(i32, i32)>,
     face: &(i32, i32),
 ) {
-    const ARROW_COLOR: [f32; 4] = [0.8, 0.3, 0.1, 1.0];
+    const ARROW_COLOR: Vector<f32, 4> = Vector([0.8, 0.3, 0.1, 1.0]);
     let head = nodes.back().unwrap(); // nodes should never be empty
     geometry.clear();
     for node in nodes {
@@ -58,32 +58,32 @@ fn load_snek_geometry(
         //let minor = major * 0.8;
         let mut center = get_space_center(node);
         center.set_y(major);
-        geometry.add_icosphere(center, major, [0.1, 0.4, 0.8, 1.0], 2);
+        geometry.add_icosphere(center, major, Vector([0.1, 0.4, 0.8, 1.0]), 2);
     }
     let pos = get_space_center(&(head.0 + face.0, head.1 + face.1));
     let arrow_verts = if face.0 < 0 {
         (
-            [pos.x() - 1.0, 1.0, pos.z()],
-            [pos.x() + 1.0, 1.0, pos.z() + 1.0],
-            [pos.x() + 1.0, 1.0, pos.z() - 1.0],
+            Vector([pos.x() - 1.0, 1.0, pos.z()]),
+            Vector([pos.x() + 1.0, 1.0, pos.z() + 1.0]),
+            Vector([pos.x() + 1.0, 1.0, pos.z() - 1.0]),
         )
     } else if face.0 > 0 {
         (
-            [pos.x() + 1.0, 1.0, pos.z()],
-            [pos.x() - 1.0, 1.0, pos.z() - 1.0],
-            [pos.x() - 1.0, 1.0, pos.z() + 1.0],
+            Vector([pos.x() + 1.0, 1.0, pos.z()]),
+            Vector([pos.x() - 1.0, 1.0, pos.z() - 1.0]),
+            Vector([pos.x() - 1.0, 1.0, pos.z() + 1.0]),
         )
     } else if face.1 < 0 {
         (
-            [pos.x(), 1.0, pos.z() - 1.0],
-            [pos.x() - 1.0, 1.0, pos.z() + 1.0],
-            [pos.x() + 1.0, 1.0, pos.z() + 1.0],
+            Vector([pos.x(), 1.0, pos.z() - 1.0]),
+            Vector([pos.x() - 1.0, 1.0, pos.z() + 1.0]),
+            Vector([pos.x() + 1.0, 1.0, pos.z() + 1.0]),
         )
     } else {
         (
-            [pos.x(), 1.0, pos.z() + 1.0],
-            [pos.x() + 1.0, 1.0, pos.z() - 1.0],
-            [pos.x() - 1.0, 1.0, pos.z() - 1.0],
+            Vector([pos.x(), 1.0, pos.z() + 1.0]),
+            Vector([pos.x() + 1.0, 1.0, pos.z() - 1.0]),
+            Vector([pos.x() - 1.0, 1.0, pos.z() - 1.0]),
         )
     };
     geometry.add(
@@ -138,13 +138,9 @@ fn main() {
     kooper.enable_render().unwrap();
 
     {
-        let mut kooper_vertices = Vec::with_capacity(kooper.vertex_count());
-        for index in 0..kooper.vertex_count() {
-            kooper_vertices.push(kooper.get_vertex(index));
-        }
-        for (index, vertex) in kooper_vertices.iter().enumerate() {
-            let mut vertex = vertex.clone();
-            vertex.norm = [0.0; 3];
+        let kooper_vertices = kooper.vertices().to_vec();
+        for vertex in kooper.vertices_mut() {
+            vertex.norm = Vector::zero();
             let mut count: f32 = 0.0;
             for test in kooper_vertices.iter() {
                 if test.pos == vertex.pos {
@@ -157,7 +153,6 @@ fn main() {
             vertex.norm[0] /= count;
             vertex.norm[1] /= count;
             vertex.norm[2] /= count;
-            kooper.set_vertex(index, &vertex);
         }
         let mut transform_thingy = Transform3D::identity();
         transform_thingy.rotate_z(-consts::FRAC_PI_2);

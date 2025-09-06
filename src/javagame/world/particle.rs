@@ -85,22 +85,21 @@ impl ParticleManager {
 
         self.geometry.clear();
         let mut vertices = Vec::new();
-        let mut faces = Vec::new();
+        let mut triangles = Vec::new();
         for particle in &self.active_particles {
             let index = vertices.len() as u32;
             let opacity = particle.lifetime.min(1.0);
             for offset in OFFSETS {
-                let position = particle.position + offset * particle.size / 16.0;
                 vertices.push(Vertex2D::new(
-                    [position.x(), position.y(), 0.0],
-                    Some([particle.color.r(), particle.color.g(), particle.color.b(), opacity]),
+                    (particle.position + offset * particle.size / 16.0).with_z(0.0),
+                    Some(particle.color.0.with_w(opacity)),
                     None,
                 ));
             }
-            faces.push([index + 0, index + 1, index + 2]);
-            faces.push([index + 2, index + 3, index + 0]);
+            triangles.push([index + 0, index + 1, index + 2]);
+            triangles.push([index + 2, index + 3, index + 0]);
         }
-        self.geometry.add(&vertices, &faces);
+        self.geometry.add(&vertices, &triangles);
         self.geometry.render();
     }
 }

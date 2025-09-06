@@ -284,12 +284,14 @@ impl Chunk {
                         faces.push([index + 0, index + 1, index + 2]);
                         faces.push([index + 2, index + 3, index + 0]);
                         // TODO: obviously lossy
-                        let x = self.location.x() as f32 * CHUNK_SIZE as f32 + block_x as f32 + offset.x();
-                        let y = self.location.y() as f32 * CHUNK_SIZE as f32 + block_y as f32 + offset.y();
+                        let vertex_position = Vector([
+                            self.location.x() as f32 * CHUNK_SIZE as f32 + block_x as f32 + offset.x(),
+                            self.location.y() as f32 * CHUNK_SIZE as f32 + block_y as f32 + offset.y(),
+                        ]);
                         for vertex_offset in QUADRANT_VERTEX_OFFSETS {
                             vertices.push(Vertex2D::new(
-                                [x + vertex_offset.x(), y + vertex_offset.y(), 0.0],
-                                Some([0.0, 0.0, 0.0, 0.0]),
+                                (vertex_position + vertex_offset).with_z(0.0),
+                                None,
                                 None,
                             ));
                         }
@@ -360,15 +362,14 @@ impl Chunk {
             for ((quadrant_offset, atlas_offset), vertex_lights) in quadrant_info {
                 let vertex_info = std::iter::zip(QUADRANT_VERTEX_OFFSETS, vertex_lights);
                 for (vertex_offset, vertex_light) in vertex_info {
-                    let mut vertex = self.geometry.get_vertex(index);
-                    vertex.color = [vertex_light, vertex_light, vertex_light, 1.0];
-                    vertex.tex = true;
+                    let vertex = self.geometry.vertex_at_mut(index);
+                    vertex.color = Vector([vertex_light, vertex_light, vertex_light, 1.0]);
+                    vertex.tex = 1;
                     let total_offset = quadrant_offset + vertex_offset;
-                    vertex.uv = [
+                    vertex.uv = Vector([
                         atlas_offset.x() as f32 + total_offset.x() * image.size() as f32,
                         atlas_offset.y() as f32 + (1.0 - total_offset.y()) * image.size() as f32,
-                    ];
-                    self.geometry.set_vertex(index, &vertex);
+                    ]);
                     index += 1;
                 }
             }
@@ -377,11 +378,10 @@ impl Chunk {
             // Make block invisible since it has no appearance (e.g. air)
             let mut index = first_index;
             for _ in 0..VERTICES_PER_BLOCK {
-                let mut vertex = self.geometry.get_vertex(index);
-                vertex.color = [0.0; 4];
-                vertex.tex = false;
-                vertex.uv = [0.0; 2];
-                self.geometry.set_vertex(index, &vertex);
+                let vertex = self.geometry.vertex_at_mut(index);
+                vertex.color = Vector::zero();
+                vertex.tex = 0;
+                vertex.uv = Vector::zero();
                 index += 1;
             }
         }

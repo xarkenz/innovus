@@ -75,14 +75,13 @@ impl BlockPreview {
                 faces.push([index + 2, index + 3, index + 0]);
                 for vertex_offset in QUADRANT_VERTEX_OFFSETS {
                     let total_offset = quadrant_offset + vertex_offset;
-                    let vertex_position = block_origin + total_offset;
                     vertices.push(Vertex2D::new(
-                        [vertex_position.x(), vertex_position.y(), 0.0],
-                        Some([light_value, light_value, light_value, self.opacity]),
-                        Some([
+                        (block_origin + total_offset).with_z(0.0),
+                        Some(Vector([light_value, light_value, light_value, self.opacity])),
+                        Some(Vector([
                             atlas_offset.x() as f32 + total_offset.x() * image.size() as f32,
                             atlas_offset.y() as f32 + (1.0 - total_offset.y()) * image.size() as f32,
-                        ]),
+                        ])),
                     ));
                 }
             }

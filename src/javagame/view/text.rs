@@ -106,8 +106,8 @@ impl StringRenderer {
                     world_offset.y() * (glyph_max_size + 4.0 * pixel_size),
                 ]);
                 vertices.push(Vertex2D::new(
-                    [position.x(), position.y(), -1.0],
-                    Some(self.background_color.0),
+                    position.with_z(-1.0),
+                    Some(self.background_color),
                     None,
                 ));
             }
@@ -120,11 +120,10 @@ impl StringRenderer {
                 let char_index = character as u32;
                 let atlas_origin = Vector([char_index % 16, char_index / 16]) * 8;
                 for (world_offset, atlas_offset) in OFFSETS {
-                    let position = world_position + world_offset * glyph_max_size;
                     vertices.push(Vertex2D::new(
-                        [position.x(), position.y(), 0.0],
-                        Some(self.text_color.0),
-                        Some((atlas_origin + atlas_offset).map(|x| x as f32).0)
+                        (world_position + world_offset * glyph_max_size).with_z(0.0),
+                        Some(self.text_color),
+                        Some((atlas_origin + atlas_offset).map(|x| x as f32))
                     ));
                 }
                 let glyph_width = (GLYPH_WIDTHS[character as usize] + 1) as f32 * pixel_size;

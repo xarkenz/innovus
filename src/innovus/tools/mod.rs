@@ -112,6 +112,10 @@ impl<T: NumAssign + Copy> Vector<T, 2> {
     pub const fn set_y(&mut self, y: T) {
         self.0[1] = y;
     }
+
+    pub const fn with_z(&self, z: T) -> Vector<T, 3> {
+        Vector([self.x(), self.y(), z])
+    }
 }
 
 impl<T: NumAssign + Copy> Vector<T, 3> {
@@ -137,6 +141,14 @@ impl<T: NumAssign + Copy> Vector<T, 3> {
 
     pub const fn set_z(&mut self, z: T) {
         self.0[2] = z;
+    }
+
+    pub const fn xy(&self) -> Vector<T, 2> {
+        Vector([self.x(), self.y()])
+    }
+
+    pub const fn with_w(&self, w: T) -> Vector<T, 4> {
+        Vector([self.x(), self.y(), self.z(), w])
     }
 
     pub fn cross(&self, rhs: &Self) -> Self {
@@ -179,6 +191,10 @@ impl<T: NumAssign + Copy> Vector<T, 4> {
 
     pub const fn set_w(&mut self, w: T) {
         self.0[3] = w;
+    }
+
+    pub const fn xyz(&self) -> Vector<T, 3> {
+        Vector([self.x(), self.y(), self.z()])
     }
 }
 
