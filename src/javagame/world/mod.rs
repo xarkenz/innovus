@@ -1,9 +1,15 @@
 use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
+use innovus::tools::phys::Physics;
 use crate::tools::*;
+use crate::tools::asset::AssetPool;
+use crate::tools::input::InputState;
 use crate::view::block_preview::BlockPreview;
-use crate::world::block::CHUNK_SIZE;
+use crate::view::Camera;
+use crate::world::block::{light_value, Block, BlockType, Chunk, ChunkLocation, ChunkMap, CHUNK_SIZE};
+use crate::world::entity::Entity;
 use crate::world::entity::render::EntityRenderer;
+use crate::world::gen::WorldGenerator;
 use crate::world::particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
 
 pub mod block;
@@ -15,62 +21,80 @@ pub const SECONDS_PER_TICK: f32 = 0.05;
 
 pub struct World<'world> {
     seconds_since_last_tick: f32,
-    physics: phys::Physics,
-    chunks: block::ChunkMap,
-    entities: HashMap<Uuid, Box<dyn entity::Entity + 'world>>,
+    camera: Camera,
+    physics: Physics,
+    chunks: ChunkMap,
+    entities: HashMap<Uuid, Box<dyn Entity + 'world>>,
     entity_renderer: EntityRenderer,
     player_entity: Option<Uuid>,
     particles: ParticleManager,
     block_preview: BlockPreview,
+    sky_color: Vector<f32, 3>,
+    sky_light: f32,
 }
 
-impl<'world> World<'world> where Self: 'world {
-    pub fn new(generator: Option<Box<dyn gen::WorldGenerator>>) -> Self {
+impl<'world> World<'world> {
+    pub fn new(generator: Option<Box<dyn WorldGenerator>>, camera: Camera) -> Self {
         Self {
             seconds_since_last_tick: SECONDS_PER_TICK,
-            physics: phys::Physics::new(),
-            chunks: block::ChunkMap::new(generator),
+            camera,
+            physics: Physics::new(),
+            chunks: ChunkMap::new(generator),
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
             player_entity: None,
             particles: ParticleManager::new(),
-            block_preview: BlockPreview::new(Vector::zero(), &block::types::AIR, 0.4)
+            block_preview: BlockPreview::new(Vector::zero(), &block::types::AIR, 0.4),
+            sky_color: Vector([0.6, 0.8, 1.0]),
+            sky_light: 1.0,
         }
     }
 
-    pub fn physics(&self) -> &phys::Physics {
+    pub fn sky_color(&self) -> Vector<f32, 3> {
+        self.sky_color * self.sky_light
+    }
+
+    pub fn camera(&self) -> &Camera {
+        &self.camera
+    }
+
+    pub fn camera_mut(&mut self) -> &mut Camera {
+        &mut self.camera
+    }
+
+    pub fn physics(&self) -> &Physics {
         &self.physics
     }
 
-    pub fn physics_mut(&mut self) -> &mut phys::Physics {
+    pub fn physics_mut(&mut self) -> &mut Physics {
         &mut self.physics
     }
 
-    pub fn chunks(&self) -> &block::ChunkMap {
+    pub fn chunks(&self) -> &ChunkMap {
         &self.chunks
     }
 
-    pub fn get_chunk(&self, location: block::ChunkLocation) -> Option<Ref<'_, block::Chunk>> {
+    pub fn get_chunk(&self, location: ChunkLocation) -> Option<Ref<'_, Chunk>> {
         self.chunks.get(location)
     }
 
-    pub fn get_chunk_mut(&self, location: block::ChunkLocation) -> Option<RefMut<'_, block::Chunk>> {
+    pub fn get_chunk_mut(&self, location: ChunkLocation) -> Option<RefMut<'_, Chunk>> {
         self.chunks.get_mut(location)
     }
 
-    pub fn load_chunk(&mut self, location: block::ChunkLocation) -> Ref<'_, block::Chunk> {
+    pub fn load_chunk(&mut self, location: ChunkLocation) -> Ref<'_, Chunk> {
         self.chunks.get_or_load(location, &mut self.physics)
     }
 
-    pub fn load_chunk_mut(&mut self, location: block::ChunkLocation) -> RefMut<'_, block::Chunk> {
+    pub fn load_chunk_mut(&mut self, location: ChunkLocation) -> RefMut<'_, Chunk> {
         self.chunks.get_or_load_mut(location, &mut self.physics)
     }
 
-    pub fn unload_chunk(&mut self, location: block::ChunkLocation) {
+    pub fn unload_chunk(&mut self, location: ChunkLocation) {
         self.chunks.unload(location, &mut self.physics);
     }
 
-    pub fn user_place_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize, hand: &'static block::BlockType) {
+    pub fn user_place_block(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize, hand: &'static BlockType) {
         if let Some(mut chunk) = self.chunks.get_mut(chunk_location) {
             if let Some(block) = chunk.block_at(block_x, block_y).right_click(hand) {
                 chunk.set_block_at(block_x, block_y, block, &self.chunks, &mut self.physics);
@@ -78,11 +102,11 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
-    pub fn user_destroy_block(&mut self, chunk_location: block::ChunkLocation, block_x: usize, block_y: usize, assets: &mut asset::AssetPool) {
+    pub fn user_destroy_block(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize, assets: &mut AssetPool) {
         if let Some(mut chunk) = self.chunks.get_mut(chunk_location) {
             let block_type = chunk.block_at(block_x, block_y).block_type();
             if block_type != &block::types::AIR {
-                chunk.set_block_at(block_x, block_y, block::Block::new(&block::types::AIR), &self.chunks, &mut self.physics);
+                chunk.set_block_at(block_x, block_y, Block::new(&block::types::AIR), &self.chunks, &mut self.physics);
                 // Create particles coming from the center of the destroyed block
                 if let Some(palette) = block_type.palette_key.and_then(|key| assets.get_color_palette(key).ok()) {
                     let position = Vector([
@@ -107,17 +131,17 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
-    pub fn add_entity(&mut self, mut entity: Box<dyn entity::Entity>, assets: &mut asset::AssetPool) {
+    pub fn add_entity(&mut self, mut entity: Box<dyn Entity>, assets: &mut AssetPool) {
         entity.init_collision(&mut self.physics);
         entity.init_appearance(assets, &mut self.entity_renderer);
         self.entities.insert(entity.uuid(), entity);
     }
 
-    pub fn get_entity(&self, uuid: Uuid) -> Option<&dyn entity::Entity> {
+    pub fn get_entity(&self, uuid: Uuid) -> Option<&dyn Entity> {
         self.entities.get(&uuid).map(Box::as_ref)
     }
 
-    pub fn get_entity_mut(&mut self, uuid: Uuid) -> Option<&mut (dyn entity::Entity + 'world)> {
+    pub fn get_entity_mut(&mut self, uuid: Uuid) -> Option<&mut (dyn Entity + 'world)> {
         self.entities.get_mut(&uuid).map(Box::as_mut)
     }
 
@@ -131,15 +155,26 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
+    pub fn player_entity(&mut self) -> Option<Uuid> {
+        self.player_entity
+    }
+
     pub fn set_player_entity(&mut self, entity: Option<Uuid>) {
         self.player_entity = entity;
+
+        let player = entity
+            .as_ref()
+            .and_then(|uuid| self.entities.get(uuid));
+        if let Some(player) = player {
+            self.camera.set_position(player.position());
+        }
     }
 
     pub fn set_cursor_pos(&mut self, world_pos: Vector<f32, 2>) {
         self.block_preview.set_position(world_pos);
     }
 
-    pub fn reload_assets(&mut self, assets: &mut asset::AssetPool) {
+    pub fn reload_assets(&mut self, assets: &mut AssetPool) {
         for mut chunk in self.chunks.iter_mut() {
             chunk.set_all_need_render();
         }
@@ -148,7 +183,7 @@ impl<'world> World<'world> where Self: 'world {
         }
     }
 
-    pub fn update(&mut self, inputs: &input::InputState, dt: f32) {
+    pub fn update(&mut self, inputs: &InputState, dt: f32) {
         self.seconds_since_last_tick += dt;
         if self.seconds_since_last_tick >= SECONDS_PER_TICK {
             // Advance one tick
@@ -166,8 +201,34 @@ impl<'world> World<'world> where Self: 'world {
                 &mut self.particles,
             );
         }
+
+        let player = self.player_entity
+            .as_ref()
+            .and_then(|uuid| self.entities.get(uuid));
+        if let Some(player) = player {
+            self.camera.set_target(player.position());
+        }
+
+        self.camera.update(dt);
         self.physics.step_simulation(dt);
         self.particles.update(dt);
+
+        let target_sky_light = {
+            let camera_pos = self.camera.position();
+            let chunk_location = Vector([
+                camera_pos.x().div_euclid(CHUNK_SIZE as f32) as i64,
+                camera_pos.y().div_euclid(CHUNK_SIZE as f32) as i64,
+            ]);
+            let block_x = camera_pos.x().rem_euclid(CHUNK_SIZE as f32) as usize;
+            let block_y = camera_pos.y().rem_euclid(CHUNK_SIZE as f32) as usize;
+            if let Some(chunk) = self.get_chunk(chunk_location) {
+                light_value(chunk.block_slot_at(block_x, block_y).sky_light())
+            }
+            else {
+                light_value(15)
+            }
+        };
+        self.sky_light += (target_sky_light - self.sky_light) * dt.min(1.0);
     }
 
     fn tick(&mut self) {
@@ -188,16 +249,23 @@ impl<'world> World<'world> where Self: 'world {
         self.chunks.tick(player_position, &mut self.physics);
     }
 
-    pub fn render(&mut self, assets: &asset::AssetPool) {
+    pub fn render(&mut self, assets: &AssetPool) {
         assets.block_texture().bind();
+        assets.block_shaders().set_uniform("tex_atlas", assets.block_texture());
+        assets.block_shaders().set_uniform("camera_view", self.camera.view());
+        assets.block_shaders().set_uniform("camera_proj", self.camera.projection());
         for mut chunk in self.chunks.iter_mut() {
             chunk.render(assets, &self.chunks);
         }
 
+        assets.default_shaders().set_uniform("tex_atlas", assets.block_texture());
+        assets.default_shaders().set_uniform("camera_view", self.camera.view());
+        assets.default_shaders().set_uniform("camera_proj", self.camera.projection());
         self.particles.render();
         self.block_preview.render(assets, &self.chunks);
 
         assets.entity_texture().bind();
+        assets.default_shaders().set_uniform("tex_atlas", assets.entity_texture());
         self.entity_renderer.render_all();
     }
 }

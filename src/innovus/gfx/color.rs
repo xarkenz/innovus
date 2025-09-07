@@ -1,6 +1,7 @@
 use std::io::{BufRead, BufReader, Read};
 use crate::tools::Vector;
 
+#[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct RGBColor(pub Vector<f32, 3>);
 

@@ -1,7 +1,7 @@
-use glfw::{Action, Modifiers, WindowEvent};
-use innovus::{Application, WindowEventReceiver, tools::Vector};
+use glfw::{Action, Modifiers};
+use innovus::tools::Vector;
 
-pub use glfw::{Key, MouseButton, MouseButtonLeft, MouseButtonRight, MouseButtonMiddle};
+pub use glfw::{Key, MouseButton};
 
 const FIRST_KEY_VALUE: usize = Key::Space as usize;
 const LAST_KEY_VALUE: usize = Key::Menu as usize;
@@ -50,43 +50,30 @@ impl ButtonState {
 }
 
 pub struct InputState {
-    event_receiver: WindowEventReceiver,
     keys: [ButtonState; KEY_ARRAY_SIZE],
     mouse_buttons: [ButtonState; MOUSE_BUTTON_ARRAY_SIZE],
     cursor_pos: Vector<f64, 2>,
+    scroll_amount: Option<Vector<f64, 2>>,
 }
 
 impl InputState {
-    pub fn new(event_receiver: WindowEventReceiver) -> Self {
+    pub fn new() -> Self {
         Self {
-            event_receiver,
             keys: [ButtonState::Idle; KEY_ARRAY_SIZE],
             mouse_buttons: [ButtonState::Idle; MOUSE_BUTTON_ARRAY_SIZE],
             cursor_pos: Vector::zero(),
+            scroll_amount: None,
         }
     }
 
-    pub fn process_events(&mut self, application: &mut Application) -> Vec<WindowEvent> {
+    pub fn reset(&mut self) {
         for state in &mut self.keys {
             state.stabilize();
         }
         for state in &mut self.mouse_buttons {
             state.stabilize();
         }
-
-        application.poll_events();
-        let events: Vec<_> = glfw::flush_messages(&self.event_receiver)
-            .map(|(_time, event)| event)
-            .collect();
-        for event in &events {
-            match *event {
-                WindowEvent::Key(key, _scancode, action, mods) => self.handle_key(key, action, mods),
-                WindowEvent::MouseButton(button, action, mods) => self.handle_mouse_button(button, action, mods),
-                WindowEvent::CursorPos(x, y) => self.handle_cursor_pos(x, y),
-                _ => {}
-            }
-        }
-        events
+        self.scroll_amount = None;
     }
 
     pub fn handle_key(&mut self, key: Key, action: Action, mods: Modifiers) {
@@ -113,6 +100,10 @@ impl InputState {
 
     pub fn handle_cursor_pos(&mut self, x: f64, y: f64) {
         self.cursor_pos = Vector([x, y]);
+    }
+
+    pub fn handle_scroll(&mut self, dx: f64, dy: f64) {
+        self.scroll_amount = Some(Vector([dx, dy]));
     }
 
     pub fn key_is_held(&self, key: Key) -> bool {
@@ -153,5 +144,9 @@ impl InputState {
 
     pub fn cursor_pos(&self) -> Vector<f64, 2> {
         self.cursor_pos
+    }
+
+    pub fn scroll_amount(&self) -> Option<Vector<f64, 2>> {
+        self.scroll_amount
     }
 }

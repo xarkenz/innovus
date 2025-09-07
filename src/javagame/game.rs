@@ -1,0 +1,196 @@
+use std::path::Path;
+use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight};
+use innovus::gfx::screen;
+use innovus::tools::{Clock, Transform3D, Vector};
+use crate::tools::asset::AssetPool;
+use crate::tools::input::InputState;
+use crate::view::Camera;
+use crate::view::text::StringRenderer;
+use crate::world::block::{BLOCK_TYPES, CHUNK_SIZE};
+use crate::world::entity::Entity;
+use crate::world::entity::types::Player;
+use crate::world::gen::WorldGenerator;
+use crate::world::World;
+
+fn select_block_index(mut index: isize, direction: isize) -> usize {
+    index = index.rem_euclid(BLOCK_TYPES.len() as isize);
+    if BLOCK_TYPES[index as usize] == &crate::world::block::types::AIR {
+        index += direction;
+        index = index.rem_euclid(BLOCK_TYPES.len() as isize);
+    }
+    let index = index as usize;
+    index
+}
+
+pub struct Game<'world> {
+    frame_clock: Clock,
+    fps_tracker: [f32; 120],
+    fps_tracker_index: usize,
+    fps_string_renderer: StringRenderer,
+    viewport_size: Vector<f32, 2>,
+    gui_projection: Transform3D,
+    assets: AssetPool,
+    current_world: Option<World<'world>>,
+    selected_block_index: usize,
+    last_block_pos: Option<(usize, usize)>,
+}
+
+impl<'world> Game<'world> {
+    pub fn start(assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>) -> Result<Self, String> {
+        screen::set_blend(screen::Blend::Transparency);
+
+        let mut game = Self {
+            frame_clock: Clock::start(),
+            fps_tracker: [f32::INFINITY; 120],
+            fps_tracker_index: 0,
+            fps_string_renderer: StringRenderer::new(
+                Vector::zero(),
+                Vector([1.0, 1.0, 1.0, 1.0]),
+                Vector([0.0, 0.0, 0.0, 0.5]),
+                "Gathering data...".into(),
+            ),
+            viewport_size,
+            gui_projection: Transform3D::identity(),
+            assets: AssetPool::load(assets_path)?,
+            current_world: None,
+            selected_block_index: select_block_index(0, 1),
+            last_block_pos: None,
+        };
+        game.set_viewport_size(viewport_size);
+        Ok(game)
+    }
+
+    pub fn viewport_size(&self) -> Vector<f32, 2> {
+        self.viewport_size
+    }
+
+    pub fn set_viewport_size(&mut self, viewport_size: Vector<f32, 2>) {
+        self.viewport_size = viewport_size;
+
+        screen::set_viewport(0, 0, viewport_size.x() as i32, viewport_size.y() as i32);
+        self.gui_projection.orthographic(
+            0.0,
+            viewport_size.x() / 64.0,
+            0.0,
+            viewport_size.y() / 64.0,
+            100.0,
+            -100.0,
+        );
+        if let Some(world) = &mut self.current_world {
+            world.camera_mut().set_size(viewport_size);
+        }
+    }
+
+    pub fn current_world(&self) -> Option<&World<'_>> {
+        self.current_world.as_ref()
+    }
+
+    pub fn enter_world(&mut self, generator: Option<Box<dyn WorldGenerator>>) {
+        let camera = Camera::new(Vector::zero(), self.viewport_size, 64.0, 5.0);
+        let mut world = World::new(generator, camera);
+        let player_start = Vector([-0.5, 0.0]);
+        let player = Player::new(player_start, None);
+        let player_uuid = player.uuid();
+        world.add_entity(Box::new(player), &mut self.assets);
+        world.set_player_entity(Some(player_uuid));
+        self.current_world = Some(world);
+    }
+
+    pub fn run_frame(&mut self, inputs: &InputState) {
+        let dt = self.frame_clock.read();
+        self.frame_clock.reset();
+        self.fps_tracker[self.fps_tracker_index] = 1.0 / dt;
+        self.fps_tracker_index = (self.fps_tracker_index + 1) % self.fps_tracker.len();
+
+        if inputs.key_was_pressed(Key::R) && inputs.key_is_held(Key::LeftControl) {
+            match self.assets.reload() {
+                Err(err) => eprintln!("Failed to reload assets: {err}"),
+                Ok(()) => println!("Reloaded assets."),
+            }
+        }
+
+        let cursor_pos = inputs.cursor_pos().map(|x| x as f32);
+        let left_held = inputs.mouse_button_is_held(MouseButtonLeft);
+        let right_held = inputs.mouse_button_is_held(MouseButtonRight);
+        let middle_held = inputs.mouse_button_is_held(MouseButtonMiddle);
+
+        let clear_color;
+        if let Some(world) = &mut self.current_world {
+            if let Some(scroll_amount) = inputs.scroll_amount() {
+                let target_zoom = world.camera().zoom() * 1.125_f32.powf(scroll_amount.y() as f32);
+                world.camera_mut().set_zoom(target_zoom);
+            }
+
+            let cursor_world_pos = world.camera().get_world_pos(cursor_pos);
+
+            if inputs.key_was_pressed(Key::Tab) {
+                let offset = if inputs.key_is_held(Key::LeftShift) { -1 } else { 1 };
+                self.selected_block_index = select_block_index(self.selected_block_index as isize + offset, offset);
+            }
+
+            if left_held || right_held || middle_held {
+                let chunk_location = Vector([
+                    cursor_world_pos.x().div_euclid(CHUNK_SIZE as f32) as i64,
+                    cursor_world_pos.y().div_euclid(CHUNK_SIZE as f32) as i64,
+                ]);
+                let block_x = cursor_world_pos.x().rem_euclid(CHUNK_SIZE as f32) as usize;
+                let block_y = cursor_world_pos.y().rem_euclid(CHUNK_SIZE as f32) as usize;
+
+                if self.last_block_pos.is_none_or(|pos| pos != (block_x, block_y)) {
+                    self.last_block_pos = Some((block_x, block_y));
+                    if middle_held {
+                        let block_type = world
+                            .get_chunk(chunk_location)
+                            .map_or(&crate::world::block::types::AIR, |chunk| {
+                                chunk.block_at(block_x, block_y).block_type()
+                            });
+                        if block_type != &crate::world::block::types::AIR {
+                            let block_index = BLOCK_TYPES
+                                .iter()
+                                .position(|&element| element == block_type)
+                                .unwrap();
+                            self.selected_block_index = select_block_index(block_index as isize, 1);
+                        }
+                    }
+                    if left_held {
+                        world.user_destroy_block(chunk_location, block_x, block_y, &mut self.assets);
+                    }
+                    if right_held {
+                        world.user_place_block(chunk_location, block_x, block_y, BLOCK_TYPES[self.selected_block_index]);
+                    }
+                }
+            }
+            else {
+                self.last_block_pos = None;
+            }
+
+            if let Some(player_uuid) = world.player_entity() {
+                let player = world.get_entity_mut(player_uuid).unwrap();
+                player.set_held_item(BLOCK_TYPES[self.selected_block_index]);
+            }
+
+            world.set_cursor_pos(cursor_world_pos);
+            world.update(inputs, dt);
+
+            let average_fps = self.fps_tracker.iter().sum::<f32>() / self.fps_tracker.len() as f32;
+            if average_fps.is_finite() {
+                self.fps_string_renderer.set_string(format!("Average FPS: {average_fps:.1}"));
+            }
+
+            clear_color = world.sky_color();
+        }
+        else {
+            clear_color = Vector::zero();
+        }
+
+        screen::set_clear_color(clear_color.x(), clear_color.y(), clear_color.z());
+        screen::clear();
+
+        if let Some(world) = &mut self.current_world {
+            world.render(&self.assets);
+        }
+        self.assets.default_shaders().set_uniform("camera_view", Transform3D::identity());
+        self.assets.default_shaders().set_uniform("camera_proj", self.gui_projection);
+        self.fps_string_renderer.render(&self.assets);
+    }
+}

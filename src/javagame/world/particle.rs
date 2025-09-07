@@ -99,7 +99,10 @@ impl ParticleManager {
             triangles.push([index + 0, index + 1, index + 2]);
             triangles.push([index + 2, index + 3, index + 0]);
         }
-        self.geometry.add(&vertices, &triangles);
-        self.geometry.render();
+
+        if !vertices.is_empty() {
+            self.geometry.add(&vertices, &triangles);
+            self.geometry.render();
+        }
     }
 }
