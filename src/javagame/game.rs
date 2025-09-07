@@ -7,8 +7,7 @@ use crate::tools::input::InputState;
 use crate::view::Camera;
 use crate::view::text::StringRenderer;
 use crate::world::block::{BLOCK_TYPES, CHUNK_SIZE};
-use crate::world::entity::Entity;
-use crate::world::entity::types::Player;
+use crate::world::entity::types::player::PlayerMode;
 use crate::world::gen::WorldGenerator;
 use crate::world::World;
 
@@ -87,13 +86,7 @@ impl<'world> Game<'world> {
 
     pub fn enter_world(&mut self, generator: Option<Box<dyn WorldGenerator>>) {
         let camera = Camera::new(Vector::zero(), self.viewport_size, 64.0, 5.0);
-        let mut world = World::new(generator, camera);
-        let player_start = Vector([-0.5, 0.0]);
-        let player = Player::new(player_start, None);
-        let player_uuid = player.uuid();
-        world.add_entity(Box::new(player), &mut self.assets);
-        world.set_player_entity(Some(player_uuid));
-        self.current_world = Some(world);
+        self.current_world = Some(World::new(generator, camera, &mut self.assets));
     }
 
     pub fn run_frame(&mut self, inputs: &InputState) {
@@ -126,6 +119,13 @@ impl<'world> Game<'world> {
             if inputs.key_was_pressed(Key::Tab) {
                 let offset = if inputs.key_is_held(Key::LeftShift) { -1 } else { 1 };
                 self.selected_block_index = select_block_index(self.selected_block_index as isize + offset, offset);
+            }
+            if inputs.key_was_pressed(Key::F4) {
+                let current_mode = world.player().mode();
+                world.player_mut().set_mode(match current_mode {
+                    PlayerMode::Normal => PlayerMode::Spectating,
+                    PlayerMode::Spectating => PlayerMode::Normal,
+                });
             }
 
             if left_held || right_held || middle_held {
@@ -164,11 +164,7 @@ impl<'world> Game<'world> {
                 self.last_block_pos = None;
             }
 
-            if let Some(player_uuid) = world.player_entity() {
-                let player = world.get_entity_mut(player_uuid).unwrap();
-                player.set_held_item(BLOCK_TYPES[self.selected_block_index]);
-            }
-
+            world.player_mut().set_held_item(BLOCK_TYPES[self.selected_block_index]);
             world.set_cursor_pos(cursor_world_pos);
             world.update(inputs, dt);
 

@@ -9,6 +9,7 @@ use crate::view::Camera;
 use crate::world::block::{light_value, Block, BlockType, Chunk, ChunkLocation, ChunkMap, CHUNK_SIZE};
 use crate::world::entity::Entity;
 use crate::world::entity::render::EntityRenderer;
+use crate::world::entity::types::player::{Player, PlayerMode};
 use crate::world::gen::WorldGenerator;
 use crate::world::particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
 
@@ -24,9 +25,9 @@ pub struct World<'world> {
     camera: Camera,
     physics: Physics,
     chunks: ChunkMap,
+    player: Player,
     entities: HashMap<Uuid, Box<dyn Entity + 'world>>,
     entity_renderer: EntityRenderer,
-    player_entity: Option<Uuid>,
     particles: ParticleManager,
     block_preview: BlockPreview,
     sky_color: Vector<f32, 3>,
@@ -34,20 +35,24 @@ pub struct World<'world> {
 }
 
 impl<'world> World<'world> {
-    pub fn new(generator: Option<Box<dyn WorldGenerator>>, camera: Camera) -> Self {
-        Self {
+    pub fn new(generator: Option<Box<dyn WorldGenerator>>, camera: Camera, assets: &mut AssetPool) -> Self {
+        let mut world = Self {
             seconds_since_last_tick: SECONDS_PER_TICK,
             camera,
             physics: Physics::new(),
             chunks: ChunkMap::new(generator),
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
-            player_entity: None,
+            player: Player::new(generate_uuid(), Vector([-0.5, 0.0]), None, PlayerMode::Normal),
             particles: ParticleManager::new(),
             block_preview: BlockPreview::new(Vector::zero(), &block::types::AIR, 0.4),
             sky_color: Vector([0.6, 0.8, 1.0]),
             sky_light: 1.0,
-        }
+        };
+        world.player.init_collision(&mut world.physics);
+        world.player.init_appearance(assets, &mut world.entity_renderer);
+        world.camera.set_position(world.player.position());
+        world
     }
 
     pub fn sky_color(&self) -> Vector<f32, 3> {
@@ -131,6 +136,14 @@ impl<'world> World<'world> {
         }
     }
 
+    pub fn player(&mut self) -> &Player {
+        &self.player
+    }
+
+    pub fn player_mut(&mut self) -> &mut Player {
+        &mut self.player
+    }
+
     pub fn add_entity(&mut self, mut entity: Box<dyn Entity>, assets: &mut AssetPool) {
         entity.init_collision(&mut self.physics);
         entity.init_appearance(assets, &mut self.entity_renderer);
@@ -138,11 +151,19 @@ impl<'world> World<'world> {
     }
 
     pub fn get_entity(&self, uuid: Uuid) -> Option<&dyn Entity> {
-        self.entities.get(&uuid).map(Box::as_ref)
+        match self.entities.get(&uuid) {
+            Some(entity) => Some(entity.as_ref()),
+            None if uuid == self.player.uuid() => Some(&self.player),
+            None => None,
+        }
     }
 
     pub fn get_entity_mut(&mut self, uuid: Uuid) -> Option<&mut (dyn Entity + 'world)> {
-        self.entities.get_mut(&uuid).map(Box::as_mut)
+        match self.entities.get_mut(&uuid) {
+            Some(entity) => Some(entity.as_mut()),
+            None if uuid == self.player.uuid() => Some(&mut self.player),
+            None => None,
+        }
     }
 
     pub fn destroy_entity(&mut self, uuid: Uuid) -> bool {
@@ -152,21 +173,6 @@ impl<'world> World<'world> {
         }
         else {
             false
-        }
-    }
-
-    pub fn player_entity(&mut self) -> Option<Uuid> {
-        self.player_entity
-    }
-
-    pub fn set_player_entity(&mut self, entity: Option<Uuid>) {
-        self.player_entity = entity;
-
-        let player = entity
-            .as_ref()
-            .and_then(|uuid| self.entities.get(uuid));
-        if let Some(player) = player {
-            self.camera.set_position(player.position());
         }
     }
 
@@ -181,6 +187,7 @@ impl<'world> World<'world> {
         for entity in self.entities.values_mut() {
             entity.init_appearance(assets, &mut self.entity_renderer);
         }
+        self.player.init_appearance(assets, &mut self.entity_renderer);
     }
 
     pub fn update(&mut self, inputs: &InputState, dt: f32) {
@@ -191,6 +198,7 @@ impl<'world> World<'world> {
             // Perform tick actions
             self.tick();
         }
+
         for entity in self.entities.values_mut() {
             entity.update(
                 dt,
@@ -201,14 +209,16 @@ impl<'world> World<'world> {
                 &mut self.particles,
             );
         }
+        self.player.update(
+            dt,
+            inputs,
+            &mut self.physics,
+            &mut self.entity_renderer,
+            &mut self.chunks,
+            &mut self.particles,
+        );
 
-        let player = self.player_entity
-            .as_ref()
-            .and_then(|uuid| self.entities.get(uuid));
-        if let Some(player) = player {
-            self.camera.set_target(player.position());
-        }
-
+        self.camera.set_target(self.player.position());
         self.camera.update(dt);
         self.physics.step_simulation(dt);
         self.particles.update(dt);
@@ -233,20 +243,8 @@ impl<'world> World<'world> {
 
     fn tick(&mut self) {
         self.entity_renderer.tick();
-
-        let player = self.player_entity
-            .as_ref()
-            .and_then(|uuid| self.entities.get(uuid));
-
-        if let Some(held_item) = player.map(|player| player.held_item()) {
-            self.block_preview.set_block_type(held_item);
-        }
-        else {
-            self.block_preview.set_block_type(&block::types::AIR);
-        }
-
-        let player_position = player.map(|player| player.position());
-        self.chunks.tick(player_position, &mut self.physics);
+        self.block_preview.set_block_type(self.player.held_item());
+        self.chunks.tick(self.player.position(), &mut self.physics);
     }
 
     pub fn render(&mut self, assets: &AssetPool) {

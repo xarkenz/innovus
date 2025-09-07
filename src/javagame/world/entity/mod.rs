@@ -2,7 +2,7 @@ use innovus::tools::phys::{ColliderHandle, Physics};
 use crate::tools::*;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
-use crate::world::block::{BlockType, ChunkMap};
+use crate::world::block::ChunkMap;
 use crate::world::entity::render::EntityRenderer;
 use crate::world::particle::ParticleManager;
 
@@ -20,15 +20,6 @@ pub trait Entity {
     fn collider(&self) -> Option<&ColliderHandle> {
         // No collision by default
         None
-    }
-
-    fn held_item(&self) -> &'static BlockType {
-        &crate::world::block::types::AIR
-    }
-
-    fn set_held_item(&mut self, block_type: &'static BlockType) {
-        // Do nothing by default
-        let _ = block_type;
     }
 
     fn init_collision(&mut self, physics: &mut Physics) {

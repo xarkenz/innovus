@@ -19,15 +19,23 @@ struct PlayerAppearance {
     body: EntityPieceHandle,
 }
 
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum PlayerMode {
+    Normal,
+    Spectating,
+}
+
 const JUMP_COOLDOWN_SECONDS: f32 = 0.3;
 const COYOTE_TIME_SECONDS: f32 = 0.1;
 
 pub struct Player {
     uuid: Uuid,
     position: Vector<f32, 2>,
+    velocity: Vector<f32, 2>,
     collider: Option<phys::ColliderHandle>,
     appearance: Option<PlayerAppearance>,
     name: String,
+    mode: PlayerMode,
     held_item: &'static BlockType,
     crouching: bool,
     spawn_point: Option<Vector<i64, 2>>,
@@ -38,13 +46,15 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(position: Vector<f32, 2>, name: Option<String>) -> Self {
+    pub fn new(uuid: Uuid, position: Vector<f32, 2>, name: Option<String>, mode: PlayerMode) -> Self {
         Self {
-            uuid: generate_uuid(),
+            uuid,
             position,
+            velocity: Vector::zero(),
             collider: None,
             appearance: None,
             name: name.unwrap_or_else(|| "(anonymous)".into()),
+            mode,
             held_item: &crate::world::block::types::AIR,
             crouching: false,
             spawn_point: None,
@@ -57,6 +67,22 @@ impl Player {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn mode(&self) -> PlayerMode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, mode: PlayerMode) {
+        self.mode = mode;
+    }
+
+    pub fn held_item(&self) -> &'static BlockType {
+        self.held_item
+    }
+
+    pub fn set_held_item(&mut self, block_type: &'static BlockType) {
+        self.held_item = block_type;
     }
 
     pub fn respawn(&mut self, physics: &mut Physics) {
@@ -87,14 +113,6 @@ impl Entity for Player {
 
     fn collider(&self) -> Option<&phys::ColliderHandle> {
         self.collider.as_ref()
-    }
-
-    fn held_item(&self) -> &'static BlockType {
-        self.held_item
-    }
-
-    fn set_held_item(&mut self, block_type: &'static BlockType) {
-        self.held_item = block_type;
     }
 
     fn init_collision(&mut self, physics: &mut Physics) {
@@ -143,12 +161,34 @@ impl Entity for Player {
     ) {
         let _ = (chunks, particles);
 
-        let mut velocity = Vector::zero();
         let mut touching_ground = true;
 
-        if let Some(collider) = &self.collider {
+        if self.mode == PlayerMode::Spectating {
+            const SPEED_LIMIT: f32 = 20.0;
+
+            if inputs.key_is_held(Key::A) {
+                self.velocity.set_x((self.velocity.x() - self.movement_accel * dt).max(-SPEED_LIMIT));
+            }
+            if inputs.key_is_held(Key::D) {
+                self.velocity.set_x((self.velocity.x() + self.movement_accel * dt).min(SPEED_LIMIT));
+            }
+            if inputs.key_is_held(Key::S) {
+                self.velocity.set_y((self.velocity.y() - self.movement_accel * dt).max(-SPEED_LIMIT));
+            }
+            if inputs.key_is_held(Key::W) {
+                self.velocity.set_y((self.velocity.y() + self.movement_accel * dt).min(SPEED_LIMIT));
+            }
+
+            self.velocity = self.velocity.map(|x| movement::apply_friction(
+                x,
+                dt,
+                movement::DEFAULT_FRICTION_DECELERATION,
+            ));
+
+            self.position += self.velocity * dt;
+        }
+        else if let Some(collider) = &self.collider {
             let collider = physics.get_collider_mut(collider).unwrap();
-            velocity = collider.velocity;
 
             if collider.hit_bottom {
                 self.coyote_time = COYOTE_TIME_SECONDS;
@@ -210,6 +250,7 @@ impl Entity for Player {
                 movement::DEFAULT_FRICTION_DECELERATION,
             ));
 
+            self.velocity = collider.velocity;
             self.position.set_x(collider.rectangle.min_x() + pixels(5));
             self.position.set_y(collider.rectangle.min_y());
         }
@@ -218,12 +259,12 @@ impl Entity for Player {
             let body = renderer.get_piece_mut(&appearance.body);
             body.set_world_position(self.position);
 
-            if velocity.x() != 0.0 {
-                body.set_flip_x(velocity.x() < 0.0);
+            if self.velocity.x() != 0.0 {
+                body.set_flip_x(self.velocity.x() < 0.0);
             }
 
             if touching_ground {
-                if velocity.x() != 0.0 {
+                if self.velocity.x() != 0.0 {
                     if self.crouching {
                         body.set_image(&appearance.crouch_walk_image);
                     }
@@ -241,7 +282,7 @@ impl Entity for Player {
                 }
             }
             else {
-                if velocity.y() > 0.0 {
+                if self.velocity.y() > 0.0 {
                     body.set_image(&appearance.jump_ascend_image);
                 }
                 else {

@@ -506,51 +506,40 @@ impl ChunkMap {
         self.chunks.keys().copied()
     }
 
-    pub fn tick(&mut self, player_pos: Option<Vector<f32, 2>>, physics: &mut Physics) {
-        let locations_to_unload: Vec<ChunkLocation>;
-        let locations_to_detach: Vec<ChunkLocation>;
+    pub fn tick(&mut self, player_position: Vector<f32, 2>, physics: &mut Physics) {
+        let center_chunk_location = Vector([
+            player_position.x().div_euclid(CHUNK_SIZE as f32) as i64,
+            player_position.y().div_euclid(CHUNK_SIZE as f32) as i64,
+        ]);
 
-        if let Some(player_pos) = player_pos {
-            let center_chunk_location = Vector([
-                player_pos.x().div_euclid(CHUNK_SIZE as f32) as i64,
-                player_pos.y().div_euclid(CHUNK_SIZE as f32) as i64,
-            ]);
+        let mut chunk_load_range = self.chunk_load_range;
+        chunk_load_range.shift_by(center_chunk_location);
+        for chunk_y in chunk_load_range.min_y() ..= chunk_load_range.max_y() {
+            for chunk_x in chunk_load_range.min_x() ..= chunk_load_range.max_x() {
+                self.get_or_load_cell(Vector([chunk_x, chunk_y]), physics);
+            }
+        }
 
-            let mut chunk_load_range = self.chunk_load_range;
-            chunk_load_range.shift_by(center_chunk_location);
-            for chunk_y in chunk_load_range.min_y() ..= chunk_load_range.max_y() {
-                for chunk_x in chunk_load_range.min_x() ..= chunk_load_range.max_x() {
-                    self.get_or_load_cell(Vector([chunk_x, chunk_y]), physics);
+        let mut chunk_simulate_range = self.chunk_simulate_range;
+        chunk_simulate_range.shift_by(center_chunk_location);
+        for chunk_y in chunk_simulate_range.min_y() ..= chunk_simulate_range.max_y() {
+            for chunk_x in chunk_simulate_range.min_x() ..= chunk_simulate_range.max_x() {
+                if let Some(mut chunk) = self.get_mut(Vector([chunk_x, chunk_y])) {
+                    chunk.attach_physics(physics);
                 }
             }
-
-            let mut chunk_simulate_range = self.chunk_simulate_range;
-            chunk_simulate_range.shift_by(center_chunk_location);
-            for chunk_y in chunk_simulate_range.min_y() ..= chunk_simulate_range.max_y() {
-                for chunk_x in chunk_simulate_range.min_x() ..= chunk_simulate_range.max_x() {
-                    if let Some(mut chunk) = self.get_mut(Vector([chunk_x, chunk_y])) {
-                        chunk.attach_physics(physics);
-                    }
-                }
-            }
-
-            // Unload the chunks that are out of load range
-            locations_to_unload = self
-                .locations()
-                .filter(|&location| !chunk_load_range.contains_inclusive(location))
-                .collect();
-            // Detach physics for the chunks that are out of simulate range
-            locations_to_detach = self
-                .locations()
-                .filter(|&location| !chunk_simulate_range.contains_inclusive(location))
-                .collect();
         }
-        else {
-            // Unload all chunks
-            locations_to_unload = self.locations().collect();
-            // Don't worry about detaching physics, unloading a chunk does that automatically
-            locations_to_detach = Vec::new();
-        }
+
+        // Unload the chunks that are out of load range
+        let locations_to_unload: Vec<ChunkLocation> = self
+            .locations()
+            .filter(|&location| !chunk_load_range.contains_inclusive(location))
+            .collect();
+        // Detach physics for the chunks that are out of simulate range
+        let locations_to_detach: Vec<ChunkLocation> = self
+            .locations()
+            .filter(|&location| !chunk_simulate_range.contains_inclusive(location))
+            .collect();
 
         for location in locations_to_unload {
             self.unload(location, physics);
