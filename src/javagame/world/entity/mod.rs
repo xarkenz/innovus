@@ -1,4 +1,4 @@
-use innovus::tools::phys::{ColliderHandle, Physics};
+use innovus::tools::phys::Physics;
 use crate::tools::*;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
@@ -17,19 +17,24 @@ pub trait Entity {
 
     fn position(&self) -> Vector<f32, 2>;
 
-    fn collider(&self) -> Option<&ColliderHandle> {
-        // No collision by default
-        None
-    }
-
-    fn init_collision(&mut self, physics: &mut Physics) {
+    fn attach_collision(&mut self, physics: &mut Physics) {
         // Do nothing by default
         let _ = physics;
     }
 
-    fn init_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
+    fn attach_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
         // Do nothing by default
         let _ = (assets, renderer);
+    }
+
+    fn detach_collision(&mut self, physics: &mut Physics) {
+        // Do nothing by default
+        let _ = physics;
+    }
+
+    fn detach_appearance(&mut self, renderer: &mut EntityRenderer) {
+        // Do nothing by default
+        let _ = renderer;
     }
 
     fn update(
@@ -41,9 +46,4 @@ pub trait Entity {
         chunks: &mut ChunkMap,
         particles: &mut ParticleManager,
     );
-
-    fn destroy(&mut self, physics: &mut Physics, renderer: &mut EntityRenderer) {
-        // Do nothing by default
-        let _ = (physics, renderer);
-    }
 }

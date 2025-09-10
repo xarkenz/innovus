@@ -49,8 +49,8 @@ impl<'world> World<'world> {
             sky_color: Vector([0.6, 0.8, 1.0]),
             sky_light: 1.0,
         };
-        world.player.init_collision(&mut world.physics);
-        world.player.init_appearance(assets, &mut world.entity_renderer);
+        world.player.attach_collision(&mut world.physics);
+        world.player.attach_appearance(assets, &mut world.entity_renderer);
         world.camera.set_position(world.player.position());
         world
     }
@@ -145,8 +145,8 @@ impl<'world> World<'world> {
     }
 
     pub fn add_entity(&mut self, mut entity: Box<dyn Entity>, assets: &mut AssetPool) {
-        entity.init_collision(&mut self.physics);
-        entity.init_appearance(assets, &mut self.entity_renderer);
+        entity.attach_collision(&mut self.physics);
+        entity.attach_appearance(assets, &mut self.entity_renderer);
         self.entities.insert(entity.uuid(), entity);
     }
 
@@ -168,7 +168,8 @@ impl<'world> World<'world> {
 
     pub fn destroy_entity(&mut self, uuid: Uuid) -> bool {
         if let Some(mut entity) = self.entities.remove(&uuid) {
-            entity.destroy(&mut self.physics, &mut self.entity_renderer);
+            entity.detach_collision(&mut self.physics);
+            entity.detach_appearance(&mut self.entity_renderer);
             true
         }
         else {
@@ -185,9 +186,9 @@ impl<'world> World<'world> {
             chunk.set_all_need_render();
         }
         for entity in self.entities.values_mut() {
-            entity.init_appearance(assets, &mut self.entity_renderer);
+            entity.attach_appearance(assets, &mut self.entity_renderer);
         }
-        self.player.init_appearance(assets, &mut self.entity_renderer);
+        self.player.attach_appearance(assets, &mut self.entity_renderer);
     }
 
     pub fn update(&mut self, inputs: &InputState, dt: f32) {

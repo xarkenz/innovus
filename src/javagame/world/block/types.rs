@@ -50,6 +50,11 @@ fn connects_to_electricity(this: &Block, that: &Block) -> bool {
         that.block_type() == &VOLTAGITE_BATTERY
 }
 
+fn connects_to_pipe(this: &Block, that: &Block) -> bool {
+    let _ = this;
+    that.block_type() == &PIPE || that.block_type() == &PIPE_SPOUT
+}
+
 fn right_click_no_action(this: &Block, hand: &'static BlockType) -> Option<Block> {
     let _ = (this, hand);
     None
@@ -95,6 +100,7 @@ pub const BLOCK_TYPES: &[&BlockType] = &[
     &PHYLUMUS_BLOCK,
     &PHYLUMUS_MUSHROOM,
     &PIPE,
+    &PIPE_SPOUT,
     &QUARTZ_BLOCK,
     &QUARTZ_CRYSTAL,
     &QUARTZ_ORE,
@@ -288,7 +294,7 @@ pub static PHYLUMUS_BLOCK: BlockType = BlockType {
 pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
     name: "phylumus_mushroom",
     attributes: &[
-        ("shape", AttributeType::Enum { default_value: 0, value_names: &["center", "left", "right"] }),
+        ("size", AttributeType::Enum { default_value: 0, value_names: &["large", "small"] }),
     ],
     colliders: &[],
     palette_key: Some("phylumus"),
@@ -300,7 +306,7 @@ pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
     right_click: |block, _| {
         let mut block = block.clone();
         let shape = block.attribute_value(0).expect_u8();
-        block.set_attribute_value(0, AttributeValue::U8((shape + 1) % 3));
+        block.set_attribute_value(0, AttributeValue::U8((shape + 1) % 2));
         Some(block)
     },
     ..DEFAULTS
@@ -310,7 +316,23 @@ pub static PIPE: BlockType = BlockType {
     colliders: &[],
     palette_key: Some("aluminum"),
     is_full_block: full_block_never,
-    connects_to: connects_to_same_type,
+    connects_to: connects_to_pipe,
+    ..DEFAULTS
+};
+pub static PIPE_SPOUT: BlockType = BlockType {
+    name: "pipe_spout",
+    attributes: &[
+        ("direction", AttributeType::Enum { default_value: 0, value_names: &["down", "left", "right", "up"] }),
+    ],
+    colliders: &[],
+    palette_key: Some("aluminum"),
+    is_full_block: full_block_never,
+    right_click: |block, _| {
+        let mut block = block.clone();
+        let direction = block.attribute_value(0).expect_u8();
+        block.set_attribute_value(0, AttributeValue::U8((direction + 1) % 4));
+        Some(block)
+    },
     ..DEFAULTS
 };
 pub static QUARTZ_BLOCK: BlockType = BlockType {

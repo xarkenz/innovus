@@ -111,11 +111,7 @@ impl Entity for Player {
         self.position
     }
 
-    fn collider(&self) -> Option<&phys::ColliderHandle> {
-        self.collider.as_ref()
-    }
-
-    fn init_collision(&mut self, physics: &mut Physics) {
+    fn attach_collision(&mut self, physics: &mut Physics) {
         self.collider = Some(physics.add_collider(phys::Collider::new(
             Rectangle::from_size(
                 Vector([self.position.x() - pixels(5), self.position.y()]),
@@ -125,7 +121,7 @@ impl Entity for Player {
         )));
     }
 
-    fn init_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
+    fn attach_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
         if let Some(appearance) = self.appearance.take() {
             renderer.remove_piece(appearance.body);
         }
@@ -148,6 +144,18 @@ impl Entity for Player {
             crouch_walk_image,
             body: renderer.add_piece(body),
         });
+    }
+
+    fn detach_collision(&mut self, physics: &mut Physics) {
+        if let Some(collider) = self.collider.take() {
+            physics.remove_collider(collider);
+        }
+    }
+
+    fn detach_appearance(&mut self, renderer: &mut EntityRenderer) {
+        if let Some(appearance) = self.appearance.take() {
+            renderer.remove_piece(appearance.body);
+        }
     }
 
     fn update(
@@ -289,15 +297,6 @@ impl Entity for Player {
                     body.set_image(&appearance.jump_descend_image);
                 }
             }
-        }
-    }
-
-    fn destroy(&mut self, physics: &mut Physics, renderer: &mut EntityRenderer) {
-        if let Some(collider) = self.collider.take() {
-            physics.remove_collider(collider);
-        }
-        if let Some(appearance) = self.appearance.take() {
-            renderer.remove_piece(appearance.body);
         }
     }
 }

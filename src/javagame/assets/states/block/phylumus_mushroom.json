@@ -1,27 +1,20 @@
 [
   {
     "condition": {
-      "shape": "center"
+      "size": "large"
     },
     "images": [
-      "block/{block_type}/shape_center_0",
-      "block/{block_type}/shape_center_1"
+      "block/{block_type}/size_large_0",
+      "block/{block_type}/size_large_1"
     ]
   },
   {
     "condition": {
-      "shape": "left"
+      "size": "small"
     },
     "images": [
-      "block/{block_type}/shape_left"
-    ]
-  },
-  {
-    "condition": {
-      "shape": "right"
-    },
-    "images": [
-      "block/{block_type}/shape_right"
+      "block/{block_type}/size_small_0",
+      "block/{block_type}/size_small_1"
     ]
   }
 ]

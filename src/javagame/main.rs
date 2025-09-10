@@ -2,6 +2,7 @@ use glfw::{Context, SwapInterval, WindowEvent, WindowMode};
 use innovus::tools::Vector;
 use crate::game::Game;
 use crate::tools::input::InputState;
+use crate::world::gen::types::OverworldGenerator;
 
 pub mod tools;
 pub mod view;
@@ -40,7 +41,7 @@ fn main() {
     };
 
     let mut game = Game::start("src/javagame/assets", viewport_size).unwrap();
-    game.enter_world(Some(Box::new(world::gen::types::OverworldGenerator::new(0))));
+    game.enter_world(Some(Box::new(OverworldGenerator::new(0))));
 
     while !window.should_close() {
         input_state.reset();
