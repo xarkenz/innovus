@@ -1146,9 +1146,18 @@ impl FromStr for Geometry<Vertex3D> {
                 }
                 vertices.push(Vertex3D::new(
                     positions[element[0] - 1],
-                    colors.get(element[3] - 1).copied(),
-                    textures.get(element[1] - 1).copied(),
-                    normals.get(element[2] - 1).copied(),
+                    match element[3] {
+                        0 => None,
+                        color_index => colors.get(color_index - 1).copied()
+                    },
+                    match element[1] {
+                        0 => None,
+                        texture_index => textures.get(texture_index - 1).copied()
+                    },
+                    match element[2] {
+                        0 => None,
+                        normal_index => normals.get(normal_index - 1).copied()
+                    },
                 ));
             }
         }

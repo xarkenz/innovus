@@ -308,9 +308,9 @@ fn main() {
         shader_program.set_uniform("tex_atlas", &test_tex);
 
         screen::clear();
-        // board_geometry.render();
-        // snek_geometry.render();
-        kooper.render();
+        board_geometry.render();
+        snek_geometry.render();
+        // kooper.render();
         window.swap_buffers();
     }
 }

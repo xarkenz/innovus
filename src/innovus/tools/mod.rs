@@ -352,8 +352,10 @@ pub struct Matrix<T: Float + NumAssign, const R: usize, const C: usize>(
     pub [Vector<T, R>; C],
 );
 
+#[allow(type_alias_bounds)]
 pub type Transform2D<T: Float + NumAssign> = Matrix<T, 3, 3>;
 
+#[allow(type_alias_bounds)]
 pub type Transform3D<T: Float + NumAssign> = Matrix<T, 4, 4>;
 
 impl<T: Float + NumAssign, const R: usize, const C: usize> Matrix<T, R, C> {
