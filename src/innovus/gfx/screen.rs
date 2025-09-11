@@ -1,8 +1,5 @@
-extern crate gl;
-extern crate glfw;
-
 use gl::types::*;
-
+use crate::gfx::color::RGBColor;
 
 pub fn bind_glfw(manager: &glfw::Glfw) {
     gl::load_with(|symbol| unsafe {
@@ -10,10 +7,20 @@ pub fn bind_glfw(manager: &glfw::Glfw) {
     });
 }
 
-
-pub fn set_clear_color(r: GLfloat, g: GLfloat, b: GLfloat) {
+pub fn set_clear_color(color: RGBColor) {
     unsafe {
-        gl::ClearColor(r, g, b, 1.0);
+        gl::ClearColor(
+            color.r() as GLfloat,
+            color.g() as GLfloat,
+            color.b() as GLfloat,
+            1.0,
+        );
+    }
+}
+
+pub fn clear() {
+    unsafe {
+        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
     }
 }
 
@@ -65,13 +72,5 @@ pub fn set_depth_testing(enable: bool) {
 pub fn set_viewport(x: i32, y: i32, width: i32, height: i32) {
     unsafe {
         gl::Viewport(x as GLint, y as GLint, width as GLsizei, height as GLsizei);
-    }
-}
-
-
-pub fn clear() {
-    unsafe {
-        gl::Clear(gl::COLOR_BUFFER_BIT);
-        gl::Clear(gl::DEPTH_BUFFER_BIT);
     }
 }

@@ -951,7 +951,7 @@ impl Geometry<Vertex3D> {
         self.add(&vertices, &faces)
     }
 
-    pub fn transform(&mut self, slice: &GeometrySlice, matrix: Transform3D) {
+    pub fn transform(&mut self, slice: &GeometrySlice, matrix: Transform3D<f32>) {
         for index in 0..slice.vertex_count {
             let index = slice.first_vertex + index;
             let vertex = self.vertex_at_mut(index);
@@ -965,25 +965,25 @@ impl Geometry<Vertex3D> {
 
     pub fn rotate_x(&mut self, slice: &GeometrySlice, angle: f32, axis_y: f32, axis_z: f32) {
         let mut rotation = Transform3D::identity();
-        rotation.translate(0.0, axis_y, axis_z);
+        rotation.translate(Vector([0.0, axis_y, axis_z]));
         rotation.rotate_x(angle);
-        rotation.translate(0.0, -axis_y, -axis_z);
+        rotation.translate(Vector([0.0, -axis_y, -axis_z]));
         self.transform(slice, rotation);
     }
 
     pub fn rotate_y(&mut self, slice: &GeometrySlice, angle: f32, axis_x: f32, axis_z: f32) {
         let mut rotation = Transform3D::identity();
-        rotation.translate(axis_x, 0.0, axis_z);
+        rotation.translate(Vector([axis_x, 0.0, axis_z]));
         rotation.rotate_y(angle);
-        rotation.translate(-axis_x, 0.0, -axis_z);
+        rotation.translate(Vector([-axis_x, 0.0, -axis_z]));
         self.transform(slice, rotation);
     }
 
     pub fn rotate_z(&mut self, slice: &GeometrySlice, angle: f32, axis_x: f32, axis_y: f32) {
         let mut rotation = Transform3D::identity();
-        rotation.translate(axis_x, axis_y, 0.0);
+        rotation.translate(Vector([axis_x, axis_y, 0.0]));
         rotation.rotate_z(angle);
-        rotation.translate(-axis_x, -axis_y, 0.0);
+        rotation.translate(Vector([-axis_x, -axis_y, 0.0]));
         self.transform(slice, rotation);
     }
 }

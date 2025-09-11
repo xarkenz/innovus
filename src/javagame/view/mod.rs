@@ -4,8 +4,8 @@ pub mod block_preview;
 pub mod text;
 
 pub struct Camera {
-    view: Transform3D,
-    projection: Transform3D,
+    view: Transform3D<f32>,
+    projection: Transform3D<f32>,
     position: Vector<f32, 2>,
     target: Vector<f32, 2>,
     size: Vector<f32, 2>,
@@ -26,15 +26,15 @@ impl Camera {
         }
     }
 
-    pub fn view(&self) -> Transform3D {
+    pub fn view(&self) -> Transform3D<f32> {
         self.view
     }
 
-    pub fn projection(&self) -> Transform3D {
+    pub fn projection(&self) -> Transform3D<f32> {
         self.projection
     }
 
-    pub fn view_projection(&self) -> Transform3D {
+    pub fn view_projection(&self) -> Transform3D<f32> {
         self.projection * self.view
     }
 
@@ -105,11 +105,11 @@ impl Camera {
             -100.0,
         );
 
-        if self.position.equals_delta(&self.target, 1.0 / self.zoom) {
+        if self.position.equals_delta(self.target, 1.0 / self.zoom) {
             self.snap_to_target();
         }
         else {
-            self.position = self.position.lerp(&self.target, (self.speed * dt).min(1.0));
+            self.position = self.position.lerp(self.target, (self.speed * dt).min(1.0));
         }
     }
 }

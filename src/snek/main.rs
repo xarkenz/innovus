@@ -4,6 +4,7 @@ use glfw::{Action, Context, Key, MouseButton};
 use innovus::gfx::*;
 use innovus::tools::{AnimationTimer, Clock, Easing, Transform3D, Vector};
 use std::{collections::VecDeque, f32::consts, str::FromStr};
+use innovus::gfx::color::RGBColor;
 
 const BOARD_W: u32 = 10;
 const BOARD_H: u32 = 10;
@@ -124,7 +125,7 @@ fn main() {
     test_tex.set_wrap_t(TextureWrap::MirroredRepeat);
     test_tex.upload_image(&test_image);
 
-    screen::set_clear_color(0.6, 0.9, 1.0);
+    screen::set_clear_color(RGBColor::new(0.6, 0.9, 1.0));
     screen::set_blend(screen::Blend::Transparency);
     screen::set_viewport(0, 0, 800, 800);
     screen::set_culling(true);
@@ -157,7 +158,7 @@ fn main() {
         let mut transform_thingy = Transform3D::identity();
         transform_thingy.rotate_z(-consts::FRAC_PI_2);
         transform_thingy.rotate_y(consts::FRAC_PI_2);
-        transform_thingy.translate(0.0, 0.0, -10.0);
+        transform_thingy.translate(Vector([0.0, 0.0, -10.0]));
         kooper.transform(&kooper.as_slice(), transform_thingy);
     }
 
@@ -291,7 +292,7 @@ fn main() {
         camera_view.reset_to_identity();
         camera_view.rotate_x(cam_p_anim.value());
         camera_view.rotate_y(cam_a_anim.value());
-        camera_view.translate(-camera_pos.x(), -camera_pos.y(), -camera_pos.z());
+        camera_view.translate(-camera_pos);
 
         camera_proj.reset_to_identity();
         camera_proj.perspective(90.0, width as f32 / height as f32, 1.0, 100.0);

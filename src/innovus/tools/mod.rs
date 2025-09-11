@@ -56,7 +56,7 @@ impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
         self.0 = [value; N];
     }
 
-    pub fn dot(&self, rhs: &Self) -> T {
+    pub fn dot(&self, rhs: Self) -> T {
         let mut dot_product = T::zero();
         for index in 0..N {
             dot_product += self.at(index) * rhs.at(index);
@@ -75,7 +75,7 @@ impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
 
 impl<T: Float + NumAssign, const N: usize> Vector<T, N> {
     pub fn magnitude(&self) -> T {
-        self.dot(self).sqrt()
+        self.dot(*self).sqrt()
     }
 
     pub fn normalized(&self) -> Self {
@@ -83,11 +83,11 @@ impl<T: Float + NumAssign, const N: usize> Vector<T, N> {
         Vector(self.0.map(|component| component / magnitude))
     }
 
-    pub fn equals_delta(&self, other: &Self, delta: T) -> bool {
+    pub fn equals_delta(&self, other: Self, delta: T) -> bool {
         std::iter::zip(&self.0, &other.0).all(|(&a, &b)| (a - b).abs() <= delta)
     }
 
-    pub fn lerp(&self, other: &Self, t: T) -> Self {
+    pub fn lerp(&self, other: Self, t: T) -> Self {
         let mut result = Vector::zero();
         for index in 0..N {
             result.set(index, self.at(index) * (T::one() - t) + other.at(index) * t);
@@ -151,7 +151,7 @@ impl<T: NumAssign + Copy> Vector<T, 3> {
         Vector([self.x(), self.y(), self.z(), w])
     }
 
-    pub fn cross(&self, rhs: &Self) -> Self {
+    pub fn cross(&self, rhs: Self) -> Self {
         Vector([
             self.y() * rhs.z() - self.z() * rhs.y(),
             self.z() * rhs.x() - self.x() * rhs.z(),
@@ -352,8 +352,9 @@ pub struct Matrix<T: Float + NumAssign, const R: usize, const C: usize>(
     pub [Vector<T, R>; C],
 );
 
-pub type Transform2D = Matrix<f32, 3, 3>;
-pub type Transform3D = Matrix<f32, 4, 4>;
+pub type Transform2D<T: Float + NumAssign> = Matrix<T, 3, 3>;
+
+pub type Transform3D<T: Float + NumAssign> = Matrix<T, 4, 4>;
 
 impl<T: Float + NumAssign, const R: usize, const C: usize> Matrix<T, R, C> {
     pub fn zero() -> Self {
@@ -447,8 +448,8 @@ impl<T: Float + NumAssign, const N: usize> Matrix<T, N, N> {
     }
 }
 
-impl Transform3D {
-    pub fn affine(&self) -> Matrix<f32, 3, 3> {
+impl<T: Float + NumAssign> Transform3D<T> {
+    pub fn affine(&self) -> Matrix<T, 3, 3> {
         Matrix([
             Vector([self[0][0], self[0][1], self[0][2]]),
             Vector([self[1][0], self[1][1], self[1][2]]),
@@ -456,57 +457,63 @@ impl Transform3D {
         ])
     }
 
-    pub fn rotate_x(&mut self, angle: f32) {
+    pub fn rotate_x(&mut self, angle: T) {
+        let zero = T::zero();
+        let one = T::one();
         let (sin, cos) = angle.sin_cos();
-        self.mul_assign(Matrix([
-            Vector([1.0, 0.0, 0.0, 0.0]),
-            Vector([0.0, cos, -sin, 0.0]),
-            Vector([0.0, sin, cos, 0.0]),
-            Vector([0.0, 0.0, 0.0, 1.0]),
+        self.mul_assign(Self([
+            Vector([one, zero, zero, zero]),
+            Vector([zero, cos, -sin, zero]),
+            Vector([zero, sin, cos, zero]),
+            Vector([zero, zero, zero, one]),
         ]));
     }
 
-    pub fn rotate_y(&mut self, angle: f32) {
+    pub fn rotate_y(&mut self, angle: T) {
+        let zero = T::zero();
+        let one = T::one();
         let (sin, cos) = angle.sin_cos();
-        self.mul_assign(Matrix([
-            Vector([cos, 0.0, sin, 0.0]),
-            Vector([0.0, 1.0, 0.0, 0.0]),
-            Vector([-sin, 0.0, cos, 0.0]),
-            Vector([0.0, 0.0, 0.0, 1.0]),
+        self.mul_assign(Self([
+            Vector([cos, zero, sin, zero]),
+            Vector([zero, one, zero, zero]),
+            Vector([-sin, zero, cos, zero]),
+            Vector([zero, zero, zero, one]),
         ]));
     }
 
-    pub fn rotate_z(&mut self, angle: f32) {
+    pub fn rotate_z(&mut self, angle: T) {
+        let zero = T::zero();
+        let one = T::one();
         let (sin, cos) = angle.sin_cos();
-        self.mul_assign(Matrix([
-            Vector([cos, sin, 0.0, 0.0]),
-            Vector([-sin, cos, 0.0, 0.0]),
-            Vector([0.0, 0.0, 1.0, 0.0]),
-            Vector([0.0, 0.0, 0.0, 1.0]),
+        self.mul_assign(Self([
+            Vector([cos, sin, zero, zero]),
+            Vector([-sin, cos, zero, zero]),
+            Vector([zero, zero, one, zero]),
+            Vector([zero, zero, zero, one]),
         ]));
     }
 
-    pub fn translate(&mut self, dx: f32, dy: f32, dz: f32) {
-        let to_add = self[0] * dx + self[1] * dy + self[2] * dz;
+    pub fn translate(&mut self, amount: Vector<T, 3>) {
+        let to_add = self[0] * amount.x() + self[1] * amount.y() + self[2] * amount.z();
         self[3] += to_add;
     }
 
-    pub fn scale(&mut self, x_by: f32, y_by: f32, z_by: f32) {
-        self.scale_x(x_by);
-        self.scale_y(y_by);
-        self.scale_z(z_by);
+    pub fn scale(&mut self, amount: Vector<T, 3>) {
+        self.scale_x(amount.x());
+        self.scale_y(amount.y());
+        self.scale_z(amount.z());
     }
 
-    pub fn scale_x(&mut self, by: f32) {
-        self[0] *= by;
+    pub fn scale_x(&mut self, amount: T) {
+        self[0] *= amount;
     }
 
-    pub fn scale_y(&mut self, by: f32) {
-        self[1] *= by;
+    pub fn scale_y(&mut self, amount: T) {
+        self[1] *= amount;
     }
 
-    pub fn scale_z(&mut self, by: f32) {
-        self[2] *= by;
+    pub fn scale_z(&mut self, amount: T) {
+        self[2] *= amount;
     }
 
     pub fn inverted(&self) -> Self {
@@ -552,67 +559,58 @@ impl Transform3D {
         ])
     }
 
-    pub fn set_look_at(&mut self, eye: Vector<f32, 3>, center: Vector<f32, 3>, up: Vector<f32, 3>) {
+    pub fn set_look_at(&mut self, eye: Vector<T, 3>, center: Vector<T, 3>, up: Vector<T, 3>) {
         let forward = (eye - center).normalized();
-        let right = up.cross(&forward).normalized();
-        let up = forward.cross(&right).normalized();
+        let right = up.cross(forward).normalized();
+        let up = forward.cross(right).normalized();
 
-        self[0].0 = [right.x(), up.x(), forward.x(), 0.0];
-        self[1].0 = [right.y(), up.y(), forward.y(), 0.0];
-        self[2].0 = [right.z(), up.z(), forward.z(), 0.0];
-        self[3].0 = [-right.dot(&eye), -up.dot(&eye), -forward.dot(&eye), 1.0];
+        self[0].0 = [right.x(), up.x(), forward.x(), T::zero()];
+        self[1].0 = [right.y(), up.y(), forward.y(), T::zero()];
+        self[2].0 = [right.z(), up.z(), forward.z(), T::zero()];
+        self[3].0 = [-right.dot(eye), -up.dot(eye), -forward.dot(eye), T::one()];
     }
 
-    pub fn new_look_at(
-        eye: Vector<f32, 3>,
-        center: Vector<f32, 3>,
-        up: Vector<f32, 3>,
-    ) -> Transform3D {
-        let mut transform = Transform3D::zero();
+    pub fn new_look_at(eye: Vector<T, 3>, center: Vector<T, 3>, up: Vector<T, 3>) -> Self {
+        let mut transform = Self::zero();
         transform.set_look_at(eye, center, up);
         transform
     }
 
-    pub fn look_at(&mut self, eye: Vector<f32, 3>, center: Vector<f32, 3>, up: Vector<f32, 3>) {
-        let transform = Transform3D::new_look_at(eye, center, up);
+    pub fn look_at(&mut self, eye: Vector<T, 3>, center: Vector<T, 3>, up: Vector<T, 3>) {
+        let transform = Self::new_look_at(eye, center, up);
         self.mul_assign(transform);
     }
 
-    pub fn orthographic(
-        &mut self,
-        left: f32,
-        right: f32,
-        bottom: f32,
-        top: f32,
-        near: f32,
-        far: f32,
-    ) {
-        self.translate(
+    pub fn orthographic(&mut self, left: T, right: T, bottom: T, top: T, near: T, far: T) {
+        self.translate(Vector([
             (left + right) / (left - right),
             (bottom + top) / (bottom - top),
             (near + far) / (near - far),
-        );
-        self.scale(
-            2.0 / (right - left),
-            2.0 / (top - bottom),
-            2.0 / (near - far),
-        );
+        ]));
+        let two = T::one() + T::one();
+        self.scale(Vector([
+            two / (right - left),
+            two / (top - bottom),
+            two / (near - far),
+        ]));
     }
 
-    pub fn frustum(&mut self, left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) {
-        let mut transform = Transform3D::zero();
-        transform[0][0] = 2.0 * near / (right - left);
-        transform[1][1] = 2.0 * near / (top - bottom);
+    pub fn frustum(&mut self, left: T, right: T, bottom: T, top: T, near: T, far: T) {
+        let two = T::one() + T::one();
+        let mut transform = Self::zero();
+        transform[0][0] = two * near / (right - left);
+        transform[1][1] = two * near / (top - bottom);
         transform[0][2] = (right + left) / (right - left);
         transform[1][2] = (top + bottom) / (top - bottom);
         transform[2][2] = (far + near) / (near - far);
-        transform[3][2] = 2.0 * near * far / (near - far);
-        transform[2][3] = -1.0;
-        self.mul_assign(transform);
+        transform[3][2] = two * near * far / (near - far);
+        transform[2][3] = -T::one();
+        *self *= transform;
     }
 
-    pub fn perspective(&mut self, field_of_view: f32, aspect_ratio: f32, near: f32, far: f32) {
-        let scale: f32 = (0.5 * field_of_view).to_radians().tan() * near;
+    pub fn perspective(&mut self, field_of_view: T, aspect_ratio: T, near: T, far: T) {
+        let two = T::one() + T::one();
+        let scale = (field_of_view / two).to_radians().tan() * near;
         self.frustum(
             -scale * aspect_ratio,
             scale * aspect_ratio,
@@ -762,12 +760,13 @@ impl<T: Float + NumAssign, const R: usize, const C: usize> MulAssign<Matrix<T, C
     }
 }
 
-impl Mul<Vector<f32, 3>> for Transform3D {
-    type Output = Vector<f32, 3>;
+impl<T: Float + NumAssign> Mul<Vector<T, 3>> for Transform3D<T> {
+    type Output = Vector<T, 3>;
 
-    fn mul(self, rhs: Vector<f32, 3>) -> Self::Output {
-        let scale =
-            1.0 / (self[0][3] * rhs.x() + self[1][3] * rhs.y() + self[2][3] * rhs.z() + self[3][3]);
+    fn mul(self, rhs: Vector<T, 3>) -> Self::Output {
+        let scale = T::one() / (
+            self[0][3] * rhs.x() + self[1][3] * rhs.y() + self[2][3] * rhs.z() + self[3][3]
+        );
         Vector([
             (self[0][0] * rhs.x() + self[1][0] * rhs.y() + self[2][0] * rhs.z() + self[3][0])
                 * scale,

@@ -1,5 +1,6 @@
 use std::path::Path;
 use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight};
+use innovus::gfx::color::RGBColor;
 use innovus::gfx::screen;
 use innovus::tools::{Clock, Transform3D, Vector};
 use crate::tools::asset::AssetPool;
@@ -27,7 +28,7 @@ pub struct Game<'world> {
     fps_tracker_index: usize,
     fps_string_renderer: StringRenderer,
     viewport_size: Vector<f32, 2>,
-    gui_projection: Transform3D,
+    gui_projection: Transform3D<f32>,
     assets: AssetPool,
     current_world: Option<World<'world>>,
     selected_block_index: usize,
@@ -176,10 +177,10 @@ impl<'world> Game<'world> {
             clear_color = world.sky_color();
         }
         else {
-            clear_color = Vector::zero();
+            clear_color = RGBColor::black();
         }
 
-        screen::set_clear_color(clear_color.x(), clear_color.y(), clear_color.z());
+        screen::set_clear_color(clear_color);
         screen::clear();
 
         if let Some(world) = &mut self.current_world {

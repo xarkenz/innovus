@@ -1,5 +1,6 @@
 use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
+use innovus::gfx::color::RGBColor;
 use innovus::tools::phys::Physics;
 use crate::tools::*;
 use crate::tools::asset::AssetPool;
@@ -55,8 +56,8 @@ impl<'world> World<'world> {
         world
     }
 
-    pub fn sky_color(&self) -> Vector<f32, 3> {
-        self.sky_color * self.sky_light
+    pub fn sky_color(&self) -> RGBColor {
+        RGBColor(self.sky_color * self.sky_light)
     }
 
     pub fn camera(&self) -> &Camera {

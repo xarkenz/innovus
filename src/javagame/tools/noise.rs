@@ -179,10 +179,10 @@ impl PerlinNoiseCell2D {
         let offset_10 = offset - Vector([1.0, 0.0]);
         let offset_11 = offset - Vector([1.0, 1.0]);
 
-        let dot_00 = self.grad_00.dot(&offset_00);
-        let dot_01 = self.grad_01.dot(&offset_01);
-        let dot_10 = self.grad_10.dot(&offset_10);
-        let dot_11 = self.grad_11.dot(&offset_11);
+        let dot_00 = self.grad_00.dot(offset_00);
+        let dot_01 = self.grad_01.dot(offset_01);
+        let dot_10 = self.grad_10.dot(offset_10);
+        let dot_11 = self.grad_11.dot(offset_11);
 
         interpolate(
             interpolate(dot_00, dot_10, offset.x()),
