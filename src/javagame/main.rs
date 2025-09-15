@@ -8,6 +8,7 @@ pub mod tools;
 pub mod view;
 pub mod world;
 pub mod game;
+pub mod gui;
 
 fn main() {
     let mut glfw = {
@@ -24,7 +25,7 @@ fn main() {
 
     window.make_current();
     window.maximize();
-    window.set_size_polling(true);
+    window.set_framebuffer_size_polling(true);
     window.set_cursor_pos_polling(true);
     window.set_mouse_button_polling(true);
     window.set_key_polling(true);
@@ -36,11 +37,15 @@ fn main() {
     let mut input_state = InputState::new();
 
     let viewport_size = {
-        let (width, height) = window.get_size();
+        let (width, height) = window.get_framebuffer_size();
         Vector([width as f32, height as f32])
     };
+    let _content_scale = {
+        let (x, y) = window.get_content_scale();
+        Vector([x, y])
+    };
 
-    let mut game = Game::start("src/javagame/assets", viewport_size).unwrap();
+    let mut game = Game::start("src/javagame/assets", viewport_size, Vector::one()).unwrap();
     game.enter_world(Some(Box::new(OverworldGenerator::new(0))));
 
     while !window.should_close() {
@@ -49,7 +54,7 @@ fn main() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&event_receiver) {
             match event {
-                WindowEvent::Size(width, height) => {
+                WindowEvent::FramebufferSize(width, height) => {
                     game.set_viewport_size(Vector([width as f32, height as f32]));
                 }
                 WindowEvent::Key(key, _scancode, action, mods) => {

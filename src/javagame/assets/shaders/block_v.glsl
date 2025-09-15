@@ -6,22 +6,14 @@ uniform sampler2D tex_atlas;
 
 layout(location = 0) in vec3 vertex_pos;
 layout(location = 1) in vec4 vertex_color;
-layout(location = 2) in uint vertex_tex;
-layout(location = 3) in vec2 vertex_uv;
+layout(location = 2) in vec2 vertex_uv;
 
-out vec3 frag_pos;
 out vec4 frag_color;
-out float frag_tex;
 out vec2 frag_uv;
 
 void main() {
-    frag_pos = vertex_pos;
     frag_color = vertex_color;
-    frag_tex = float(vertex_tex);
-
-    if (bool(vertex_tex)) {
-        frag_uv = vertex_uv / textureSize(tex_atlas, 0);
-    }
+    frag_uv = vertex_uv / textureSize(tex_atlas, 0);
 
     gl_Position = camera_proj * camera_view * vec4(vertex_pos, 1.0);
 }

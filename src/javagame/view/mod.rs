@@ -1,7 +1,6 @@
 use innovus::tools::*;
 
 pub mod block_preview;
-pub mod text;
 
 pub struct Camera {
     view: Transform3D<f32>,
@@ -9,12 +8,12 @@ pub struct Camera {
     position: Vector<f32, 2>,
     target: Vector<f32, 2>,
     size: Vector<f32, 2>,
-    zoom: f32,
+    zoom: Vector<f32, 2>,
     speed: f32,
 }
 
 impl Camera {
-    pub fn new(position: Vector<f32, 2>, size: Vector<f32, 2>, zoom: f32, speed: f32) -> Self {
+    pub fn new(position: Vector<f32, 2>, size: Vector<f32, 2>, zoom: Vector<f32, 2>, speed: f32) -> Self {
         Self {
             view: Transform3D::identity(),
             projection: Transform3D::identity(),
@@ -66,11 +65,11 @@ impl Camera {
         self.size = size;
     }
 
-    pub fn zoom(&self) -> f32 {
+    pub fn zoom(&self) -> Vector<f32, 2> {
         self.zoom
     }
 
-    pub fn set_zoom(&mut self, zoom: f32) {
+    pub fn set_zoom(&mut self, zoom: Vector<f32, 2>) {
         self.zoom = zoom;
     }
 
@@ -95,17 +94,17 @@ impl Camera {
         );
 
         self.projection.reset_to_identity();
-        let scale = 0.5 / self.zoom;
+        let pixel_size = self.zoom.map(|x| 1.0 / x);
         self.projection.orthographic(
-            self.size.x() * -scale,
-            self.size.x() * scale,
-            self.size.y() * -scale,
-            self.size.y() * scale,
+            self.size.x() * -pixel_size.x() / 2.0,
+            self.size.x() * pixel_size.x() / 2.0,
+            self.size.y() * -pixel_size.y() / 2.0,
+            self.size.y() * pixel_size.y() / 2.0,
             100.0,
             -100.0,
         );
 
-        if self.position.equals_delta(self.target, 1.0 / self.zoom) {
+        if self.position.equals_delta(self.target, pixel_size) {
             self.snap_to_target();
         }
         else {

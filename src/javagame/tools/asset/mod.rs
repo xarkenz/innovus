@@ -16,6 +16,10 @@ pub mod anim;
 pub struct AssetPool {
     assets_path: PathBuf,
     default_shaders: Program,
+    gui_texture: Texture2D,
+    gui_atlas: ImageAtlas,
+    gui_images: HashMap<String, Rectangle<u32>>,
+    gui_shaders: Program,
     block_texture: Texture2D,
     block_atlas: ImageAtlas,
     block_appearances: HashMap<*const BlockType, BlockAppearance>,
@@ -29,37 +33,30 @@ pub struct AssetPool {
 
 impl AssetPool {
     pub fn load(assets_path: impl AsRef<Path>) -> Result<Self, String> {
-        let assets_path = assets_path.as_ref();
-
-        let mut block_texture = Texture2D::new(0);
-        block_texture.set_minify_filter(TextureSampling::Nearest);
-        block_texture.set_magnify_filter(TextureSampling::Nearest);
-        block_texture.set_wrap_s(TextureWrap::Repeat);
-        block_texture.set_wrap_t(TextureWrap::Repeat);
-
-        let mut entity_texture = Texture2D::new(0);
-        entity_texture.set_minify_filter(TextureSampling::Nearest);
-        entity_texture.set_magnify_filter(TextureSampling::Nearest);
-        entity_texture.set_wrap_s(TextureWrap::Repeat);
-        entity_texture.set_wrap_t(TextureWrap::Repeat);
-
-        let mut font_texture = Texture2D::new(0);
-        font_texture.set_minify_filter(TextureSampling::Nearest);
-        font_texture.set_magnify_filter(TextureSampling::Nearest);
-        font_texture.set_wrap_s(TextureWrap::Repeat);
-        font_texture.set_wrap_t(TextureWrap::Repeat);
+        fn create_texture(bind_slot: u32) -> Texture2D {
+            let mut texture = Texture2D::create(bind_slot);
+            texture.set_minify_sampling(TextureSampling::Nearest);
+            texture.set_magnify_sampling(TextureSampling::Nearest);
+            texture.set_wrap_s(TextureWrap::Repeat);
+            texture.set_wrap_t(TextureWrap::Repeat);
+            texture
+        }
 
         let mut assets = Self {
-            assets_path: assets_path.into(),
+            assets_path: assets_path.as_ref().into(),
             default_shaders: Program::from_preset(ProgramPreset::Default2DShader)?,
-            block_texture,
+            gui_texture: create_texture(0),
+            gui_atlas: ImageAtlas::new(Default::default()),
+            gui_images: HashMap::new(),
+            gui_shaders: Program::create()?,
+            block_texture: create_texture(0),
             block_atlas: ImageAtlas::new(Default::default()),
             block_appearances: HashMap::new(),
             block_shaders: Program::create()?,
-            entity_texture,
+            entity_texture: create_texture(0),
             entity_atlas: ImageAtlas::new(Default::default()),
             entity_images: HashMap::new(),
-            font_texture,
+            font_texture: create_texture(0),
             color_palettes: HashMap::new(),
         };
 
@@ -73,28 +70,30 @@ impl AssetPool {
         &self.assets_path
     }
 
-    pub fn get_asset_path(&self, sub_path: impl AsRef<Path>) -> PathBuf {
+    pub fn resolve_path(&self, sub_path: impl AsRef<Path>) -> PathBuf {
         self.assets_path.join(sub_path)
     }
 
-    pub fn load_image(&self, path: impl AsRef<Path>) -> Result<Image, String> {
-        let path = path.as_ref().with_extension("png");
+    pub fn load_image(&self, sub_path: impl AsRef<Path>) -> Result<Image, String> {
+        let path = self.resolve_path(sub_path).with_extension("png");
         Image::load_file(&path)
     }
 
-    pub fn load_json(&self, path: impl AsRef<Path>) -> Result<JsonValue, String> {
-        let path = path.as_ref().with_extension("json");
+    pub fn load_json(&self, sub_path: impl AsRef<Path>) -> Result<JsonValue, String> {
+        let path = self.resolve_path(sub_path).with_extension("json");
         let json_raw = std::fs::read_to_string(&path)
             .map_err(|err| format!("failed to read JSON asset at '{}': {err}", path.display()))?;
         json::parse(&json_raw)
             .map_err(|err| format!("failed to parse JSON asset at '{}': {err}", path.display()))
     }
 
-    pub fn load_text(&self, path: impl AsRef<Path>) -> Result<String, String> {
-        std::fs::read_to_string(path).map_err(|err| err.to_string())
+    pub fn load_text(&self, sub_path: impl AsRef<Path>) -> Result<String, String> {
+        let path = self.resolve_path(sub_path);
+        std::fs::read_to_string(&path).map_err(|err| err.to_string())
     }
 
     pub fn reload(&mut self) -> Result<(), String> {
+        self.clear_gui_images();
         self.reload_block_appearances()?;
         self.clear_entity_images();
         self.reload_font()?;
@@ -107,12 +106,44 @@ impl AssetPool {
         &self.default_shaders
     }
 
-    pub fn block_atlas(&self) -> &ImageAtlas {
-        &self.block_atlas
+    pub fn gui_texture(&self) -> &Texture2D {
+        &self.gui_texture
+    }
+
+    pub fn gui_atlas(&self) -> &ImageAtlas {
+        &self.gui_atlas
+    }
+
+    pub fn get_gui_image(&mut self, key: &str) -> Result<Rectangle<u32>, String> {
+        if let Some(&atlas_region) = self.gui_images.get(key) {
+            Ok(atlas_region)
+        }
+        else {
+            let loaded_image = self.load_image(format!("images/{key}"))?;
+            let atlas_offset = self.gui_atlas.add_image(&loaded_image);
+            let atlas_region = Rectangle::from_size(atlas_offset, loaded_image.size());
+            self.gui_texture.upload_image(self.gui_atlas.image());
+
+            self.gui_images.insert(key.into(), atlas_region);
+            Ok(atlas_region)
+        }
+    }
+
+    pub fn clear_gui_images(&mut self) {
+        self.gui_images.clear();
+        self.gui_atlas.clear();
+    }
+
+    pub fn gui_shaders(&self) -> &Program {
+        &self.gui_shaders
     }
 
     pub fn block_texture(&self) -> &Texture2D {
         &self.block_texture
+    }
+
+    pub fn block_atlas(&self) -> &ImageAtlas {
+        &self.block_atlas
     }
 
     pub fn reload_block_appearances(&mut self) -> Result<(), String> {
@@ -120,26 +151,22 @@ impl AssetPool {
         self.block_atlas.clear();
 
         let default_block_image = {
-            let path = self.get_asset_path("defaults/block_image");
-            let metadata = self.load_json(&path)?;
+            let metadata = self.load_json("defaults/block_image")?;
             BlockImage::parse("defaults/block_image".into(), &metadata, None)?
         };
-        let default_states_data = {
-            let path = self.get_asset_path("defaults/block_states");
-            self.load_json(&path)?
-        };
+        let default_states_data = self.load_json("defaults/block_states")?;
         let mut block_images: HashMap<String, BlockImage> = HashMap::new();
 
         for &block_type in BLOCK_TYPES {
-            let states_path = self.get_asset_path(format!("states/block/{}", block_type.name));
-            let states_data = self.load_json(states_path).unwrap_or_else(|_| default_states_data.clone());
+            let states_data = self.load_json(format!("states/block/{}", block_type.name))
+                .unwrap_or_else(|_| default_states_data.clone());
 
             let block_appearance = BlockAppearance::parse(&states_data, block_type, |image_key| {
                 if let Some(block_image) = block_images.get(image_key) {
                     Ok(block_image.clone())
                 }
                 else {
-                    let path = self.get_asset_path(format!("images/{image_key}"));
+                    let path = format!("images/{image_key}");
 
                     let loaded_image = self.load_image(&path)?;
                     let atlas_offset = self.block_atlas.add_image(&loaded_image);
@@ -160,7 +187,7 @@ impl AssetPool {
                 }
             })?;
 
-            self.block_appearances.insert(block_type as *const _, block_appearance);
+            self.block_appearances.insert(block_type, block_appearance);
         }
 
         self.block_texture.upload_image(self.block_atlas.image());
@@ -169,7 +196,7 @@ impl AssetPool {
     }
 
     pub fn get_block_appearance(&self, block_type: &'static BlockType) -> &BlockAppearance {
-        &self.block_appearances[&(block_type as *const BlockType)]
+        &self.block_appearances[&(block_type as *const _)]
     }
 
     pub fn get_block_image(&self, block: &Block, chunk_location: ChunkLocation, x: usize, y: usize) -> Option<&BlockImage> {
@@ -180,12 +207,12 @@ impl AssetPool {
         &self.block_shaders
     }
 
-    pub fn entity_atlas(&self) -> &ImageAtlas {
-        &self.entity_atlas
-    }
-
     pub fn entity_texture(&self) -> &Texture2D {
         &self.entity_texture
+    }
+
+    pub fn entity_atlas(&self) -> &ImageAtlas {
+        &self.entity_atlas
     }
 
     pub fn get_entity_image(&mut self, key: &str) -> Result<EntityImage, String> {
@@ -193,7 +220,7 @@ impl AssetPool {
             Ok(entity_image.clone())
         }
         else {
-            let path = self.get_asset_path(format!("images/{key}"));
+            let path = format!("images/{key}");
 
             let loaded_image = self.load_image(&path)?;
             let atlas_offset = self.entity_atlas.add_image(&loaded_image);
@@ -218,14 +245,14 @@ impl AssetPool {
     }
 
     pub fn reload_font(&mut self) -> Result<(), String> {
-        let font_image = self.load_image(self.get_asset_path("images/font/unicode_0"))?;
+        let font_image = self.load_image("images/font/unicode_0")?;
         self.font_texture.upload_image(&font_image);
         Ok(())
     }
 
     pub fn get_color_palette(&mut self, key: &str) -> Result<&ColorPalette, String> {
         if !self.color_palettes.contains_key(key) {
-            let path = self.get_asset_path(format!("palettes/{key}")).with_extension("gpl");
+            let path = self.resolve_path(format!("palettes/{key}")).with_extension("gpl");
             let palette_file = File::open(&path)
                 .map_err(|err| format!("failed to read color palette at '{}': {err}", path.display()))?;
             let color_palette = ColorPalette::parse_gpl(palette_file)?;
@@ -240,12 +267,22 @@ impl AssetPool {
     }
 
     pub fn reload_shaders(&mut self) -> Result<(), String> {
+        self.gui_shaders.attach_shader(&Shader::create(
+            &self.load_text("shaders/gui_v.glsl")?,
+            ShaderType::Vertex,
+        )?);
+        self.gui_shaders.attach_shader(&Shader::create(
+            &self.load_text("shaders/gui_f.glsl")?,
+            ShaderType::Fragment,
+        )?);
+        self.gui_shaders.link()?;
+
         self.block_shaders.attach_shader(&Shader::create(
-            &self.load_text(self.get_asset_path("shaders/block.v.glsl"))?,
+            &self.load_text("shaders/block_v.glsl")?,
             ShaderType::Vertex,
         )?);
         self.block_shaders.attach_shader(&Shader::create(
-            &self.load_text(self.get_asset_path("shaders/block.f.glsl"))?,
+            &self.load_text("shaders/block_f.glsl")?,
             ShaderType::Fragment,
         )?);
         self.block_shaders.link()?;

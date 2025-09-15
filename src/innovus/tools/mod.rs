@@ -40,6 +40,10 @@ impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
         Self([T::one(); N])
     }
 
+    pub const fn filled(value: T) -> Self {
+        Self([value; N])
+    }
+
     pub const fn content(&self) -> [T; N] {
         self.0
     }
@@ -50,10 +54,6 @@ impl<T: NumAssign + Copy, const N: usize> Vector<T, N> {
 
     pub const fn set(&mut self, index: usize, value: T) {
         self.0[index] = value;
-    }
-
-    pub const fn fill(&mut self, value: T) {
-        self.0 = [value; N];
     }
 
     pub fn dot(&self, rhs: Self) -> T {
@@ -83,8 +83,10 @@ impl<T: Float + NumAssign, const N: usize> Vector<T, N> {
         Vector(self.0.map(|component| component / magnitude))
     }
 
-    pub fn equals_delta(&self, other: Self, delta: T) -> bool {
-        std::iter::zip(&self.0, &other.0).all(|(&a, &b)| (a - b).abs() <= delta)
+    pub fn equals_delta(&self, other: Self, delta: Self) -> bool {
+        std::iter::zip(&self.0, &other.0)
+            .zip(&delta.0)
+            .all(|((&a, &b), &d)| (a - b).abs() <= d)
     }
 
     pub fn lerp(&self, other: Self, t: T) -> Self {

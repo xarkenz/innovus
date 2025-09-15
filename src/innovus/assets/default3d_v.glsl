@@ -3,18 +3,15 @@
 uniform float time;
 uniform mat4 camera_view;
 uniform mat4 camera_proj;
-uniform sampler2D tex_atlas;
 
 layout(location = 0) in vec3 vertex_pos;
 layout(location = 1) in vec4 vertex_color;
-layout(location = 2) in uint vertex_tex;
-layout(location = 3) in vec2 vertex_uv;
-layout(location = 4) in vec3 vertex_norm;
+layout(location = 2) in vec2 vertex_uv;
+layout(location = 3) in vec3 vertex_norm;
 
 out Vertex {
     vec3 pos;
     vec4 color;
-    float tex;
     vec2 uv;
     vec3 norm;
 } vertex;
@@ -22,7 +19,6 @@ out Vertex {
 void main() {
     vertex.pos = vertex_pos;
     vertex.color = vertex_color;
-    vertex.tex = float(vertex_tex);
     vertex.uv = vertex_uv;
     vertex.norm = vertex_norm;
 

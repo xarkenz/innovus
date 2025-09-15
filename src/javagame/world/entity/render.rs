@@ -285,7 +285,6 @@ impl RendererBatch {
                     let vertex = self.geometry.vertex_at_mut(vertex_index);
                     vertex.pos = position.with_z(1.0);
                     vertex.color = color;
-                    vertex.tex = 1;
                     vertex.uv = uv.map(|x| x as f32);
                     vertex_index += 1;
                 }

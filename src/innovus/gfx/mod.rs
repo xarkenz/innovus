@@ -223,8 +223,9 @@ impl ShaderUniformType for Matrix<f32, 3, 4> {
 
 impl ShaderUniformType for &Texture2D {
     fn upload_uniform(self, location: GLint) {
+        self.bind();
         unsafe {
-            gl::Uniform1ui(location, self.slot());
+            gl::Uniform1ui(location, self.bind_slot());
         }
     }
 }
@@ -243,7 +244,7 @@ impl Program {
     pub fn create() -> Result<Self, String> {
         let id = unsafe { gl::CreateProgram() };
         if id == 0 {
-            Err("Program::new(): failed to create GL program.".into())
+            Err("failed to create GL program.".into())
         }
         else {
             Ok(Self {
@@ -303,25 +304,25 @@ impl Program {
         Self::with_linked_shaders(&match preset {
             ProgramPreset::Default2DShader => vec![
                 Shader::create(
-                    &fetch_source("./src/innovus/assets/default2d.v.glsl")?,
+                    &fetch_source("./src/innovus/assets/default2d_v.glsl")?,
                     ShaderType::Vertex,
                 )?,
                 Shader::create(
-                    &fetch_source("./src/innovus/assets/default2d.f.glsl")?,
+                    &fetch_source("./src/innovus/assets/default2d_f.glsl")?,
                     ShaderType::Fragment,
                 )?,
             ],
             ProgramPreset::Default3DShader => vec![
                 Shader::create(
-                    &fetch_source("./src/innovus/assets/default3d.v.glsl")?,
+                    &fetch_source("./src/innovus/assets/default3d_v.glsl")?,
                     ShaderType::Vertex,
                 )?,
                 Shader::create(
-                    &fetch_source("./src/innovus/assets/default3d.g.glsl")?,
+                    &fetch_source("./src/innovus/assets/default3d_g.glsl")?,
                     ShaderType::Geometry,
                 )?,
                 Shader::create(
-                    &fetch_source("./src/innovus/assets/default3d.f.glsl")?,
+                    &fetch_source("./src/innovus/assets/default3d_f.glsl")?,
                     ShaderType::Fragment,
                 )?,
             ],
@@ -419,7 +420,6 @@ pub trait Vertex : Clone {
 pub struct Vertex3D {
     pub pos: Vector<f32, 3>,
     pub color: Vector<f32, 4>,
-    pub tex: u32,
     pub uv: Vector<f32, 2>,
     pub norm: Vector<f32, 3>,
 }
@@ -434,37 +434,33 @@ impl Vertex3D {
         Self {
             pos,
             color: color.unwrap_or(Vector::one()),
-            tex: uv.is_some() as u32,
-            uv: uv.unwrap_or(Vector::zero()),
+            uv: uv.unwrap_or(Vector::filled(f32::NAN)),
             norm: norm.unwrap_or(Vector::zero()),
         }
     }
 
-    pub fn colored(pos: Vector<f32, 3>, color: Vector<f32, 4>) -> Vertex3D {
-        Vertex3D {
+    pub fn colored(pos: Vector<f32, 3>, color: Vector<f32, 4>) -> Self {
+        Self {
             pos,
             color,
-            tex: 0,
-            uv: Vector::zero(),
+            uv: Vector::filled(f32::NAN),
             norm: Vector::zero(),
         }
     }
 
-    pub fn textured(pos: Vector<f32, 3>, uv: Vector<f32, 2>) -> Vertex3D {
-        Vertex3D {
+    pub fn textured(pos: Vector<f32, 3>, uv: Vector<f32, 2>) -> Self {
+        Self {
             pos,
             color: Vector::one(),
-            tex: 1,
             uv,
             norm: Vector::zero(),
         }
     }
 
-    pub fn combined(pos: Vector<f32, 3>, color: Vector<f32, 4>, uv: Vector<f32, 2>) -> Vertex3D {
-        Vertex3D {
+    pub fn combined(pos: Vector<f32, 3>, color: Vector<f32, 4>, uv: Vector<f32, 2>) -> Self {
+        Self {
             pos,
             color,
-            tex: 1,
             uv,
             norm: Vector::zero(),
         }
@@ -479,7 +475,6 @@ impl Vertex for Vertex3D {
     const ATTRIBUTES: &'static [VertexAttribute] = &[
         VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, pos)),
         VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
-        VertexAttribute::new(VertexAttributeType::U32, 1, offset_of!(Self, tex)),
         VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
         VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, norm)),
     ];
@@ -490,17 +485,15 @@ impl Vertex for Vertex3D {
 pub struct Vertex2D {
     pub pos: Vector<f32, 3>,
     pub color: Vector<f32, 4>,
-    pub tex: u32,
     pub uv: Vector<f32, 2>,
 }
 
 impl Vertex2D {
-    pub fn new(pos: Vector<f32, 3>, color: Option<Vector<f32, 4>>, uv: Option<Vector<f32, 2>>) -> Vertex2D {
-        Vertex2D {
+    pub fn new(pos: Vector<f32, 3>, color: Option<Vector<f32, 4>>, uv: Option<Vector<f32, 2>>) -> Self {
+        Self {
             pos,
             color: color.unwrap_or(Vector::one()),
-            tex: uv.is_some() as u32,
-            uv: uv.unwrap_or(Vector::zero()),
+            uv: uv.unwrap_or(Vector::filled(f32::NAN)),
         }
     }
 }
@@ -509,7 +502,6 @@ impl Vertex for Vertex2D {
     const ATTRIBUTES: &'static [VertexAttribute] = &[
         VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, pos)),
         VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
-        VertexAttribute::new(VertexAttributeType::U32, 1, offset_of!(Self, tex)),
         VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
     ];
 }
@@ -1368,56 +1360,82 @@ impl ImageAtlas {
     }
 }
 
+#[repr(u32)]
+#[non_exhaustive]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum TextureSampling {
-    Nearest = gl::NEAREST as isize,
-    Linear = gl::LINEAR as isize,
+    Nearest = gl::NEAREST,
+    Linear = gl::LINEAR,
 }
 
+#[repr(u32)]
+#[non_exhaustive]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum TextureWrap {
-    ClampToEdge = gl::CLAMP_TO_EDGE as isize,
-    ClampToBorder = gl::CLAMP_TO_BORDER as isize,
-    MirroredRepeat = gl::MIRRORED_REPEAT as isize,
-    Repeat = gl::REPEAT as isize,
-    MirrorClampToEdge = gl::MIRROR_CLAMP_TO_EDGE as isize,
+    ClampToEdge = gl::CLAMP_TO_EDGE,
+    ClampToBorder = gl::CLAMP_TO_BORDER,
+    MirroredRepeat = gl::MIRRORED_REPEAT,
+    Repeat = gl::REPEAT,
+    MirrorClampToEdge = gl::MIRROR_CLAMP_TO_EDGE,
 }
 
 pub struct Texture2D {
-    id: GLuint,
-    slot: GLuint,
+    id: u32,
+    bind_slot: u32,
 }
 
 impl Texture2D {
-    pub fn new(slot: GLuint) -> Self {
-        let mut texture = Self { id: 0, slot };
+    pub fn create(bind_slot: u32) -> Self {
+        let mut texture = Self {
+            id: 0,
+            bind_slot,
+        };
         unsafe {
             gl::GenTextures(1, &mut texture.id);
         }
         texture
     }
 
-    pub fn set_parameter_int(&mut self, parameter: GLenum, value: GLint) {
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    pub fn bind_slot(&self) -> u32 {
+        self.bind_slot
+    }
+
+    pub fn set_bind_slot(&mut self, bind_slot: u32) {
+        self.bind_slot = bind_slot;
+    }
+
+    pub fn bind(&self) {
+        unsafe {
+            gl::ActiveTexture(gl::TEXTURE0 + self.bind_slot);
+            gl::BindTexture(gl::TEXTURE_2D, self.id);
+        }
+    }
+
+    pub fn set_parameter_i32(&mut self, parameter: GLenum, value: i32) {
         self.bind();
         unsafe {
             gl::TexParameteri(gl::TEXTURE_2D, parameter, value);
         }
     }
 
-    pub fn set_minify_filter(&mut self, sampling: TextureSampling) {
-        self.set_parameter_int(gl::TEXTURE_MIN_FILTER, sampling as GLint);
+    pub fn set_minify_sampling(&mut self, sampling: TextureSampling) {
+        self.set_parameter_i32(gl::TEXTURE_MIN_FILTER, sampling as i32);
     }
 
-    pub fn set_magnify_filter(&mut self, sampling: TextureSampling) {
-        self.set_parameter_int(gl::TEXTURE_MAG_FILTER, sampling as GLint);
+    pub fn set_magnify_sampling(&mut self, sampling: TextureSampling) {
+        self.set_parameter_i32(gl::TEXTURE_MAG_FILTER, sampling as i32);
     }
 
     pub fn set_wrap_s(&mut self, wrap: TextureWrap) {
-        self.set_parameter_int(gl::TEXTURE_WRAP_S, wrap as GLint);
+        self.set_parameter_i32(gl::TEXTURE_WRAP_S, wrap as i32);
     }
 
     pub fn set_wrap_t(&mut self, wrap: TextureWrap) {
-        self.set_parameter_int(gl::TEXTURE_WRAP_T, wrap as GLint);
+        self.set_parameter_i32(gl::TEXTURE_WRAP_T, wrap as i32);
     }
 
     pub fn upload_image(&mut self, image: &Image) {
@@ -1448,21 +1466,6 @@ impl Texture2D {
                 gl::UNSIGNED_BYTE,
                 image.data().as_ptr() as *const GLvoid,
             );
-        }
-    }
-
-    pub fn id(&self) -> GLuint {
-        self.id
-    }
-
-    pub fn slot(&self) -> GLuint {
-        self.slot
-    }
-
-    pub fn bind(&self) {
-        unsafe {
-            gl::ActiveTexture(gl::TEXTURE0 + self.slot);
-            gl::BindTexture(gl::TEXTURE_2D, self.id);
         }
     }
 }

@@ -1,19 +1,31 @@
-use innovus::gfx::{Geometry, Vertex2D};
+use innovus::gfx::Geometry;
 use innovus::tools::Vector;
+use crate::gui::GuiVertex;
 use crate::tools::asset::AssetPool;
 
 pub struct StringRenderer {
-    position: Vector<f32, 2>,
+    anchor: Vector<f32, 2>,
+    offset: Vector<f32, 2>,
+    placement: Vector<f32, 2>,
     text_color: Vector<f32, 4>,
     background_color: Vector<f32, 4>,
     string: String,
-    geometry: Geometry<Vertex2D>,
+    geometry: Geometry<GuiVertex>,
 }
 
 impl StringRenderer {
-    pub fn new(position: Vector<f32, 2>, text_color: Vector<f32, 4>, background_color: Vector<f32, 4>, string: String) -> Self {
+    pub fn new(
+        anchor: Vector<f32, 2>,
+        offset: Vector<f32, 2>,
+        placement: Vector<f32, 2>,
+        text_color: Vector<f32, 4>,
+        background_color: Vector<f32, 4>,
+        string: String,
+    ) -> Self {
         Self {
-            position,
+            anchor,
+            offset,
+            placement,
             text_color,
             background_color,
             string,
@@ -21,12 +33,30 @@ impl StringRenderer {
         }
     }
 
-    pub fn position(&self) -> Vector<f32, 2> {
-        self.position
+    pub fn anchor(&self) -> Vector<f32, 2> {
+        self.anchor
     }
 
-    pub fn set_position(&mut self, position: Vector<f32, 2>) {
-        self.position = position;
+    pub fn set_anchor(&mut self, anchor: Vector<f32, 2>) {
+        self.anchor = anchor;
+        self.invalidate();
+    }
+
+    pub fn offset(&self) -> Vector<f32, 2> {
+        self.offset
+    }
+
+    pub fn set_offset(&mut self, position: Vector<f32, 2>) {
+        self.offset = position;
+        self.invalidate();
+    }
+
+    pub fn placement(&self) -> Vector<f32, 2> {
+        self.placement
+    }
+
+    pub fn set_placement(&mut self, position: Vector<f32, 2>) {
+        self.placement = position;
         self.invalidate();
     }
 
@@ -91,43 +121,49 @@ impl StringRenderer {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
 
-            let pixel_size = 1.0 / 16.0;
-            let glyph_max_size = 8.0 * pixel_size;
+            let glyph_max_size = 8.0;
 
             faces.push([0, 1, 2]);
             faces.push([2, 3, 0]);
-            let text_width = 3.0 * pixel_size + self.string
+            let text_width = 3.0 + self.string
                 .bytes()
-                .map(|character| (GLYPH_WIDTHS[character as usize] + 1) as f32 * pixel_size)
+                .map(|character| (GLYPH_WIDTHS[character as usize] + 1) as f32)
                 .sum::<f32>();
-            for (world_offset, _) in OFFSETS {
-                let position = self.position + Vector([
-                    world_offset.x() * text_width,
-                    world_offset.y() * (glyph_max_size + 4.0 * pixel_size),
+            let bounds_size = Vector([text_width, glyph_max_size]);
+            let adjusted_offset = self.offset - self.placement * bounds_size;
+
+            // Background rectangle
+            for (vertex_offset, _) in OFFSETS {
+                let total_offset = adjusted_offset + Vector([
+                    vertex_offset.x() * text_width,
+                    vertex_offset.y() * (glyph_max_size + 4.0),
                 ]);
-                vertices.push(Vertex2D::new(
-                    position.with_z(-1.0),
+                vertices.push(GuiVertex::new(
+                    self.anchor,
+                    total_offset,
                     Some(self.background_color),
                     None,
                 ));
             }
 
-            let mut world_position = self.position + Vector([2.0 * pixel_size; 2]);
+            // Foreground text
+            let mut current_position = adjusted_offset + Vector([2.0, 2.0]);
             for character in self.string.bytes() {
                 let index = vertices.len() as u32;
                 faces.push([index + 0, index + 1, index + 2]);
                 faces.push([index + 2, index + 3, index + 0]);
                 let char_index = character as u32;
                 let atlas_origin = Vector([char_index % 16, char_index / 16]) * 8;
-                for (world_offset, atlas_offset) in OFFSETS {
-                    vertices.push(Vertex2D::new(
-                        (world_position + world_offset * glyph_max_size).with_z(0.0),
+                for (vertex_offset, atlas_offset) in OFFSETS {
+                    vertices.push(GuiVertex::new(
+                        self.anchor,
+                        current_position + vertex_offset * glyph_max_size,
                         Some(self.text_color),
                         Some((atlas_origin + atlas_offset).map(|x| x as f32))
                     ));
                 }
-                let glyph_width = (GLYPH_WIDTHS[character as usize] + 1) as f32 * pixel_size;
-                world_position.set_x(world_position.x() + glyph_width);
+                let glyph_width = (GLYPH_WIDTHS[character as usize] + 1) as f32;
+                current_position.set_x(current_position.x() + glyph_width);
             }
 
             self.geometry.add(&vertices, &faces);

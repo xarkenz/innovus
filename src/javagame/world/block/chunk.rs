@@ -15,7 +15,9 @@ pub fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
 
 pub fn light_value(effective_light: u8) -> f32 {
     const AMBIENT_LIGHT: f32 = 3.0;
-    (AMBIENT_LIGHT + effective_light as f32) / (AMBIENT_LIGHT + 15.0)
+    const MULTIPLIER: f32 = 1.3;
+    ((AMBIENT_LIGHT + effective_light as f32 * MULTIPLIER) / (AMBIENT_LIGHT + 15.0))
+        .clamp(0.0, 1.0)
 }
 
 pub type ChunkLocation = Vector<i64, 2>;
@@ -364,7 +366,6 @@ impl Chunk {
                 for (vertex_offset, vertex_light) in vertex_info {
                     let vertex = self.geometry.vertex_at_mut(index);
                     vertex.color = Vector([vertex_light, vertex_light, vertex_light, 1.0]);
-                    vertex.tex = 1;
                     let total_offset = quadrant_offset + vertex_offset;
                     vertex.uv = Vector([
                         atlas_offset.x() as f32 + total_offset.x() * image.size() as f32,
@@ -380,8 +381,7 @@ impl Chunk {
             for _ in 0..VERTICES_PER_BLOCK {
                 let vertex = self.geometry.vertex_at_mut(index);
                 vertex.color = Vector::zero();
-                vertex.tex = 0;
-                vertex.uv = Vector::zero();
+                vertex.uv = Vector::filled(f32::NAN);
                 index += 1;
             }
         }

@@ -2,11 +2,11 @@ use std::path::Path;
 use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight};
 use innovus::gfx::color::RGBColor;
 use innovus::gfx::screen;
-use innovus::tools::{Clock, Transform3D, Vector};
+use innovus::tools::{Clock, Vector};
+use crate::gui::GuiManager;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
 use crate::view::Camera;
-use crate::view::text::StringRenderer;
 use crate::world::block::{BLOCK_TYPES, CHUNK_SIZE};
 use crate::world::entity::types::player::PlayerMode;
 use crate::world::gen::WorldGenerator;
@@ -26,32 +26,27 @@ pub struct Game<'world> {
     frame_clock: Clock,
     fps_tracker: [f32; 120],
     fps_tracker_index: usize,
-    fps_string_renderer: StringRenderer,
     viewport_size: Vector<f32, 2>,
-    gui_projection: Transform3D<f32>,
+    content_scale: Vector<f32, 2>,
     assets: AssetPool,
+    gui: GuiManager,
     current_world: Option<World<'world>>,
     selected_block_index: usize,
     last_block_pos: Option<(usize, usize)>,
 }
 
 impl<'world> Game<'world> {
-    pub fn start(assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>) -> Result<Self, String> {
+    pub fn start(assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>) -> Result<Self, String> {
         screen::set_blend(screen::Blend::Transparency);
 
         let mut game = Self {
             frame_clock: Clock::start(),
             fps_tracker: [f32::INFINITY; 120],
             fps_tracker_index: 0,
-            fps_string_renderer: StringRenderer::new(
-                Vector::zero(),
-                Vector([1.0, 1.0, 1.0, 1.0]),
-                Vector([0.0, 0.0, 0.0, 0.5]),
-                "Gathering data...".into(),
-            ),
             viewport_size,
-            gui_projection: Transform3D::identity(),
+            content_scale,
             assets: AssetPool::load(assets_path)?,
+            gui: GuiManager::new(viewport_size, content_scale, 8.0),
             current_world: None,
             selected_block_index: select_block_index(0, 1),
             last_block_pos: None,
@@ -68,17 +63,20 @@ impl<'world> Game<'world> {
         self.viewport_size = viewport_size;
 
         screen::set_viewport(0, 0, viewport_size.x() as i32, viewport_size.y() as i32);
-        self.gui_projection.orthographic(
-            0.0,
-            viewport_size.x() / 64.0,
-            0.0,
-            viewport_size.y() / 64.0,
-            100.0,
-            -100.0,
-        );
+        self.gui.set_viewport_size(viewport_size);
         if let Some(world) = &mut self.current_world {
             world.camera_mut().set_size(viewport_size);
         }
+    }
+
+    pub fn content_scale(&self) -> Vector<f32, 2> {
+        self.content_scale
+    }
+
+    pub fn set_content_scale(&mut self, content_scale: Vector<f32, 2>) {
+        self.content_scale = content_scale;
+
+        self.gui.set_content_scale(content_scale);
     }
 
     pub fn current_world(&self) -> Option<&World<'_>> {
@@ -86,7 +84,12 @@ impl<'world> Game<'world> {
     }
 
     pub fn enter_world(&mut self, generator: Option<Box<dyn WorldGenerator>>) {
-        let camera = Camera::new(Vector::zero(), self.viewport_size, 64.0, 5.0);
+        let camera = Camera::new(
+            Vector::zero(),
+            self.viewport_size,
+            self.content_scale * 48.0,
+            5.0,
+        );
         self.current_world = Some(World::new(generator, camera, &mut self.assets));
     }
 
@@ -171,7 +174,7 @@ impl<'world> Game<'world> {
 
             let average_fps = self.fps_tracker.iter().sum::<f32>() / self.fps_tracker.len() as f32;
             if average_fps.is_finite() {
-                self.fps_string_renderer.set_string(format!("Average FPS: {average_fps:.1}"));
+                self.gui.fps_display.set_string(format!("Average FPS: {average_fps:.1}"));
             }
 
             clear_color = world.sky_color();
@@ -186,8 +189,6 @@ impl<'world> Game<'world> {
         if let Some(world) = &mut self.current_world {
             world.render(&self.assets);
         }
-        self.assets.default_shaders().set_uniform("camera_view", Transform3D::identity());
-        self.assets.default_shaders().set_uniform("camera_proj", self.gui_projection);
-        self.fps_string_renderer.render(&self.assets);
+        self.gui.render(&mut self.assets);
     }
 }
