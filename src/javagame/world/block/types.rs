@@ -99,6 +99,7 @@ pub const BLOCK_TYPES: &[&BlockType] = &[
     &LANTERN,
     &LUMINITE_BLOCK,
     &MAGMIUM_BLOCK,
+    &OAK_WOOD,
     &OBSIDIAN_BLOCK,
     &PHYLUMUS_BLOCK,
     &PHYLUMUS_MUSHROOM,
@@ -315,6 +316,12 @@ pub static LUMINITE_BLOCK: BlockType = BlockType {
 pub static MAGMIUM_BLOCK: BlockType = BlockType {
     name: "magmium_block",
     palette_key: Some("magmium"),
+    connects_to: connects_to_same_type,
+    ..DEFAULTS
+};
+pub static OAK_WOOD: BlockType = BlockType {
+    name: "oak_wood",
+    palette_key: Some("wood_oak"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
