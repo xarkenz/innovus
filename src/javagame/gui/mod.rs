@@ -3,6 +3,7 @@ use innovus::gfx::{Geometry, Vertex, VertexAttribute, VertexAttributeType};
 use innovus::tools::Vector;
 use crate::gui::text::StringRenderer;
 use crate::tools::asset::AssetPool;
+use crate::world::block::BlockType;
 
 pub mod text;
 
@@ -46,7 +47,8 @@ pub struct GuiManager {
     gui_scale: f32,
     offset_scale: Vector<f32, 2>,
     hotbar: Geometry<GuiVertex>,
-    pub fps_display: StringRenderer,
+    fps_display: StringRenderer,
+    item_display: StringRenderer,
 }
 
 impl GuiManager {
@@ -62,8 +64,16 @@ impl GuiManager {
                 Vector([0.0, -4.0]),
                 Vector([0.0, 1.0]),
                 Vector([1.0, 1.0, 1.0, 1.0]),
-                Vector([0.0, 0.0, 0.0, 0.5]),
-                "Gathering data...".into(),
+                Vector([0.0, 0.0, 0.0, 0.4]),
+                String::new(),
+            ),
+            item_display: StringRenderer::new(
+                Vector([0.0, -1.0]),
+                Vector([0.0, 32.0]),
+                Vector([0.5, 0.0]),
+                Vector([1.0, 1.0, 1.0, 1.0]),
+                Vector([0.0, 0.0, 0.0, 0.4]),
+                String::new(),
             ),
         }
     }
@@ -99,6 +109,16 @@ impl GuiManager {
         scale / viewport_size
     }
 
+    pub fn update_fps_display(&mut self, average_fps: f32) {
+        self.fps_display.set_string(format!("Average FPS: {average_fps:.1}"));
+    }
+
+    pub fn update_item_display(&mut self, item: &'static BlockType, assets: &AssetPool) {
+        let item_key = format!("item.{}", item.name);
+        let item_name = assets.get_text_string(&item_key);
+        self.item_display.set_string(item_name.into());
+    }
+
     pub fn render(&mut self, assets: &mut AssetPool) {
         assets.gui_texture().bind();
         assets.gui_shaders().set_uniform("offset_scale", self.offset_scale);
@@ -124,5 +144,6 @@ impl GuiManager {
         self.hotbar.render();
 
         self.fps_display.render(assets);
+        self.item_display.render(assets);
     }
 }

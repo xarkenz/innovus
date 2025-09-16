@@ -29,6 +29,7 @@ pub struct AssetPool {
     entity_images: HashMap<String, EntityImage>,
     font_texture: Texture2D,
     color_palettes: HashMap<String, ColorPalette>,
+    text_strings: HashMap<String, String>,
 }
 
 impl AssetPool {
@@ -58,6 +59,7 @@ impl AssetPool {
             entity_images: HashMap::new(),
             font_texture: create_texture(0),
             color_palettes: HashMap::new(),
+            text_strings: HashMap::new(),
         };
 
         // Despite the name of the method, this loads everything for the first time
@@ -99,6 +101,8 @@ impl AssetPool {
         self.reload_font()?;
         self.clear_color_palettes();
         self.reload_shaders()?;
+        self.reload_text_strings()?;
+
         Ok(())
     }
 
@@ -264,6 +268,33 @@ impl AssetPool {
 
     pub fn clear_color_palettes(&mut self) {
         self.color_palettes.clear();
+    }
+
+    pub fn get_text_string<'a>(&'a self, key: &'a str) -> &'a str {
+        match self.text_strings.get(key) {
+            Some(string) => string,
+            None => key,
+        }
+    }
+
+    pub fn reload_text_strings(&mut self) -> Result<(), String> {
+        self.text_strings.clear();
+
+        fn parse<'a>(value: &'a JsonValue, prefix: &mut Vec<&'a str>, text_strings: &mut HashMap<String, String>) {
+            for (inner_key, inner_value) in value.entries() {
+                prefix.push(inner_key);
+                parse(inner_value, prefix, text_strings);
+                prefix.pop();
+            }
+            if let Some(string) = value.as_str() {
+                text_strings.insert(prefix.join("."), string.into());
+            }
+        }
+
+        let data = self.load_json("text/en_us")?;
+        parse(&data, &mut Vec::new(), &mut self.text_strings);
+
+        Ok(())
     }
 
     pub fn reload_shaders(&mut self) -> Result<(), String> {

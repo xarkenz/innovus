@@ -1,0 +1,10 @@
+[
+  {
+    "images": [
+      "block/{block_type}/0",
+      "block/{block_type}/1",
+      "block/{block_type}/2",
+      "block/{block_type}/3"
+    ]
+  }
+]

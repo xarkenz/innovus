@@ -73,6 +73,7 @@ const DEFAULTS: BlockType = BlockType {
 
 pub const BLOCK_TYPES: &[&BlockType] = &[
     &AIR,
+    &TEST_BLOCK,
     &ALUMINUM_BLOCK,
     &AMETHYST_BLOCK,
     &AMETHYST_CRYSTAL,
@@ -121,6 +122,10 @@ pub static AIR: BlockType = BlockType {
     right_click: |_, hand| {
         Some(Block::new(hand))
     },
+    ..DEFAULTS
+};
+pub static TEST_BLOCK: BlockType = BlockType {
+    name: "test_block",
     ..DEFAULTS
 };
 pub static ALUMINUM_BLOCK: BlockType = BlockType {

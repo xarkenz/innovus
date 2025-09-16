@@ -255,10 +255,6 @@ impl Chunk {
                 .unwrap();
             let expected_light = light_emission.max(max_surrounding_light.saturating_sub(1));
 
-            if current_light == expected_light {
-                continue;
-            }
-
             if chunk_offset_x == 0 && chunk_offset_y == 0 {
                 self.block_slots[block_y][block_x].block_light = expected_light;
                 self.set_all_need_render();
@@ -270,8 +266,10 @@ impl Chunk {
                 chunk.set_all_need_render();
             }
 
-            // Add adjacent blocks to update stack
-            stack.extend(ADJACENT_OFFSETS.map(|(dx, dy)| (x + dx, y + dy)));
+            if current_light != expected_light {
+                // Add adjacent blocks to update stack
+                stack.extend(ADJACENT_OFFSETS.map(|(dx, dy)| (x + dx, y + dy)));
+            }
         }
     }
 

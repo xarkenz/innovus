@@ -197,6 +197,7 @@ impl Entity for Player {
         }
         else if let Some(collider) = &self.collider {
             let collider = physics.get_collider_mut(collider).unwrap();
+            self.velocity = collider.velocity;
 
             if collider.hit_bottom {
                 self.coyote_time = COYOTE_TIME_SECONDS;
@@ -258,7 +259,6 @@ impl Entity for Player {
                 movement::DEFAULT_FRICTION_DECELERATION,
             ));
 
-            self.velocity = collider.velocity;
             self.position.set_x(collider.rectangle.min_x() + pixels(5));
             self.position.set_y(collider.rectangle.min_y());
         }

@@ -27,15 +27,15 @@ impl OverworldGenerator {
         }
     }
 
-    pub fn get_height_map(&self, chunk_x: i64) -> [i64; block::CHUNK_SIZE] {
+    pub fn get_height_map(&self, chunk_x: i64) -> [i64; CHUNK_SIZE] {
         let small_terrain_cell = self.small_terrain.get_cell(chunk_x.div_euclid(2));
         let small_offset_base = chunk_x.rem_euclid(2) as f32 / 2.0;
         let big_terrain_cell = self.big_terrain.get_cell(chunk_x.div_euclid(4));
         let big_offset_base = chunk_x.rem_euclid(4) as f32 / 4.0;
 
         let mut x_offset = 0;
-        [(); block::CHUNK_SIZE].map(|_| {
-            let offset = x_offset as f32 / block::CHUNK_SIZE as f32;
+        [(); CHUNK_SIZE].map(|_| {
+            let offset = x_offset as f32 / CHUNK_SIZE as f32;
             let small_offset = small_offset_base + offset / 2.0;
             let small_terrain_value = small_terrain_cell.compute_value(small_offset, smooth_step);
             let big_offset = big_offset_base + offset / 4.0;
@@ -51,7 +51,7 @@ impl WorldGenerator for OverworldGenerator {
         self.world_seed
     }
 
-    fn generate_chunk(&self, chunk: &mut block::Chunk, chunk_map: &block::ChunkMap, physics: &mut phys::Physics) -> Vec<Box<dyn entity::Entity>> {
+    fn generate_chunk(&self, chunk: &mut Chunk, chunk_map: &ChunkMap, physics: &mut Physics) -> Vec<Box<dyn Entity>> {
         let height_map = self.get_height_map(chunk.location().x());
         chunk.set_height_map(height_map);
 
@@ -61,8 +61,8 @@ impl WorldGenerator for OverworldGenerator {
         let small_caves_cell = self.small_caves.get_cell(chunk.location());
         let big_caves_cell = self.big_caves.get_cell(big_location);
 
-        for y in 0..block::CHUNK_SIZE {
-            for x in 0..block::CHUNK_SIZE {
+        for y in 0..CHUNK_SIZE {
+            for x in 0..CHUNK_SIZE {
                 let block_y = i64::from(BlockCoord::new(chunk.location().y(), y));
                 let terrain_height = height_map[x];
 
@@ -77,7 +77,7 @@ impl WorldGenerator for OverworldGenerator {
                     block_type = &block::types::DIRT;
                 }
                 else {
-                    let small_offset = Vector([x as f32, y as f32]) / block::CHUNK_SIZE as f32;
+                    let small_offset = Vector([x as f32, y as f32]) / CHUNK_SIZE as f32;
                     let small_caves_value = small_caves_cell.compute_value(small_offset, smooth_step);
                     let big_offset = big_offset_base + small_offset / 2.0;
                     let big_caves_value = big_caves_cell.compute_value(big_offset, smooth_step);
@@ -98,7 +98,7 @@ impl WorldGenerator for OverworldGenerator {
                     }
                 }
 
-                let block = block::Block::new(block_type);
+                let block = Block::new(block_type);
                 chunk.set_block_at(x, y, block, chunk_map, physics);
             }
         }
@@ -125,23 +125,12 @@ impl WorldGenerator for TestWorldGenerator {
         self.seed
     }
 
-    fn generate_chunk(&self, chunk: &mut block::Chunk, chunk_map: &block::ChunkMap, physics: &mut phys::Physics) -> Vec<Box<dyn entity::Entity>> {
-        if chunk.location().y() == -1 {
-            for y in 0..15 {
-                for x in 0..16 {
-                    let block = block::Block::new(&block::types::DIRT);
-                    chunk.set_block_at(x, y, block, chunk_map, physics);
-                }
-            }
-            for x in 0..16 {
-                let block = block::Block::new(&block::types::GRASSY_DIRT);
-                chunk.set_block_at(x, 15, block, chunk_map, physics);
-            }
-        }
-        else if chunk.location().y() < -1 {
+    fn generate_chunk(&self, chunk: &mut Chunk, chunk_map: &ChunkMap, physics: &mut Physics) -> Vec<Box<dyn Entity>> {
+        chunk.set_height_map([i32::MIN as i64; CHUNK_SIZE]);
+        if chunk.location().y() < 0 {
             for y in 0..16 {
                 for x in 0..16 {
-                    let block = block::Block::new(&block::types::STONE);
+                    let block = Block::new(&block::types::TEST_BLOCK);
                     chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }
@@ -149,7 +138,7 @@ impl WorldGenerator for TestWorldGenerator {
         else {
             for y in 0..16 {
                 for x in 0..16 {
-                    let block = block::Block::new(&block::types::AIR);
+                    let block = Block::new(&block::types::AIR);
                     chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }

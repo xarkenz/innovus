@@ -168,13 +168,15 @@ impl<'world> Game<'world> {
                 self.last_block_pos = None;
             }
 
-            world.player_mut().set_held_item(BLOCK_TYPES[self.selected_block_index]);
+            let held_item = BLOCK_TYPES[self.selected_block_index];
+            self.gui.update_item_display(held_item, &self.assets);
+            world.player_mut().set_held_item(held_item);
             world.set_cursor_pos(cursor_world_pos);
             world.update(inputs, dt);
 
             let average_fps = self.fps_tracker.iter().sum::<f32>() / self.fps_tracker.len() as f32;
             if average_fps.is_finite() {
-                self.gui.fps_display.set_string(format!("Average FPS: {average_fps:.1}"));
+                self.gui.update_fps_display(average_fps);
             }
 
             clear_color = world.sky_color();

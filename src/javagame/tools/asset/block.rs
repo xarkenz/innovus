@@ -1,7 +1,7 @@
 use std::hash::{Hash, Hasher};
 use json::JsonValue;
 use innovus::tools::{Rectangle, Vector};
-use crate::tools::noise::SimpleHasher;
+use crate::tools::noise::{scramble, SimpleHasher};
 use crate::world::block::{AttributeType, AttributeValue, Block, BlockType, Chunk, ChunkLocation, ChunkMap};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -308,8 +308,8 @@ impl ImageSelector {
             chunk_location.y().hash(&mut hasher);
             x.hash(&mut hasher);
             y.hash(&mut hasher);
-
-            &self.images[hasher.finish() as usize % self.images.len()]
+            let scrambled = scramble(hasher.finish());
+            &self.images[scrambled as usize % self.images.len()]
         }
     }
 }

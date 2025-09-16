@@ -92,6 +92,10 @@ impl StringRenderer {
     }
 
     pub fn render(&mut self, assets: &AssetPool) {
+        if self.string.is_empty() {
+            return;
+        }
+
         const GLYPH_WIDTHS: [u32; 256] = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -123,8 +127,6 @@ impl StringRenderer {
 
             let glyph_max_size = 8.0;
 
-            faces.push([0, 1, 2]);
-            faces.push([2, 3, 0]);
             let text_width = 3.0 + self.string
                 .bytes()
                 .map(|character| (GLYPH_WIDTHS[character as usize] + 1) as f32)
@@ -133,6 +135,8 @@ impl StringRenderer {
             let adjusted_offset = self.offset - self.placement * bounds_size;
 
             // Background rectangle
+            faces.push([0, 1, 2]);
+            faces.push([2, 3, 0]);
             for (vertex_offset, _) in OFFSETS {
                 let total_offset = adjusted_offset + Vector([
                     vertex_offset.x() * text_width,
