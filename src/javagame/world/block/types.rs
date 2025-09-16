@@ -79,6 +79,7 @@ pub const BLOCK_TYPES: &[&BlockType] = &[
     &AMETHYST_CRYSTAL,
     &AMETHYST_ORE,
     &AMPLIFITE_BLOCK,
+    &CHAIN,
     &COAL_BLOCK,
     &COBALT_BLOCK,
     &COBBLES,
@@ -95,6 +96,7 @@ pub const BLOCK_TYPES: &[&BlockType] = &[
     &GOLD_WIRE,
     &GRASSY_DIRT,
     &IRON_BLOCK,
+    &LANTERN,
     &LUMINITE_BLOCK,
     &MAGMIUM_BLOCK,
     &OBSIDIAN_BLOCK,
@@ -167,6 +169,22 @@ pub static AMPLIFITE_BLOCK: BlockType = BlockType {
     name: "amplifite_block",
     palette_key: Some("amplifite"),
     connects_to: connects_to_same_type,
+    ..DEFAULTS
+};
+pub static CHAIN: BlockType = BlockType {
+    name: "chain",
+    attributes: &[
+        ("axis", AttributeType::Enum { default_value: 0, value_names: &["x", "y"] }),
+    ],
+    colliders: &[],
+    palette_key: Some("iron"),
+    is_full_block: full_block_never,
+    right_click: |block, _| {
+        let mut block = block.clone();
+        let axis = block.attribute_value(0).expect_u8();
+        block.set_attribute_value(0, AttributeValue::U8((axis + 1) % 2));
+        Some(block)
+    },
     ..DEFAULTS
 };
 pub static COAL_BLOCK: BlockType = BlockType {
@@ -268,6 +286,23 @@ pub static IRON_BLOCK: BlockType = BlockType {
     name: "iron_block",
     palette_key: Some("iron"),
     connects_to: connects_to_same_type,
+    ..DEFAULTS
+};
+pub static LANTERN: BlockType = BlockType {
+    name: "lantern",
+    attributes: &[
+        ("type", AttributeType::Enum { default_value: 0, value_names: &["floor", "hanging", "left", "right"] }),
+    ],
+    colliders: &[],
+    palette_key: Some("iron"),
+    is_full_block: full_block_never,
+    light_emission: light_emission_15,
+    right_click: |block, _| {
+        let mut block = block.clone();
+        let type_ = block.attribute_value(0).expect_u8();
+        block.set_attribute_value(0, AttributeValue::U8((type_ + 1) % 4));
+        Some(block)
+    },
     ..DEFAULTS
 };
 pub static LUMINITE_BLOCK: BlockType = BlockType {
