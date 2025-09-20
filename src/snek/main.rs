@@ -98,8 +98,7 @@ fn load_snek_geometry(
 }
 
 fn main() {
-    use glfw::fail_on_errors;
-    let mut glfw = glfw::init(glfw::fail_on_errors!()).unwrap();
+    let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
     glfw.window_hint(glfw::WindowHint::Samples(Some(8)));
 
     let (mut window, events) = glfw

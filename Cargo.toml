@@ -16,10 +16,6 @@ path = "src/javagame/main.rs"
 name = "snek"
 path = "src/snek/main.rs"
 
-[[bin]]
-name = "stratego"
-path = "src/stratego/main.rs"
-
 [dependencies]
 fnv = "1.0.7"
 gl = "0.14.0"

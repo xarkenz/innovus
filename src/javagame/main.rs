@@ -8,13 +8,10 @@ pub mod tools;
 pub mod world;
 pub mod game;
 pub mod gui;
-mod audio;
+pub mod audio;
 
 fn main() {
-    let mut glfw = {
-        use glfw::fail_on_errors;
-        glfw::init(glfw::fail_on_errors!()).unwrap()
-    };
+    let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
 
     let (mut window, event_receiver) = glfw.create_window(
         1200,

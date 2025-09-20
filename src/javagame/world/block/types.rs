@@ -170,6 +170,7 @@ pub static AMETHYST_ORE: BlockType = BlockType {
 };
 pub static AMPLIFITE_BLOCK: BlockType = BlockType {
     name: "amplifite_block",
+    item_type: Some(&item::types::AMPLIFITE_BLOCK),
     palette_key: Some("amplifite"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
@@ -179,6 +180,7 @@ pub static CHAIN: BlockType = BlockType {
     attributes: &[
         ("axis", AttributeType::Enum { default_value: 0, value_names: &["x", "y"] }),
     ],
+    item_type: Some(&item::types::CHAIN),
     colliders: &[],
     palette_key: Some("iron"),
     is_full_block: full_block_never,
@@ -192,30 +194,35 @@ pub static CHAIN: BlockType = BlockType {
 };
 pub static COAL_BLOCK: BlockType = BlockType {
     name: "coal_block",
+    item_type: Some(&item::types::COAL_BLOCK),
     palette_key: Some("coal"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static COBALT_BLOCK: BlockType = BlockType {
     name: "cobalt_block",
+    item_type: Some(&item::types::COBALT_BLOCK),
     palette_key: Some("cobalt"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static COBBLES: BlockType = BlockType {
     name: "cobbles",
+    item_type: Some(&item::types::COBBLES),
     palette_key: Some("stone"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static COPPER_BLOCK: BlockType = BlockType {
     name: "copper_block",
+    item_type: Some(&item::types::COPPER_BLOCK),
     palette_key: Some("copper"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static COPPER_WIRE: BlockType = BlockType {
     name: "copper_wire",
+    item_type: Some(&item::types::COPPER_WIRE),
     colliders: &[],
     palette_key: Some("copper"),
     is_full_block: full_block_never,
@@ -224,30 +231,35 @@ pub static COPPER_WIRE: BlockType = BlockType {
 };
 pub static CORRUPTITE_BLOCK: BlockType = BlockType {
     name: "corruptite_block",
+    item_type: Some(&item::types::CORRUPTITE_BLOCK),
     palette_key: Some("corruptite"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static DIAMOND_BLOCK: BlockType = BlockType {
     name: "diamond_block",
+    item_type: Some(&item::types::DIAMOND_BLOCK),
     palette_key: Some("diamond"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static DIRT: BlockType = BlockType {
     name: "dirt",
+    item_type: Some(&item::types::DIRT),
     palette_key: Some("dirt"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static EMERALD_BLOCK: BlockType = BlockType {
     name: "emerald_block",
+    item_type: Some(&item::types::EMERALD_BLOCK),
     palette_key: Some("emerald"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static FLAMARITE_BLOCK: BlockType = BlockType {
     name: "flamarite_block",
+    item_type: Some(&item::types::FLAMARITE_BLOCK),
     palette_key: Some("flamarite"),
     light_emission: light_emission_5,
     connects_to: connects_to_same_type,
@@ -255,24 +267,28 @@ pub static FLAMARITE_BLOCK: BlockType = BlockType {
 };
 pub static FRIGIDITE_BLOCK: BlockType = BlockType {
     name: "frigidite_block",
+    item_type: Some(&item::types::FRIGIDITE_BLOCK),
     palette_key: Some("frigidite"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static GLASS: BlockType = BlockType {
     name: "glass",
+    item_type: Some(&item::types::GLASS),
     palette_key: Some("glass"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static GOLD_BLOCK: BlockType = BlockType {
     name: "gold_block",
+    item_type: Some(&item::types::GOLD_BLOCK),
     palette_key: Some("gold"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static GOLD_WIRE: BlockType = BlockType {
     name: "gold_wire",
+    item_type: Some(&item::types::GOLD_WIRE),
     colliders: &[],
     palette_key: Some("gold"),
     is_full_block: full_block_never,
@@ -281,12 +297,14 @@ pub static GOLD_WIRE: BlockType = BlockType {
 };
 pub static GRASSY_DIRT: BlockType = BlockType {
     name: "grassy_dirt",
+    item_type: Some(&item::types::GRASSY_DIRT),
     palette_key: Some("dirt"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static IRON_BLOCK: BlockType = BlockType {
     name: "iron_block",
+    item_type: Some(&item::types::IRON_BLOCK),
     palette_key: Some("iron"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
@@ -296,6 +314,7 @@ pub static LANTERN: BlockType = BlockType {
     attributes: &[
         ("type", AttributeType::Enum { default_value: 0, value_names: &["floor", "hanging", "left", "right"] }),
     ],
+    item_type: Some(&item::types::LANTERN),
     colliders: &[],
     palette_key: Some("iron"),
     is_full_block: full_block_never,
@@ -310,6 +329,7 @@ pub static LANTERN: BlockType = BlockType {
 };
 pub static LUMINITE_BLOCK: BlockType = BlockType {
     name: "luminite_block",
+    item_type: Some(&item::types::LUMINITE_BLOCK),
     palette_key: Some("luminite"),
     light_emission: light_emission_15,
     connects_to: connects_to_same_type,
@@ -317,24 +337,28 @@ pub static LUMINITE_BLOCK: BlockType = BlockType {
 };
 pub static MAGMIUM_BLOCK: BlockType = BlockType {
     name: "magmium_block",
+    item_type: Some(&item::types::MAGMIUM_BLOCK),
     palette_key: Some("magmium"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static OAK_WOOD: BlockType = BlockType {
     name: "oak_wood",
+    item_type: Some(&item::types::OAK_WOOD),
     palette_key: Some("wood_oak"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static OBSIDIAN_BLOCK: BlockType = BlockType {
     name: "obsidian_block",
+    item_type: Some(&item::types::OBSIDIAN_BLOCK),
     palette_key: Some("obsidian"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static PHYLUMUS_BLOCK: BlockType = BlockType {
     name: "phylumus_block",
+    item_type: Some(&item::types::PHYLUMUS_BLOCK),
     palette_key: Some("phylumus"),
     light_emission: light_emission_15,
     connects_to: connects_to_full_block,
@@ -345,6 +369,7 @@ pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
     attributes: &[
         ("size", AttributeType::Enum { default_value: 0, value_names: &["large", "small"] }),
     ],
+    item_type: Some(&item::types::PHYLUMUS_MUSHROOM),
     colliders: &[],
     palette_key: Some("phylumus"),
     is_full_block: full_block_never,
@@ -362,6 +387,7 @@ pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
 };
 pub static PIPE: BlockType = BlockType {
     name: "pipe",
+    item_type: Some(&item::types::PIPE),
     colliders: &[],
     palette_key: Some("aluminum"),
     is_full_block: full_block_never,
@@ -373,6 +399,7 @@ pub static PIPE_SPOUT: BlockType = BlockType {
     attributes: &[
         ("direction", AttributeType::Enum { default_value: 0, value_names: &["down", "left", "right", "up"] }),
     ],
+    item_type: Some(&item::types::PIPE_SPOUT),
     colliders: &[],
     palette_key: Some("aluminum"),
     is_full_block: full_block_never,
@@ -386,6 +413,7 @@ pub static PIPE_SPOUT: BlockType = BlockType {
 };
 pub static QUARTZ_BLOCK: BlockType = BlockType {
     name: "quartz_block",
+    item_type: Some(&item::types::QUARTZ_BLOCK),
     palette_key: Some("quartz"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
@@ -395,6 +423,7 @@ pub static QUARTZ_CRYSTAL: BlockType = BlockType {
     attributes: &[
         ("wall", AttributeType::Enum { default_value: 0, value_names: &["bottom", "left", "right", "top"] }),
     ],
+    item_type: Some(&item::types::QUARTZ_CRYSTAL),
     colliders: &[],
     palette_key: Some("quartz"),
     is_full_block: full_block_never,
@@ -409,42 +438,49 @@ pub static QUARTZ_CRYSTAL: BlockType = BlockType {
 };
 pub static QUARTZ_ORE: BlockType = BlockType {
     name: "quartz_ore",
+    item_type: Some(&item::types::QUARTZ_ORE),
     palette_key: Some("quartz"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static SAND: BlockType = BlockType {
     name: "sand",
+    item_type: Some(&item::types::SAND),
     palette_key: Some("sand"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static SANDSTONE: BlockType = BlockType {
     name: "sandstone",
+    item_type: Some(&item::types::SANDSTONE),
     palette_key: Some("sand"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static SLATE: BlockType = BlockType {
     name: "slate",
+    item_type: Some(&item::types::SLATE),
     palette_key: Some("slate"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static STEEL_BLOCK: BlockType = BlockType {
     name: "steel_block",
+    item_type: Some(&item::types::STEEL_BLOCK),
     palette_key: Some("steel"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static STONE: BlockType = BlockType {
     name: "stone",
+    item_type: Some(&item::types::STONE),
     palette_key: Some("stone"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
 };
 pub static VERSATILIUM_BLOCK: BlockType = BlockType {
     name: "versatilium_block",
+    item_type: Some(&item::types::VERSATILIUM_BLOCK),
     palette_key: Some("versatilium"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
@@ -454,6 +490,7 @@ pub static VOLTAGITE_BATTERY: BlockType = BlockType {
     attributes: &[
         ("charge", AttributeType::U8(0)),
     ],
+    item_type: Some(&item::types::VOLTAGITE_BATTERY),
     palette_key: Some("voltagite"),
     light_emission: |block| block.attribute_value(0).expect_u8(),
     connects_to: connects_to_electricity,
@@ -467,6 +504,7 @@ pub static VOLTAGITE_BATTERY: BlockType = BlockType {
 };
 pub static VOLTAGITE_BLOCK: BlockType = BlockType {
     name: "voltagite_block",
+    item_type: Some(&item::types::VOLTAGITE_BLOCK),
     palette_key: Some("voltagite"),
     light_emission: light_emission_5,
     connects_to: connects_to_same_type,
