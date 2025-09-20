@@ -141,19 +141,19 @@ fn main() {
     {
         let kooper_vertices = kooper.vertices().to_vec();
         for vertex in kooper.vertices_mut() {
-            vertex.norm = Vector::zero();
+            vertex.normal = Vector::zero();
             let mut count: f32 = 0.0;
             for test in kooper_vertices.iter() {
-                if test.pos == vertex.pos {
-                    vertex.norm[0] += test.norm[0];
-                    vertex.norm[1] += test.norm[1];
-                    vertex.norm[2] += test.norm[2];
+                if test.position == vertex.position {
+                    vertex.normal[0] += test.normal[0];
+                    vertex.normal[1] += test.normal[1];
+                    vertex.normal[2] += test.normal[2];
                     count += 1.0;
                 }
             }
-            vertex.norm[0] /= count;
-            vertex.norm[1] /= count;
-            vertex.norm[2] /= count;
+            vertex.normal[0] /= count;
+            vertex.normal[1] /= count;
+            vertex.normal[2] /= count;
         }
         let mut transform_thingy = Transform3D::identity();
         transform_thingy.rotate_z(-consts::FRAC_PI_2);

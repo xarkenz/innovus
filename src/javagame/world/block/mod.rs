@@ -1,4 +1,5 @@
 use innovus::tools::*;
+use crate::world::item::{Item, ItemType};
 
 pub mod types;
 mod chunk;
@@ -91,17 +92,38 @@ impl AttributeValue {
 }
 
 pub struct BlockType {
-    pub name: &'static str,
-    pub attributes: &'static [(&'static str, AttributeType)],
-    pub colliders: &'static [Rectangle<i32>],
-    pub palette_key: Option<&'static str>,
+    name: &'static str,
+    attributes: &'static [(&'static str, AttributeType)],
+    item_type: Option<&'static ItemType>,
+    colliders: &'static [Rectangle<i32>],
+    palette_key: Option<&'static str>,
     is_full_block: fn(&Block) -> bool,
     light_emission: fn(&Block) -> u8,
     connects_to: fn(&Block, &Block) -> bool,
-    right_click: fn(&Block, &'static BlockType) -> Option<Block>,
+    right_click: fn(&Block, &Item) -> (Option<Block>, Option<Item>),
 }
 
 impl BlockType {
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub fn attributes(&self) -> &'static [(&'static str, AttributeType)] {
+        self.attributes
+    }
+
+    pub fn item_type(&self) -> Option<&'static ItemType> {
+        self.item_type
+    }
+
+    pub fn colliders(&self) -> &'static [Rectangle<i32>] {
+        self.colliders
+    }
+
+    pub fn palette_key(&self) -> Option<&'static str> {
+        self.palette_key
+    }
+
     pub fn get_attribute_info(&self, name: &str) -> Option<(usize, &AttributeType)> {
         self.attributes
             .iter()
@@ -131,6 +153,12 @@ impl PartialEq for BlockType {
     fn eq(&self, other: &Self) -> bool {
         // Comparing pointers is sufficient; only the static BlockType objects should be used.
         self as *const Self == other as *const Self
+    }
+}
+
+impl std::fmt::Display for BlockType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 
@@ -196,8 +224,8 @@ impl Block {
         (self.block_type.connects_to)(self, other)
     }
 
-    pub fn right_click(&self, hand: &'static BlockType) -> Option<Self> {
-        (self.block_type.right_click)(self, hand)
+    pub fn handle_right_click(&self, held_item: &Item) -> (Option<Self>, Option<Item>) {
+        (self.block_type.right_click)(self, held_item)
     }
 }
 

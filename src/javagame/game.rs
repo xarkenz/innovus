@@ -6,21 +6,14 @@ use innovus::tools::{Clock, Vector};
 use crate::gui::GuiManager;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
-use crate::view::Camera;
-use crate::world::block::{BLOCK_TYPES, CHUNK_SIZE};
+use crate::world::camera::Camera;
+use crate::world::block::CHUNK_SIZE;
+use crate::world::block::types::AIR;
+use crate::world::entity::Entity;
 use crate::world::entity::types::player::PlayerMode;
 use crate::world::gen::WorldGenerator;
+use crate::world::item::{Item, ITEM_TYPES};
 use crate::world::World;
-
-fn select_block_index(mut index: isize, direction: isize) -> usize {
-    index = index.rem_euclid(BLOCK_TYPES.len() as isize);
-    if BLOCK_TYPES[index as usize] == &crate::world::block::types::AIR {
-        index += direction;
-        index = index.rem_euclid(BLOCK_TYPES.len() as isize);
-    }
-    let index = index as usize;
-    index
-}
 
 pub struct Game<'world> {
     frame_clock: Clock,
@@ -31,7 +24,6 @@ pub struct Game<'world> {
     assets: AssetPool,
     gui: GuiManager,
     current_world: Option<World<'world>>,
-    selected_block_index: usize,
     last_block_pos: Option<(usize, usize)>,
 }
 
@@ -48,7 +40,6 @@ impl<'world> Game<'world> {
             assets: AssetPool::load(assets_path)?,
             gui: GuiManager::new(viewport_size, content_scale, 8.0),
             current_world: None,
-            selected_block_index: select_block_index(0, 1),
             last_block_pos: None,
         };
         game.set_viewport_size(viewport_size);
@@ -122,7 +113,16 @@ impl<'world> Game<'world> {
 
             if inputs.key_was_pressed(Key::Tab) {
                 let offset = if inputs.key_is_held(Key::LeftShift) { -1 } else { 1 };
-                self.selected_block_index = select_block_index(self.selected_block_index as isize + offset, offset);
+                let held_item_type = world.player().held_item().item_type();
+                let item_index = ITEM_TYPES
+                    .iter()
+                    .position(|&item_type| item_type == held_item_type)
+                    .unwrap();
+                let next_item_index = (item_index as isize + offset).rem_euclid(ITEM_TYPES.len() as isize) as usize;
+                world.player_mut().set_held_item(Item::new(
+                    ITEM_TYPES[next_item_index],
+                    ITEM_TYPES[next_item_index].max_count(),
+                ));
             }
             if inputs.key_was_pressed(Key::F4) {
                 let current_mode = world.player().mode();
@@ -145,22 +145,21 @@ impl<'world> Game<'world> {
                     if middle_held {
                         let block_type = world
                             .get_chunk(chunk_location)
-                            .map_or(&crate::world::block::types::AIR, |chunk| {
+                            .map_or(&AIR, |chunk| {
                                 chunk.block_at(block_x, block_y).block_type()
                             });
-                        if block_type != &crate::world::block::types::AIR {
-                            let block_index = BLOCK_TYPES
-                                .iter()
-                                .position(|&element| element == block_type)
-                                .unwrap();
-                            self.selected_block_index = select_block_index(block_index as isize, 1);
+                        if let Some(item_type) = block_type.item_type() {
+                            world.player_mut().set_held_item(Item::new(
+                                item_type,
+                                item_type.max_count(),
+                            ));
                         }
                     }
                     if left_held {
                         world.user_destroy_block(chunk_location, block_x, block_y, &mut self.assets);
                     }
                     if right_held {
-                        world.user_place_block(chunk_location, block_x, block_y, BLOCK_TYPES[self.selected_block_index]);
+                        world.player_use_item(chunk_location, block_x, block_y);
                     }
                 }
             }
@@ -168,12 +167,14 @@ impl<'world> Game<'world> {
                 self.last_block_pos = None;
             }
 
-            let held_item = BLOCK_TYPES[self.selected_block_index];
-            self.gui.update_item_display(held_item, &self.assets);
-            world.player_mut().set_held_item(held_item);
             world.set_cursor_pos(cursor_world_pos);
             world.update(inputs, dt);
 
+            self.gui.update_item_display(world.player().held_item(), &self.assets);
+            self.gui.update_player_info_display(
+                world.player().position(),
+                world.player().velocity(),
+            );
             let average_fps = self.fps_tracker.iter().sum::<f32>() / self.fps_tracker.len() as f32;
             if average_fps.is_finite() {
                 self.gui.update_fps_display(average_fps);

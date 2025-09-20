@@ -4,23 +4,23 @@ uniform float time;
 uniform mat4 camera_view;
 uniform mat4 camera_proj;
 
-layout(location = 0) in vec3 vertex_pos;
+layout(location = 0) in vec3 vertex_position;
 layout(location = 1) in vec4 vertex_color;
 layout(location = 2) in vec2 vertex_uv;
-layout(location = 3) in vec3 vertex_norm;
+layout(location = 3) in vec3 vertex_normal;
 
 out Vertex {
-    vec3 pos;
+    vec3 position;
     vec4 color;
     vec2 uv;
-    vec3 norm;
+    vec3 normal;
 } vertex;
 
 void main() {
-    vertex.pos = vertex_pos;
+    vertex.position = vertex_position;
     vertex.color = vertex_color;
     vertex.uv = vertex_uv;
-    vertex.norm = vertex_norm;
+    vertex.normal = vertex_normal;
 
-    gl_Position = camera_proj * camera_view * vec4(vertex.pos, 1.0);
+    gl_Position = camera_proj * camera_view * vec4(vertex_position, 1.0);
 }

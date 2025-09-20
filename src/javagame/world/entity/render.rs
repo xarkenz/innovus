@@ -283,7 +283,7 @@ impl RendererBatch {
                 let mut vertex_index = handle.slot * 4;
                 for (position, uv) in vertices {
                     let vertex = self.geometry.vertex_at_mut(vertex_index);
-                    vertex.pos = position.with_z(1.0);
+                    vertex.position = position.with_z(1.0);
                     vertex.color = color;
                     vertex.uv = uv.map(|x| x as f32);
                     vertex_index += 1;

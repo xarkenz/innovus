@@ -3,7 +3,8 @@ use innovus::gfx::{Geometry, Vertex, VertexAttribute, VertexAttributeType};
 use innovus::tools::Vector;
 use crate::gui::text::StringRenderer;
 use crate::tools::asset::AssetPool;
-use crate::world::block::BlockType;
+use crate::world::item::Item;
+use crate::world::item::types::AIR;
 
 pub mod text;
 
@@ -48,6 +49,7 @@ pub struct GuiManager {
     offset_scale: Vector<f32, 2>,
     hotbar: Geometry<GuiVertex>,
     fps_display: StringRenderer,
+    player_info_display: StringRenderer,
     item_display: StringRenderer,
 }
 
@@ -63,6 +65,14 @@ impl GuiManager {
                 Vector([-1.0, 1.0]),
                 Vector([0.0, -4.0]),
                 Vector([0.0, 1.0]),
+                Vector([1.0, 1.0, 1.0, 1.0]),
+                Vector([0.0, 0.0, 0.0, 0.4]),
+                String::new(),
+            ),
+            player_info_display: StringRenderer::new(
+                Vector([1.0, 1.0]),
+                Vector([0.0, -4.0]),
+                Vector([1.0, 1.0]),
                 Vector([1.0, 1.0, 1.0, 1.0]),
                 Vector([0.0, 0.0, 0.0, 0.4]),
                 String::new(),
@@ -113,10 +123,28 @@ impl GuiManager {
         self.fps_display.set_string(format!("Average FPS: {average_fps:.1}"));
     }
 
-    pub fn update_item_display(&mut self, item: &'static BlockType, assets: &AssetPool) {
-        let item_key = format!("item.{}", item.name);
-        let item_name = assets.get_text_string(&item_key);
-        self.item_display.set_string(item_name.into());
+    pub fn update_player_info_display(&mut self, position: Vector<f32, 2>, velocity: Vector<f32, 2>) {
+        self.player_info_display.set_string(format!(
+            "P=({:.0}, {:.0}); V=({:.1}, {:.1})",
+            position.x().floor(),
+            position.y().floor(),
+            velocity.x(),
+            velocity.y(),
+        ));
+    }
+
+    pub fn update_item_display(&mut self, item: &Item, assets: &AssetPool) {
+        if item.item_type() == &AIR {
+            self.item_display.set_string(String::new());
+        }
+        else {
+            let item_key = format!("item.{}", item.item_type());
+            let item_name = assets.get_text_string(&item_key);
+            self.item_display.set_string(match item.count() {
+                1 => item_name.to_string(),
+                count => format!("{item_name} ({count})")
+            });
+        }
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {
@@ -144,6 +172,7 @@ impl GuiManager {
         self.hotbar.render();
 
         self.fps_display.render(assets);
+        self.player_info_display.render(assets);
         self.item_display.render(assets);
     }
 }

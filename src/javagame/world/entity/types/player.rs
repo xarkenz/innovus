@@ -3,9 +3,10 @@ use crate::tools::*;
 use crate::tools::asset::AssetPool;
 use crate::tools::asset::entity::EntityImage;
 use crate::tools::input::{InputState, Key};
-use crate::world::block::{BlockType, ChunkMap};
+use crate::world::block::ChunkMap;
 use crate::world::entity::{movement, Entity};
 use crate::world::entity::render::{EntityPiece, EntityPieceHandle, EntityRenderer};
+use crate::world::item::Item;
 use crate::world::particle::ParticleManager;
 use super::*;
 
@@ -36,7 +37,7 @@ pub struct Player {
     appearance: Option<PlayerAppearance>,
     name: String,
     mode: PlayerMode,
-    held_item: &'static BlockType,
+    held_item: Item,
     crouching: bool,
     spawn_point: Option<Vector<i64, 2>>,
     movement_accel: f32,
@@ -55,7 +56,7 @@ impl Player {
             appearance: None,
             name: name.unwrap_or_else(|| "(anonymous)".into()),
             mode,
-            held_item: &crate::world::block::types::AIR,
+            held_item: Item::new(&crate::world::item::types::AIR, 0),
             crouching: false,
             spawn_point: None,
             movement_accel: 32.0,
@@ -63,6 +64,10 @@ impl Player {
             jump_cooldown: 0.0,
             coyote_time: COYOTE_TIME_SECONDS,
         }
+    }
+
+    pub fn velocity(&self) -> Vector<f32, 2> {
+        self.velocity
     }
 
     pub fn name(&self) -> &str {
@@ -77,12 +82,12 @@ impl Player {
         self.mode = mode;
     }
 
-    pub fn held_item(&self) -> &'static BlockType {
-        self.held_item
+    pub fn held_item(&self) -> &Item {
+        &self.held_item
     }
 
-    pub fn set_held_item(&mut self, block_type: &'static BlockType) {
-        self.held_item = block_type;
+    pub fn set_held_item(&mut self, item: Item) {
+        self.held_item = item;
     }
 
     pub fn respawn(&mut self, physics: &mut Physics) {
@@ -290,7 +295,7 @@ impl Entity for Player {
                 }
             }
             else {
-                if self.velocity.y() > 0.0 {
+                if self.velocity.y() > -4.0 {
                     body.set_image(&appearance.jump_ascend_image);
                 }
                 else {

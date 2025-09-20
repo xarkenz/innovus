@@ -418,80 +418,80 @@ pub trait Vertex : Clone {
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Vertex3D {
-    pub pos: Vector<f32, 3>,
+    pub position: Vector<f32, 3>,
     pub color: Vector<f32, 4>,
     pub uv: Vector<f32, 2>,
-    pub norm: Vector<f32, 3>,
+    pub normal: Vector<f32, 3>,
 }
 
 impl Vertex3D {
     pub fn new(
-        pos: Vector<f32, 3>,
+        position: Vector<f32, 3>,
         color: Option<Vector<f32, 4>>,
         uv: Option<Vector<f32, 2>>,
-        norm: Option<Vector<f32, 3>>,
+        normal: Option<Vector<f32, 3>>,
     ) -> Self {
         Self {
-            pos,
+            position,
             color: color.unwrap_or(Vector::one()),
             uv: uv.unwrap_or(Vector::filled(f32::NAN)),
-            norm: norm.unwrap_or(Vector::zero()),
+            normal: normal.unwrap_or(Vector::zero()),
         }
     }
 
-    pub fn colored(pos: Vector<f32, 3>, color: Vector<f32, 4>) -> Self {
+    pub fn colored(position: Vector<f32, 3>, color: Vector<f32, 4>) -> Self {
         Self {
-            pos,
+            position,
             color,
             uv: Vector::filled(f32::NAN),
-            norm: Vector::zero(),
+            normal: Vector::zero(),
         }
     }
 
-    pub fn textured(pos: Vector<f32, 3>, uv: Vector<f32, 2>) -> Self {
+    pub fn textured(position: Vector<f32, 3>, uv: Vector<f32, 2>) -> Self {
         Self {
-            pos,
+            position,
             color: Vector::one(),
             uv,
-            norm: Vector::zero(),
+            normal: Vector::zero(),
         }
     }
 
-    pub fn combined(pos: Vector<f32, 3>, color: Vector<f32, 4>, uv: Vector<f32, 2>) -> Self {
+    pub fn combined(position: Vector<f32, 3>, color: Vector<f32, 4>, uv: Vector<f32, 2>) -> Self {
         Self {
-            pos,
+            position,
             color,
             uv,
-            norm: Vector::zero(),
+            normal: Vector::zero(),
         }
     }
 
-    pub fn has_norm(&self) -> bool {
-        self.norm != Vector::zero()
+    pub fn has_normal(&self) -> bool {
+        self.normal != Vector::zero()
     }
 }
 
 impl Vertex for Vertex3D {
     const ATTRIBUTES: &'static [VertexAttribute] = &[
-        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, pos)),
+        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, position)),
         VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
         VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
-        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, norm)),
+        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, normal)),
     ];
 }
 
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Vertex2D {
-    pub pos: Vector<f32, 3>,
+    pub position: Vector<f32, 3>,
     pub color: Vector<f32, 4>,
     pub uv: Vector<f32, 2>,
 }
 
 impl Vertex2D {
-    pub fn new(pos: Vector<f32, 3>, color: Option<Vector<f32, 4>>, uv: Option<Vector<f32, 2>>) -> Self {
+    pub fn new(position: Vector<f32, 3>, color: Option<Vector<f32, 4>>, uv: Option<Vector<f32, 2>>) -> Self {
         Self {
-            pos,
+            position,
             color: color.unwrap_or(Vector::one()),
             uv: uv.unwrap_or(Vector::filled(f32::NAN)),
         }
@@ -500,7 +500,7 @@ impl Vertex2D {
 
 impl Vertex for Vertex2D {
     const ATTRIBUTES: &'static [VertexAttribute] = &[
-        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, pos)),
+        VertexAttribute::new(VertexAttributeType::F32, 3, offset_of!(Self, position)),
         VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
         VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
     ];
@@ -916,7 +916,7 @@ impl Geometry<Vertex3D> {
                         }
                     }
                     let idx = (vertices.len() + add_vertices.len()) as u32;
-                    let normal = (vertices[v1 as usize].norm + vertices[v2 as usize].norm).normalized();
+                    let normal = (vertices[v1 as usize].normal + vertices[v2 as usize].normal).normalized();
                     add_vertices.push(Vertex3D::new(
                         normal * radius + center,
                         Some(color),
@@ -947,9 +947,9 @@ impl Geometry<Vertex3D> {
         for index in 0..slice.vertex_count {
             let index = slice.first_vertex + index;
             let vertex = self.vertex_at_mut(index);
-            vertex.pos = matrix * vertex.pos;
-            if vertex.has_norm() {
-                vertex.norm = matrix.affine() * vertex.norm;
+            vertex.position = matrix * vertex.position;
+            if vertex.has_normal() {
+                vertex.normal = matrix.affine() * vertex.normal;
             }
         }
         self.update_buffer_slice(slice);

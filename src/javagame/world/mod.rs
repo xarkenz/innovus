@@ -5,18 +5,20 @@ use innovus::tools::phys::Physics;
 use crate::tools::*;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
-use crate::view::block_preview::BlockPreview;
-use crate::view::Camera;
-use crate::world::block::{light_value, Block, BlockType, Chunk, ChunkLocation, ChunkMap, CHUNK_SIZE};
-use crate::world::entity::Entity;
-use crate::world::entity::render::EntityRenderer;
-use crate::world::entity::types::player::{Player, PlayerMode};
-use crate::world::gen::WorldGenerator;
-use crate::world::particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
+use block::{light_value, Block, Chunk, ChunkLocation, ChunkMap, CHUNK_SIZE};
+use camera::Camera;
+use entity::Entity;
+use entity::render::EntityRenderer;
+use entity::types::player::{Player, PlayerMode};
+use gen::WorldGenerator;
+use item::preview::ItemPreview;
+use particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
 
 pub mod block;
+pub mod camera;
 pub mod entity;
 pub mod gen;
+pub mod item;
 pub mod particle;
 
 pub const SECONDS_PER_TICK: f32 = 0.05;
@@ -30,7 +32,7 @@ pub struct World<'world> {
     entities: HashMap<Uuid, Box<dyn Entity + 'world>>,
     entity_renderer: EntityRenderer,
     particles: ParticleManager,
-    block_preview: BlockPreview,
+    block_preview: ItemPreview,
     sky_color: Vector<f32, 3>,
     sky_light: f32,
 }
@@ -46,7 +48,7 @@ impl<'world> World<'world> {
             entity_renderer: EntityRenderer::new(),
             player: Player::new(generate_uuid(), Vector([-0.5, 0.0]), None, PlayerMode::Normal),
             particles: ParticleManager::new(),
-            block_preview: BlockPreview::new(Vector::zero(), &block::types::AIR, 0.4),
+            block_preview: ItemPreview::new(Vector::zero(), &item::types::AIR, 0.4),
             sky_color: Vector([0.6, 0.8, 1.0]),
             sky_light: 1.0,
         };
@@ -100,10 +102,16 @@ impl<'world> World<'world> {
         self.chunks.unload(location, &mut self.physics);
     }
 
-    pub fn user_place_block(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize, hand: &'static BlockType) {
+    pub fn player_use_item(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize) {
         if let Some(mut chunk) = self.chunks.get_mut(chunk_location) {
-            if let Some(block) = chunk.block_at(block_x, block_y).right_click(hand) {
+            let (changed_block, changed_item) = chunk
+                .block_at(block_x, block_y)
+                .handle_right_click(self.player.held_item());
+            if let Some(block) = changed_block {
                 chunk.set_block_at(block_x, block_y, block, &self.chunks, &mut self.physics);
+            }
+            if let Some(item) = changed_item {
+                self.player.set_held_item(item);
             }
         }
     }
@@ -114,7 +122,7 @@ impl<'world> World<'world> {
             if block_type != &block::types::AIR {
                 chunk.set_block_at(block_x, block_y, Block::new(&block::types::AIR), &self.chunks, &mut self.physics);
                 // Create particles coming from the center of the destroyed block
-                if let Some(palette) = block_type.palette_key.and_then(|key| assets.get_color_palette(key).ok()) {
+                if let Some(palette) = block_type.palette_key().and_then(|key| assets.get_color_palette(key).ok()) {
                     let position = Vector([
                         chunk_location.x() as f32 * CHUNK_SIZE as f32 + block_x as f32 + 0.5,
                         chunk_location.y() as f32 * CHUNK_SIZE as f32 + block_y as f32 + 0.5,
@@ -245,7 +253,7 @@ impl<'world> World<'world> {
 
     fn tick(&mut self) {
         self.entity_renderer.tick();
-        self.block_preview.set_block_type(self.player.held_item());
+        self.block_preview.set_item_type(self.player.held_item().item_type());
         self.chunks.tick(self.player.position(), &mut self.physics);
     }
 

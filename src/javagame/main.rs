@@ -5,10 +5,10 @@ use crate::tools::input::InputState;
 use crate::world::gen::types::OverworldGenerator;
 
 pub mod tools;
-pub mod view;
 pub mod world;
 pub mod game;
 pub mod gui;
+mod audio;
 
 fn main() {
     let mut glfw = {

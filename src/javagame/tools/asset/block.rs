@@ -244,11 +244,11 @@ impl Condition {
         // Note that data being null results in this loop being skipped.
         for (name, value) in data.entries() {
             let Some((index, attribute_type)) = block_type.get_attribute_info(name) else {
-                return Err(format!("block type '{}' has no attribute named '{name}'", block_type.name));
+                return Err(format!("block type '{block_type}' has no attribute named '{name}'"));
             };
 
             let Some(value) = parse_attribute_value(attribute_type, value) else {
-                return Err(format!("attribute '{name}' for block type '{}' expects {}", block_type.name, attribute_type.description()));
+                return Err(format!("attribute '{name}' for block type '{block_type}' expects {}", attribute_type.description()));
             };
 
             attributes.push((index, value));
@@ -282,15 +282,15 @@ impl ImageSelector {
 
         for image_key in list.members() {
             let Some(image_key) = image_key.as_str() else {
-                return Err(format!("all image keys for block type '{}' must be strings", block_type.name));
+                return Err(format!("all image keys for block type '{block_type}' must be strings"));
             };
-            let image_key = image_key.replace("{block_type}", block_type.name);
+            let image_key = image_key.replace("{block_type}", block_type.name());
 
             images.push(get_image(&image_key)?);
         }
 
         if images.is_empty() {
-            return Err(format!("expected a list of one or more image keys for block type '{}'", block_type.name));
+            return Err(format!("expected a list of one or more image keys for block type '{block_type}'"));
         }
 
         Ok(Self {

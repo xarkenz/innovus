@@ -1,5 +1,5 @@
 use crate::tools::*;
-
+use crate::world::item;
 use super::*;
 
 const BLOCK_RECT: Rectangle<i32> = Rectangle::new(Vector([0, 0]), Vector([32, 32]));
@@ -55,14 +55,15 @@ fn connects_to_pipe(this: &Block, that: &Block) -> bool {
     that.block_type() == &PIPE || that.block_type() == &PIPE_SPOUT
 }
 
-fn right_click_no_action(this: &Block, hand: &'static BlockType) -> Option<Block> {
-    let _ = (this, hand);
-    None
+fn right_click_no_action(target_block: &Block, held_item: &Item) -> (Option<Block>, Option<Item>) {
+    // Defer to the held item's right click handler
+    held_item.handle_right_click(target_block)
 }
 
 const DEFAULTS: BlockType = BlockType {
     name: "invalid",
     attributes: &[],
+    item_type: None,
     colliders: &[BLOCK_RECT],
     palette_key: None,
     is_full_block: full_block_always,
@@ -122,9 +123,6 @@ pub static AIR: BlockType = BlockType {
     name: "air",
     colliders: &[],
     is_full_block: full_block_never,
-    right_click: |_, hand| {
-        Some(Block::new(hand))
-    },
     ..DEFAULTS
 };
 pub static TEST_BLOCK: BlockType = BlockType {
@@ -133,12 +131,14 @@ pub static TEST_BLOCK: BlockType = BlockType {
 };
 pub static ALUMINUM_BLOCK: BlockType = BlockType {
     name: "aluminum_block",
+    item_type: Some(&item::types::ALUMINUM_BLOCK),
     palette_key: Some("aluminum"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
 };
 pub static AMETHYST_BLOCK: BlockType = BlockType {
     name: "amethyst_block",
+    item_type: Some(&item::types::AMETHYST_BLOCK),
     palette_key: Some("amethyst"),
     connects_to: connects_to_same_type,
     ..DEFAULTS
@@ -148,20 +148,22 @@ pub static AMETHYST_CRYSTAL: BlockType = BlockType {
     attributes: &[
         ("wall", AttributeType::Enum { default_value: 0, value_names: &["bottom", "left", "right", "top"] }),
     ],
+    item_type: Some(&item::types::AMETHYST_CRYSTAL),
     colliders: &[],
     palette_key: Some("amethyst"),
     is_full_block: full_block_never,
     light_emission: light_emission_5,
-    right_click: |block, _| {
-        let mut block = block.clone();
+    right_click: |target_block, _| {
+        let mut block = target_block.clone();
         let wall = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((wall + 1) % 4));
-        Some(block)
+        (Some(block), None)
     },
     ..DEFAULTS
 };
 pub static AMETHYST_ORE: BlockType = BlockType {
     name: "amethyst_ore",
+    item_type: Some(&item::types::AMETHYST_ORE),
     palette_key: Some("amethyst"),
     connects_to: connects_to_full_block,
     ..DEFAULTS
@@ -180,11 +182,11 @@ pub static CHAIN: BlockType = BlockType {
     colliders: &[],
     palette_key: Some("iron"),
     is_full_block: full_block_never,
-    right_click: |block, _| {
-        let mut block = block.clone();
+    right_click: |target_block, _| {
+        let mut block = target_block.clone();
         let axis = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((axis + 1) % 2));
-        Some(block)
+        (Some(block), None)
     },
     ..DEFAULTS
 };
@@ -298,11 +300,11 @@ pub static LANTERN: BlockType = BlockType {
     palette_key: Some("iron"),
     is_full_block: full_block_never,
     light_emission: light_emission_15,
-    right_click: |block, _| {
-        let mut block = block.clone();
+    right_click: |target_block, _| {
+        let mut block = target_block.clone();
         let type_ = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((type_ + 1) % 4));
-        Some(block)
+        (Some(block), None)
     },
     ..DEFAULTS
 };
@@ -350,11 +352,11 @@ pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
         let shape = block.attribute_value(0).expect_u8();
         if shape == 0 { 6 } else { 3 }
     },
-    right_click: |block, _| {
-        let mut block = block.clone();
+    right_click: |target_block, _| {
+        let mut block = target_block.clone();
         let shape = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((shape + 1) % 2));
-        Some(block)
+        (Some(block), None)
     },
     ..DEFAULTS
 };
@@ -374,11 +376,11 @@ pub static PIPE_SPOUT: BlockType = BlockType {
     colliders: &[],
     palette_key: Some("aluminum"),
     is_full_block: full_block_never,
-    right_click: |block, _| {
-        let mut block = block.clone();
+    right_click: |target_block, _| {
+        let mut block = target_block.clone();
         let direction = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((direction + 1) % 4));
-        Some(block)
+        (Some(block), None)
     },
     ..DEFAULTS
 };
@@ -397,11 +399,11 @@ pub static QUARTZ_CRYSTAL: BlockType = BlockType {
     palette_key: Some("quartz"),
     is_full_block: full_block_never,
     light_emission: light_emission_5,
-    right_click: |block, _| {
-        let mut block = block.clone();
+    right_click: |target_block, _| {
+        let mut block = target_block.clone();
         let wall = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((wall + 1) % 4));
-        Some(block)
+        (Some(block), None)
     },
     ..DEFAULTS
 };
@@ -455,11 +457,11 @@ pub static VOLTAGITE_BATTERY: BlockType = BlockType {
     palette_key: Some("voltagite"),
     light_emission: |block| block.attribute_value(0).expect_u8(),
     connects_to: connects_to_electricity,
-    right_click: |block, _| {
-        let mut block = block.clone();
+    right_click: |target_block, _| {
+        let mut block = target_block.clone();
         let charge = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((charge + 1) % 9));
-        Some(block)
+        (Some(block), None)
     },
     ..DEFAULTS
 };

@@ -20,13 +20,12 @@ path = "src/snek/main.rs"
 name = "stratego"
 path = "src/stratego/main.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-num = "0.4.0"
+fnv = "1.0.7"
 gl = "0.14.0"
 glfw = "0.60.0"
 image = "0.25.6"
-uuid = {version = "1.2.2", features = ["v4", "fast-rng"]}
 json = "0.12.4"
-fnv = "1.0.7"
+num = "0.4.0"
+rodio = "0.21.1"
+uuid = { version = "1.2.2", features = ["v4", "fast-rng"] }

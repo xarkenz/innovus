@@ -1,20 +1,22 @@
 use innovus::gfx::{Geometry, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::asset::AssetPool;
-use crate::world::block::{self, Block, BlockType, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
+use crate::world::block::{Block, BlockType, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
+use crate::world::block::types::AIR;
+use crate::world::item::ItemType;
 
-pub struct BlockPreview {
+pub struct ItemPreview {
     position: Vector<f32, 2>,
-    block_type: &'static BlockType,
+    item_type: &'static ItemType,
     opacity: f32,
     geometry: Geometry<Vertex2D>,
 }
 
-impl BlockPreview {
-    pub fn new(position: Vector<f32, 2>, block_type: &'static BlockType, opacity: f32) -> Self {
+impl ItemPreview {
+    pub fn new(position: Vector<f32, 2>, item_type: &'static ItemType, opacity: f32) -> Self {
         Self {
             position,
-            block_type,
+            item_type,
             opacity,
             geometry: Geometry::new_render().unwrap(),
         }
@@ -28,12 +30,12 @@ impl BlockPreview {
         self.position = position;
     }
 
-    pub fn block_type(&self) -> &'static BlockType {
-        self.block_type
+    pub fn item_type(&self) -> &'static ItemType {
+        self.item_type
     }
 
-    pub fn set_block_type(&mut self, block_type: &'static BlockType) {
-        self.block_type = block_type;
+    pub fn set_item_type(&mut self, item_type: &'static ItemType) {
+        self.item_type = item_type;
     }
 
     pub fn opacity(&self) -> f32 {
@@ -45,6 +47,48 @@ impl BlockPreview {
     }
 
     pub fn render(&mut self, assets: &AssetPool, chunks: &ChunkMap) {
+        if let Some(block_type) = self.item_type.block_type() {
+            self.render_block(block_type, assets, chunks);
+        }
+        else if let Some(atlas_region) = assets.get_item_image(self.item_type) {
+            let color = Vector([1.0, 1.0, 1.0, self.opacity]);
+            let to_f32 = |x: u32| x as f32;
+            self.geometry.clear();
+            self.geometry.add(
+                &[
+                    Vertex2D::new(
+                        (self.position + Vector([-0.5, -0.5])).with_z(0.0),
+                        Some(color),
+                        Some(atlas_region.min_x_max_y().map(to_f32)),
+                    ),
+                    Vertex2D::new(
+                        (self.position + Vector([-0.5, 0.5])).with_z(0.0),
+                        Some(color),
+                        Some(atlas_region.min().map(to_f32)),
+                    ),
+                    Vertex2D::new(
+                        (self.position + Vector([0.5, 0.5])).with_z(0.0),
+                        Some(color),
+                        Some(atlas_region.max_x_min_y().map(to_f32)),
+                    ),
+                    Vertex2D::new(
+                        (self.position + Vector([0.5, -0.5])).with_z(0.0),
+                        Some(color),
+                        Some(atlas_region.max().map(to_f32)),
+                    ),
+                ],
+                &[
+                    [0, 1, 2],
+                    [2, 3, 0],
+                ],
+            );
+
+            assets.item_texture().bind();
+            self.geometry.render();
+        }
+    }
+
+    fn render_block(&mut self, block_type: &'static BlockType, assets: &AssetPool, chunks: &ChunkMap) {
         let chunk_location = Vector([
             self.position.x().div_euclid(CHUNK_SIZE as f32) as i64,
             self.position.y().div_euclid(CHUNK_SIZE as f32) as i64,
@@ -56,12 +100,12 @@ impl BlockPreview {
         let block_x = self.position.x().rem_euclid(CHUNK_SIZE as f32) as usize;
         let block_y = self.position.y().rem_euclid(CHUNK_SIZE as f32) as usize;
         let slot = chunk.block_slot_at(block_x, block_y);
-        if slot.block().block_type() != &block::types::AIR {
+        if slot.block().block_type() != &AIR {
             return;
         }
         let light_value = slot.light_value();
 
-        let block = Block::new(self.block_type);
+        let block = Block::new(block_type);
         if let Some(image) = assets.get_block_image(&block, chunk_location, block_x, block_y) {
             let atlas_offsets = image.get_quadrant_atlas_offsets(chunks, &*chunk, &block, block_x, block_y);
             let block_origin = self.position.map(f32::floor);

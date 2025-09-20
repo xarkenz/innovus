@@ -8,6 +8,8 @@ use innovus::tools::Rectangle;
 use crate::tools::asset::block::{BlockAppearance, BlockImage};
 use crate::tools::asset::entity::EntityImage;
 use crate::world::block::{Block, BlockType, ChunkLocation, BLOCK_TYPES};
+use crate::world::item::ItemType;
+use crate::world::item::types::ITEM_TYPES;
 
 pub mod entity;
 pub mod block;
@@ -24,6 +26,9 @@ pub struct AssetPool {
     block_atlas: ImageAtlas,
     block_appearances: HashMap<*const BlockType, BlockAppearance>,
     block_shaders: Program,
+    item_texture: Texture2D,
+    item_atlas: ImageAtlas,
+    item_images: HashMap<*const ItemType, Rectangle<u32>>,
     entity_texture: Texture2D,
     entity_atlas: ImageAtlas,
     entity_images: HashMap<String, EntityImage>,
@@ -54,6 +59,9 @@ impl AssetPool {
             block_atlas: ImageAtlas::new(Default::default()),
             block_appearances: HashMap::new(),
             block_shaders: Program::create()?,
+            item_texture: create_texture(0),
+            item_atlas: ImageAtlas::new(Default::default()),
+            item_images: HashMap::new(),
             entity_texture: create_texture(0),
             entity_atlas: ImageAtlas::new(Default::default()),
             entity_images: HashMap::new(),
@@ -97,6 +105,7 @@ impl AssetPool {
     pub fn reload(&mut self) -> Result<(), String> {
         self.clear_gui_images();
         self.reload_block_appearances()?;
+        self.reload_item_images()?;
         self.clear_entity_images();
         self.reload_font()?;
         self.clear_color_palettes();
@@ -162,7 +171,7 @@ impl AssetPool {
         let mut block_images: HashMap<String, BlockImage> = HashMap::new();
 
         for &block_type in BLOCK_TYPES {
-            let states_data = self.load_json(format!("states/block/{}", block_type.name))
+            let states_data = self.load_json(format!("states/block/{block_type}"))
                 .unwrap_or_else(|_| default_states_data.clone());
 
             let block_appearance = BlockAppearance::parse(&states_data, block_type, |image_key| {
@@ -209,6 +218,39 @@ impl AssetPool {
 
     pub fn block_shaders(&self) -> &Program {
         &self.block_shaders
+    }
+
+    pub fn item_texture(&self) -> &Texture2D {
+        &self.item_texture
+    }
+
+    pub fn item_atlas(&self) -> &ImageAtlas {
+        &self.item_atlas
+    }
+
+    pub fn reload_item_images(&mut self) -> Result<(), String> {
+        self.item_images.clear();
+        self.item_atlas.clear();
+
+        for &item_type in ITEM_TYPES {
+            let path = format!("images/item/{item_type}");
+
+            let Ok(loaded_image) = self.load_image(&path) else {
+                continue;
+            };
+            let atlas_offset = self.item_atlas.add_image(&loaded_image);
+            let atlas_region = Rectangle::from_size(atlas_offset, loaded_image.size());
+
+            self.item_images.insert(item_type, atlas_region);
+        }
+
+        self.item_texture.upload_image(self.item_atlas.image());
+
+        Ok(())
+    }
+
+    pub fn get_item_image(&self, item_type: &'static ItemType) -> Option<Rectangle<u32>> {
+        self.item_images.get(&(item_type as *const _)).copied()
     }
 
     pub fn entity_texture(&self) -> &Texture2D {
