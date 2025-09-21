@@ -1,20 +1,20 @@
 [package]
-name = "rust-gaming"
+name = "innovus"
 version = "0.1.0"
 edition = "2021"
 default-run = "javagame"
 
 [lib]
 name = "innovus"
-path = "src/innovus/lib.rs"
+path = "innovus/src/lib.rs"
 
 [[bin]]
 name = "javagame"
-path = "src/javagame/main.rs"
+path = "sandbox/src/main.rs"
 
 [[bin]]
 name = "snek"
-path = "src/snek/main.rs"
+path = "snek/src/main.rs"
 
 [dependencies]
 fnv = "1.0.7"

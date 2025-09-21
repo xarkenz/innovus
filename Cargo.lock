@@ -569,6 +569,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "innovus"
+version = "0.1.0"
+dependencies = [
+ "fnv",
+ "gl",
+ "glfw",
+ "image",
+ "json",
+ "num",
+ "rodio",
+ "uuid",
+]
+
+[[package]]
 name = "interpolate_name"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1276,20 +1290,6 @@ dependencies = [
  "dasp_sample",
  "num-rational",
  "symphonia",
-]
-
-[[package]]
-name = "rust-gaming"
-version = "0.1.0"
-dependencies = [
- "fnv",
- "gl",
- "glfw",
- "image",
- "json",
- "num",
- "rodio",
- "uuid",
 ]
 
 [[package]]
