@@ -1,7 +1,6 @@
 use crate::world::block::{Block, BlockType};
 
 pub mod types;
-pub mod preview;
 
 pub use types::ITEM_TYPES;
 

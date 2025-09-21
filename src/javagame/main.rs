@@ -1,4 +1,4 @@
-use glfw::{Context, SwapInterval, WindowEvent, WindowMode};
+use glfw::{Context, WindowEvent};
 use innovus::tools::Vector;
 use crate::game::Game;
 use crate::tools::input::InputState;
@@ -17,7 +17,7 @@ fn main() {
         1200,
         800,
         "2D Sandbox Game",
-        WindowMode::Windowed,
+        glfw::WindowMode::Windowed,
     ).unwrap();
 
     window.make_current();
@@ -27,8 +27,9 @@ fn main() {
     window.set_mouse_button_polling(true);
     window.set_key_polling(true);
     window.set_scroll_polling(true);
+    window.set_cursor_mode(glfw::CursorMode::Hidden);
 
-    glfw.set_swap_interval(SwapInterval::Sync(1));
+    glfw.set_swap_interval(glfw::SwapInterval::Sync(1));
     innovus::gfx::screen::bind_glfw(&glfw);
 
     let mut input_state = InputState::new();

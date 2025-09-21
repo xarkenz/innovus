@@ -1,11 +1,13 @@
 use std::mem::offset_of;
 use innovus::gfx::{Geometry, Vertex, VertexAttribute, VertexAttributeType};
 use innovus::tools::Vector;
+use crate::gui::cursor::CursorRenderer;
 use crate::gui::text::StringRenderer;
 use crate::tools::asset::AssetPool;
 use crate::world::item::Item;
 use crate::world::item::types::AIR;
 
+pub mod cursor;
 pub mod text;
 
 #[repr(C)]
@@ -47,6 +49,9 @@ pub struct GuiManager {
     content_scale: Vector<f32, 2>,
     gui_scale: f32,
     offset_scale: Vector<f32, 2>,
+    cursor_position: Vector<f32, 2>,
+    cursor_offset: Vector<f32, 2>,
+    cursor_renderer: CursorRenderer,
     hotbar: Geometry<GuiVertex>,
     fps_display: StringRenderer,
     player_info_display: StringRenderer,
@@ -60,6 +65,9 @@ impl GuiManager {
             content_scale,
             gui_scale,
             offset_scale: Self::compute_offset_scale(viewport_size, content_scale * gui_scale),
+            cursor_position: Vector::zero(),
+            cursor_offset: Vector::zero(),
+            cursor_renderer: CursorRenderer::new(Vector::zero(), &AIR),
             hotbar: Geometry::new_render().unwrap(),
             fps_display: StringRenderer::new(
                 Vector([-1.0, 1.0]),
@@ -95,6 +103,7 @@ impl GuiManager {
     pub fn set_viewport_size(&mut self, viewport_size: Vector<f32, 2>) {
         self.viewport_size = viewport_size;
         self.offset_scale = Self::compute_offset_scale(viewport_size, self.content_scale * self.gui_scale);
+        self.compute_cursor_offset();
     }
 
     pub fn content_scale(&self) -> Vector<f32, 2> {
@@ -104,6 +113,7 @@ impl GuiManager {
     pub fn set_content_scale(&mut self, content_scale: Vector<f32, 2>) {
         self.content_scale = content_scale;
         self.offset_scale = Self::compute_offset_scale(self.viewport_size, content_scale * self.gui_scale);
+        self.compute_cursor_offset();
     }
 
     pub fn gui_scale(&self) -> f32 {
@@ -113,10 +123,29 @@ impl GuiManager {
     pub fn set_gui_scale(&mut self, gui_scale: f32) {
         self.gui_scale = gui_scale;
         self.offset_scale = Self::compute_offset_scale(self.viewport_size, self.content_scale * gui_scale);
+        self.compute_cursor_offset();
     }
 
     fn compute_offset_scale(viewport_size: Vector<f32, 2>, scale: Vector<f32, 2>) -> Vector<f32, 2> {
         scale / viewport_size
+    }
+
+    pub fn cursor_position(&self) -> Vector<f32, 2> {
+        self.cursor_position
+    }
+
+    pub fn set_cursor_position(&mut self, position: Vector<f32, 2>) {
+        self.cursor_position = position;
+        self.compute_cursor_offset();
+    }
+
+    fn compute_cursor_offset(&mut self) {
+        self.cursor_offset = Vector([
+            self.cursor_position.x() * 2.0,
+            self.cursor_position.y() * -2.0,
+        ]);
+        self.cursor_offset /= self.content_scale * self.gui_scale;
+        self.cursor_renderer.set_offset(self.cursor_offset);
     }
 
     pub fn update_fps_display(&mut self, average_fps: f32) {
@@ -134,6 +163,7 @@ impl GuiManager {
     }
 
     pub fn update_item_display(&mut self, item: &Item, assets: &AssetPool) {
+        self.cursor_renderer.set_item_type(item.item_type());
         if item.item_type() == &AIR {
             self.item_display.set_string(String::new());
         }
@@ -174,5 +204,6 @@ impl GuiManager {
         self.fps_display.render(assets);
         self.player_info_display.render(assets);
         self.item_display.render(assets);
+        self.cursor_renderer.render(assets);
     }
 }

@@ -11,7 +11,7 @@ use entity::Entity;
 use entity::render::EntityRenderer;
 use entity::types::player::{Player, PlayerMode};
 use gen::WorldGenerator;
-use item::preview::ItemPreview;
+use block::preview::BlockPreview;
 use particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
 
 pub mod block;
@@ -32,7 +32,7 @@ pub struct World<'world> {
     entities: HashMap<Uuid, Box<dyn Entity + 'world>>,
     entity_renderer: EntityRenderer,
     particles: ParticleManager,
-    block_preview: ItemPreview,
+    block_preview: BlockPreview,
     sky_color: Vector<f32, 3>,
     sky_light: f32,
 }
@@ -48,7 +48,7 @@ impl<'world> World<'world> {
             entity_renderer: EntityRenderer::new(),
             player: Player::new(generate_uuid(), Vector([-0.5, 0.0]), None, PlayerMode::Normal),
             particles: ParticleManager::new(),
-            block_preview: ItemPreview::new(Vector::zero(), &item::types::AIR, 0.4),
+            block_preview: BlockPreview::new(Vector::zero(), &item::types::AIR, 0.4),
             sky_color: Vector([0.6, 0.8, 1.0]),
             sky_light: 1.0,
         };
@@ -186,8 +186,8 @@ impl<'world> World<'world> {
         }
     }
 
-    pub fn set_cursor_pos(&mut self, world_pos: Vector<f32, 2>) {
-        self.block_preview.set_position(world_pos);
+    pub fn set_block_preview_position(&mut self, position: Vector<f32, 2>) {
+        self.block_preview.set_position(position);
     }
 
     pub fn reload_assets(&mut self, assets: &mut AssetPool) {

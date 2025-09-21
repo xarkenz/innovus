@@ -102,6 +102,8 @@ impl<'world> Game<'world> {
         let right_held = inputs.mouse_button_is_held(MouseButtonRight);
         let middle_held = inputs.mouse_button_is_held(MouseButtonMiddle);
 
+        self.gui.set_cursor_position(cursor_pos);
+
         let clear_color;
         if let Some(world) = &mut self.current_world {
             if let Some(scroll_amount) = inputs.scroll_amount() {
@@ -167,7 +169,7 @@ impl<'world> Game<'world> {
                 self.last_block_pos = None;
             }
 
-            world.set_cursor_pos(cursor_world_pos);
+            world.set_block_preview_position(cursor_world_pos);
             world.update(inputs, dt);
 
             self.gui.update_item_display(world.player().held_item(), &self.assets);

@@ -3,6 +3,7 @@ use crate::world::item::{Item, ItemType};
 
 pub mod types;
 mod chunk;
+pub mod preview;
 
 pub use types::BLOCK_TYPES;
 pub use chunk::*;
