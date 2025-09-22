@@ -1,0 +1,74 @@
+[
+  {
+    "condition": {
+      "charge": 0
+    },
+    "images": [
+      "block/{block_type}/charge_0"
+    ]
+  },
+  {
+    "condition": {
+      "charge": 1
+    },
+    "images": [
+      "block/{block_type}/charge_1"
+    ]
+  },
+  {
+    "condition": {
+      "charge": 2
+    },
+    "images": [
+      "block/{block_type}/charge_2"
+    ]
+  },
+  {
+    "condition": {
+      "charge": 3
+    },
+    "images": [
+      "block/{block_type}/charge_3"
+    ]
+  },
+  {
+    "condition": {
+      "charge": 4
+    },
+    "images": [
+      "block/{block_type}/charge_4"
+    ]
+  },
+  {
+    "condition": {
+      "charge": 5
+    },
+    "images": [
+      "block/{block_type}/charge_5"
+    ]
+  },
+  {
+    "condition": {
+      "charge": 6
+    },
+    "images": [
+      "block/{block_type}/charge_6"
+    ]
+  },
+  {
+    "condition": {
+      "charge": 7
+    },
+    "images": [
+      "block/{block_type}/charge_7"
+    ]
+  },
+  {
+    "condition": {
+      "charge": 8
+    },
+    "images": [
+      "block/{block_type}/charge_8"
+    ]
+  }
+]

@@ -13,6 +13,7 @@ use entity::types::player::{Player, PlayerMode};
 use gen::WorldGenerator;
 use block::preview::BlockPreview;
 use particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
+use crate::audio::AudioEngine;
 
 pub mod block;
 pub mod camera;
@@ -102,13 +103,14 @@ impl<'world> World<'world> {
         self.chunks.unload(location, &mut self.physics);
     }
 
-    pub fn player_use_item(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize) {
+    pub fn player_use_item(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize, assets: &AssetPool, audio: &AudioEngine) {
         if let Some(mut chunk) = self.chunks.get_mut(chunk_location) {
             let (changed_block, changed_item) = chunk
                 .block_at(block_x, block_y)
                 .handle_right_click(self.player.held_item());
             if let Some(block) = changed_block {
                 chunk.set_block_at(block_x, block_y, block, &self.chunks, &mut self.physics);
+                audio.play_sound(assets.resolve_path("sounds/block/wood_big_1.ogg")).unwrap();
             }
             if let Some(item) = changed_item {
                 self.player.set_held_item(item);
@@ -116,7 +118,7 @@ impl<'world> World<'world> {
         }
     }
 
-    pub fn user_destroy_block(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize, assets: &mut AssetPool) {
+    pub fn user_destroy_block(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize, assets: &mut AssetPool, audio: &AudioEngine) {
         if let Some(mut chunk) = self.chunks.get_mut(chunk_location) {
             let block_type = chunk.block_at(block_x, block_y).block_type();
             if block_type != &block::types::AIR {
@@ -140,6 +142,7 @@ impl<'world> World<'world> {
                             ..Default::default()
                         });
                     }
+                    audio.play_sound(assets.resolve_path("sounds/block/wood_big_0.ogg")).unwrap();
                 }
             }
         }

@@ -1,0 +1,18 @@
+[
+  {
+    "condition": {
+      "axis": "x"
+    },
+    "images": [
+      "block/{block_type}/axis_x"
+    ]
+  },
+  {
+    "condition": {
+      "axis": "y"
+    },
+    "images": [
+      "block/{block_type}/axis_y"
+    ]
+  }
+]

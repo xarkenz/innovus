@@ -1,0 +1,20 @@
+[
+  {
+    "condition": {
+      "size": "large"
+    },
+    "images": [
+      "block/{block_type}/size_large_0",
+      "block/{block_type}/size_large_1"
+    ]
+  },
+  {
+    "condition": {
+      "size": "small"
+    },
+    "images": [
+      "block/{block_type}/size_small_0",
+      "block/{block_type}/size_small_1"
+    ]
+  }
+]

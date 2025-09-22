@@ -3,6 +3,7 @@ use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight};
 use innovus::gfx::color::RGBColor;
 use innovus::gfx::screen;
 use innovus::tools::{Clock, Vector};
+use crate::audio::AudioEngine;
 use crate::gui::GuiManager;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
@@ -23,6 +24,7 @@ pub struct Game<'world> {
     content_scale: Vector<f32, 2>,
     assets: AssetPool,
     gui: GuiManager,
+    audio: AudioEngine,
     current_world: Option<World<'world>>,
     last_block_pos: Option<(usize, usize)>,
 }
@@ -39,6 +41,7 @@ impl<'world> Game<'world> {
             content_scale,
             assets: AssetPool::load(assets_path)?,
             gui: GuiManager::new(viewport_size, content_scale, 8.0),
+            audio: AudioEngine::new()?,
             current_world: None,
             last_block_pos: None,
         };
@@ -95,6 +98,9 @@ impl<'world> Game<'world> {
                 Err(err) => eprintln!("Failed to reload assets: {err}"),
                 Ok(()) => println!("Reloaded assets."),
             }
+        }
+        if inputs.key_was_pressed(Key::J) {
+            self.audio.play_sound(self.assets.resolve_path("sounds/block/dong.ogg")).unwrap();
         }
 
         let cursor_pos = inputs.cursor_pos().map(|x| x as f32);
@@ -158,10 +164,10 @@ impl<'world> Game<'world> {
                         }
                     }
                     if left_held {
-                        world.user_destroy_block(chunk_location, block_x, block_y, &mut self.assets);
+                        world.user_destroy_block(chunk_location, block_x, block_y, &mut self.assets, &self.audio);
                     }
                     if right_held {
-                        world.player_use_item(chunk_location, block_x, block_y);
+                        world.player_use_item(chunk_location, block_x, block_y, &self.assets, &self.audio);
                     }
                 }
             }

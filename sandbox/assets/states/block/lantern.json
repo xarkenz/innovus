@@ -1,0 +1,34 @@
+[
+  {
+    "condition": {
+      "type": "floor"
+    },
+    "images": [
+      "block/{block_type}/type_floor"
+    ]
+  },
+  {
+    "condition": {
+      "type": "hanging"
+    },
+    "images": [
+      "block/{block_type}/type_hanging"
+    ]
+  },
+  {
+    "condition": {
+      "type": "left"
+    },
+    "images": [
+      "block/{block_type}/type_left"
+    ]
+  },
+  {
+    "condition": {
+      "type": "right"
+    },
+    "images": [
+      "block/{block_type}/type_right"
+    ]
+  }
+]

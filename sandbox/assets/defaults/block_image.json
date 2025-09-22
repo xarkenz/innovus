@@ -1,0 +1,11 @@
+{
+  "size": 16,
+  "format": "connected_simple",
+  "shapes": [
+    "outward_corners",
+    "horizontal",
+    "vertical",
+    "inward_corners",
+    "fill"
+  ]
+}
