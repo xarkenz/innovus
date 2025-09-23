@@ -1,4 +1,4 @@
-use crate::world::block::{Block, BlockType};
+use crate::world::block::{Block, BlockSide, BlockType};
 
 pub mod types;
 
@@ -8,7 +8,7 @@ pub struct ItemType {
     name: &'static str,
     max_count: u32,
     block_type: Option<&'static BlockType>,
-    right_click: fn(&Block, &Item) -> (Option<Block>, Option<Item>),
+    right_click: fn(&Block, &Item, BlockSide) -> (Option<Block>, Option<Item>),
 }
 
 impl ItemType {
@@ -77,7 +77,7 @@ impl Item {
         }
     }
 
-    pub fn handle_right_click(&self, target_block: &Block) -> (Option<Block>, Option<Self>) {
-        (self.item_type.right_click)(target_block, self)
+    pub fn handle_right_click(&self, target_block: &Block, side: BlockSide) -> (Option<Block>, Option<Self>) {
+        (self.item_type.right_click)(target_block, self, side)
     }
 }

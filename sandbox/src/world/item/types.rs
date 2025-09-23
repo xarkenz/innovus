@@ -1,15 +1,15 @@
 use crate::world::block;
 use super::*;
 
-fn right_click_no_action(target_block: &Block, held_item: &Item) -> (Option<Block>, Option<Item>) {
-    let _ = (target_block, held_item);
+fn right_click_no_action(target_block: &Block, held_item: &Item, side: BlockSide) -> (Option<Block>, Option<Item>) {
+    let _ = (target_block, held_item, side);
     (None, None)
 }
 
-fn right_click_place_block(target_block: &Block, held_item: &Item) -> (Option<Block>, Option<Item>) {
+fn right_click_place_block(target_block: &Block, held_item: &Item, side: BlockSide) -> (Option<Block>, Option<Item>) {
     if held_item.count() > 0 && target_block.block_type() == &block::types::AIR {
         let block_type = held_item.item_type().block_type().unwrap();
-        (Some(Block::new(block_type)), Some(held_item.decrement_count()))
+        (Some(Block::new(block_type, side)), Some(held_item.decrement_count()))
     }
     else {
         (None, None)

@@ -55,9 +55,9 @@ fn connects_to_pipe(this: &Block, that: &Block) -> bool {
     that.block_type() == &PIPE || that.block_type() == &PIPE_SPOUT
 }
 
-fn right_click_no_action(target_block: &Block, held_item: &Item) -> (Option<Block>, Option<Item>) {
+fn right_click_no_action(target_block: &Block, held_item: &Item, side: BlockSide) -> (Option<Block>, Option<Item>) {
     // Defer to the held item's right click handler
-    held_item.handle_right_click(target_block)
+    held_item.handle_right_click(target_block, side)
 }
 
 const DEFAULTS: BlockType = BlockType {
@@ -146,14 +146,17 @@ pub static AMETHYST_BLOCK: BlockType = BlockType {
 pub static AMETHYST_CRYSTAL: BlockType = BlockType {
     name: "amethyst_crystal",
     attributes: &[
-        ("wall", AttributeType::Enum { default_value: 0, value_names: &["bottom", "left", "right", "top"] }),
+        ("wall", AttributeType::Enum {
+            side_default_values: [0, 1, 2, 0, 3],
+            value_names: &["bottom", "left", "right", "top"],
+        }),
     ],
     item_type: Some(&item::types::AMETHYST_CRYSTAL),
     colliders: &[],
     palette_key: Some("amethyst"),
     is_full_block: full_block_never,
     light_emission: light_emission_5,
-    right_click: |target_block, _| {
+    right_click: |target_block, _, _| {
         let mut block = target_block.clone();
         let wall = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((wall + 1) % 4));
@@ -178,13 +181,16 @@ pub static AMPLIFITE_BLOCK: BlockType = BlockType {
 pub static CHAIN: BlockType = BlockType {
     name: "chain",
     attributes: &[
-        ("axis", AttributeType::Enum { default_value: 0, value_names: &["x", "y"] }),
+        ("axis", AttributeType::Enum {
+            side_default_values: [1, 0, 0, 1, 1],
+            value_names: &["x", "y"],
+        }),
     ],
     item_type: Some(&item::types::CHAIN),
     colliders: &[],
     palette_key: Some("iron"),
     is_full_block: full_block_never,
-    right_click: |target_block, _| {
+    right_click: |target_block, _, _| {
         let mut block = target_block.clone();
         let axis = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((axis + 1) % 2));
@@ -312,14 +318,17 @@ pub static IRON_BLOCK: BlockType = BlockType {
 pub static LANTERN: BlockType = BlockType {
     name: "lantern",
     attributes: &[
-        ("type", AttributeType::Enum { default_value: 0, value_names: &["floor", "hanging", "left", "right"] }),
+        ("type", AttributeType::Enum {
+            side_default_values: [0, 2, 3, 0, 1],
+            value_names: &["floor", "hanging", "left", "right"],
+        }),
     ],
     item_type: Some(&item::types::LANTERN),
     colliders: &[],
     palette_key: Some("iron"),
     is_full_block: full_block_never,
     light_emission: light_emission_15,
-    right_click: |target_block, _| {
+    right_click: |target_block, _, _| {
         let mut block = target_block.clone();
         let type_ = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((type_ + 1) % 4));
@@ -367,7 +376,10 @@ pub static PHYLUMUS_BLOCK: BlockType = BlockType {
 pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
     name: "phylumus_mushroom",
     attributes: &[
-        ("size", AttributeType::Enum { default_value: 0, value_names: &["large", "small"] }),
+        ("size", AttributeType::Enum {
+            side_default_values: [0; 5],
+            value_names: &["large", "small"],
+        }),
     ],
     item_type: Some(&item::types::PHYLUMUS_MUSHROOM),
     colliders: &[],
@@ -377,7 +389,7 @@ pub static PHYLUMUS_MUSHROOM: BlockType = BlockType {
         let shape = block.attribute_value(0).expect_u8();
         if shape == 0 { 6 } else { 3 }
     },
-    right_click: |target_block, _| {
+    right_click: |target_block, _, _| {
         let mut block = target_block.clone();
         let shape = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((shape + 1) % 2));
@@ -397,13 +409,16 @@ pub static PIPE: BlockType = BlockType {
 pub static PIPE_SPOUT: BlockType = BlockType {
     name: "pipe_spout",
     attributes: &[
-        ("direction", AttributeType::Enum { default_value: 0, value_names: &["down", "left", "right", "up"] }),
+        ("direction", AttributeType::Enum {
+            side_default_values: [0, 2, 1, 3, 0],
+            value_names: &["down", "left", "right", "up"],
+        }),
     ],
     item_type: Some(&item::types::PIPE_SPOUT),
     colliders: &[],
     palette_key: Some("aluminum"),
     is_full_block: full_block_never,
-    right_click: |target_block, _| {
+    right_click: |target_block, _, _| {
         let mut block = target_block.clone();
         let direction = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((direction + 1) % 4));
@@ -421,14 +436,17 @@ pub static QUARTZ_BLOCK: BlockType = BlockType {
 pub static QUARTZ_CRYSTAL: BlockType = BlockType {
     name: "quartz_crystal",
     attributes: &[
-        ("wall", AttributeType::Enum { default_value: 0, value_names: &["bottom", "left", "right", "top"] }),
+        ("wall", AttributeType::Enum {
+            side_default_values: [0, 1, 2, 0, 3],
+            value_names: &["bottom", "left", "right", "top"],
+        }),
     ],
     item_type: Some(&item::types::QUARTZ_CRYSTAL),
     colliders: &[],
     palette_key: Some("quartz"),
     is_full_block: full_block_never,
     light_emission: light_emission_5,
-    right_click: |target_block, _| {
+    right_click: |target_block, _, _| {
         let mut block = target_block.clone();
         let wall = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((wall + 1) % 4));
@@ -494,7 +512,7 @@ pub static VOLTAGITE_BATTERY: BlockType = BlockType {
     palette_key: Some("voltagite"),
     light_emission: |block| block.attribute_value(0).expect_u8(),
     connects_to: connects_to_electricity,
-    right_click: |target_block, _| {
+    right_click: |target_block, _, _| {
         let mut block = target_block.clone();
         let charge = block.attribute_value(0).expect_u8();
         block.set_attribute_value(0, AttributeValue::U8((charge + 1) % 9));

@@ -8,6 +8,29 @@ pub mod preview;
 pub use types::BLOCK_TYPES;
 pub use chunk::*;
 
+#[derive(Default, Copy, Clone, PartialEq, Debug)]
+pub enum BlockSide {
+    #[default]
+    None = 0,
+    Left = 1,
+    Right = 2,
+    Bottom = 3,
+    Top = 4,
+}
+
+impl BlockSide {
+    pub fn from_position(position: Vector<f32, 2>) -> Self {
+        let x = position.x().rem_euclid(1.0);
+        let y = position.y().rem_euclid(1.0);
+        match (y > x, x + y > 1.0) {
+            (false, false) => Self::Bottom,
+            (false, true) => Self::Right,
+            (true, false) => Self::Left,
+            (true, true) => Self::Top,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum AttributeType {
     Bool(bool),
@@ -17,7 +40,7 @@ pub enum AttributeType {
     I32(i32),
     String(&'static str),
     Enum {
-        default_value: u8,
+        side_default_values: [u8; 5],
         value_names: &'static [&'static str],
     },
 }
@@ -101,7 +124,7 @@ pub struct BlockType {
     is_full_block: fn(&Block) -> bool,
     light_emission: fn(&Block) -> u8,
     connects_to: fn(&Block, &Block) -> bool,
-    right_click: fn(&Block, &Item) -> (Option<Block>, Option<Item>),
+    right_click: fn(&Block, &Item, BlockSide) -> (Option<Block>, Option<Item>),
 }
 
 impl BlockType {
@@ -134,17 +157,19 @@ impl BlockType {
             })
     }
 
-    pub fn default_attributes(&self) -> Box<[AttributeValue]> {
+    pub fn default_attributes(&self, side: BlockSide) -> Box<[AttributeValue]> {
         self.attributes
             .iter()
-            .map(|(_, t)| match t {
+            .map(|(_, attribute_type)| match attribute_type {
                 &AttributeType::Bool(b) => AttributeValue::Bool(b),
                 &AttributeType::U8(n) => AttributeValue::U8(n),
                 &AttributeType::I8(n) => AttributeValue::I8(n),
                 &AttributeType::U32(n) => AttributeValue::U32(n),
                 &AttributeType::I32(n) => AttributeValue::I32(n),
                 &AttributeType::String(s) => AttributeValue::String(s.into()),
-                &AttributeType::Enum { default_value, .. } => AttributeValue::U8(default_value),
+                &AttributeType::Enum { side_default_values: default_values, .. } => {
+                    AttributeValue::U8(default_values[side as usize])
+                }
             })
             .collect()
     }
@@ -190,10 +215,10 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(block_type: &'static BlockType) -> Self {
+    pub fn new(block_type: &'static BlockType, side: BlockSide) -> Self {
         Self {
             block_type,
-            attributes: block_type.default_attributes(),
+            attributes: block_type.default_attributes(side),
         }
     }
 
@@ -225,13 +250,13 @@ impl Block {
         (self.block_type.connects_to)(self, other)
     }
 
-    pub fn handle_right_click(&self, held_item: &Item) -> (Option<Self>, Option<Item>) {
-        (self.block_type.right_click)(self, held_item)
+    pub fn handle_right_click(&self, held_item: &Item, side: BlockSide) -> (Option<Self>, Option<Item>) {
+        (self.block_type.right_click)(self, held_item, side)
     }
 }
 
 impl Default for Block {
     fn default() -> Self {
-        Self::new(&types::AIR)
+        Self::new(&types::AIR, Default::default())
     }
 }

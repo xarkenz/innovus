@@ -98,7 +98,7 @@ impl WorldGenerator for OverworldGenerator {
                     }
                 }
 
-                let block = Block::new(block_type);
+                let block = Block::new(block_type, Default::default());
                 chunk.set_block_at(x, y, block, chunk_map, physics);
             }
         }
@@ -114,9 +114,7 @@ pub struct TestWorldGenerator {
 
 impl TestWorldGenerator {
     pub fn new(seed: u64) -> Self {
-        Self {
-            seed,
-        }
+        Self { seed }
     }
 }
 
@@ -130,7 +128,7 @@ impl WorldGenerator for TestWorldGenerator {
         if chunk.location().y() < 0 {
             for y in 0..16 {
                 for x in 0..16 {
-                    let block = Block::new(&block::types::TEST_BLOCK);
+                    let block = Block::new(&block::types::TEST_BLOCK, Default::default());
                     chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }
@@ -138,7 +136,7 @@ impl WorldGenerator for TestWorldGenerator {
         else {
             for y in 0..16 {
                 for x in 0..16 {
-                    let block = Block::new(&block::types::AIR);
+                    let block = Block::new(&block::types::AIR, Default::default());
                     chunk.set_block_at(x, y, block, chunk_map, physics);
                 }
             }

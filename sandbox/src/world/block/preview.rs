@@ -1,7 +1,7 @@
 use innovus::gfx::{Geometry, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::asset::AssetPool;
-use crate::world::block::{Block, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
+use crate::world::block::{Block, BlockSide, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
 use crate::world::block::types::AIR;
 use crate::world::item::ItemType;
 
@@ -64,7 +64,7 @@ impl BlockPreview {
             }
             let light_value = slot.light_value();
 
-            let block = Block::new(block_type);
+            let block = Block::new(block_type, BlockSide::from_position(self.position));
             if let Some(image) = assets.get_block_image(&block, chunk_location, block_x, block_y) {
                 let atlas_offsets = image.get_quadrant_atlas_offsets(chunks, &*chunk, &block, block_x, block_y);
                 let block_origin = self.position.map(f32::floor);

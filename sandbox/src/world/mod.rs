@@ -14,6 +14,7 @@ use gen::WorldGenerator;
 use block::preview::BlockPreview;
 use particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
 use crate::audio::AudioEngine;
+use crate::world::block::BlockSide;
 
 pub mod block;
 pub mod camera;
@@ -103,11 +104,11 @@ impl<'world> World<'world> {
         self.chunks.unload(location, &mut self.physics);
     }
 
-    pub fn player_use_item(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize, assets: &AssetPool, audio: &AudioEngine) {
+    pub fn player_use_item(&mut self, chunk_location: ChunkLocation, block_x: usize, block_y: usize, side: BlockSide, assets: &AssetPool, audio: &AudioEngine) {
         if let Some(mut chunk) = self.chunks.get_mut(chunk_location) {
             let (changed_block, changed_item) = chunk
                 .block_at(block_x, block_y)
-                .handle_right_click(self.player.held_item());
+                .handle_right_click(self.player.held_item(), side);
             if let Some(block) = changed_block {
                 chunk.set_block_at(block_x, block_y, block, &self.chunks, &mut self.physics);
                 audio.play_sound(assets.resolve_path("sounds/block/wood_big_1.ogg")).unwrap();
@@ -122,7 +123,8 @@ impl<'world> World<'world> {
         if let Some(mut chunk) = self.chunks.get_mut(chunk_location) {
             let block_type = chunk.block_at(block_x, block_y).block_type();
             if block_type != &block::types::AIR {
-                chunk.set_block_at(block_x, block_y, Block::new(&block::types::AIR), &self.chunks, &mut self.physics);
+                let air_block = Block::new(&block::types::AIR, Default::default());
+                chunk.set_block_at(block_x, block_y, air_block, &self.chunks, &mut self.physics);
                 // Create particles coming from the center of the destroyed block
                 if let Some(palette) = block_type.palette_key().and_then(|key| assets.get_color_palette(key).ok()) {
                     let position = Vector([

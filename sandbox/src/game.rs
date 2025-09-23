@@ -8,7 +8,7 @@ use crate::gui::GuiManager;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
 use crate::world::camera::Camera;
-use crate::world::block::CHUNK_SIZE;
+use crate::world::block::{BlockSide, CHUNK_SIZE};
 use crate::world::block::types::AIR;
 use crate::world::entity::Entity;
 use crate::world::entity::types::player::PlayerMode;
@@ -164,10 +164,23 @@ impl<'world> Game<'world> {
                         }
                     }
                     if left_held {
-                        world.user_destroy_block(chunk_location, block_x, block_y, &mut self.assets, &self.audio);
+                        world.user_destroy_block(
+                            chunk_location,
+                            block_x,
+                            block_y,
+                            &mut self.assets,
+                            &self.audio,
+                        );
                     }
                     if right_held {
-                        world.player_use_item(chunk_location, block_x, block_y, &self.assets, &self.audio);
+                        world.player_use_item(
+                            chunk_location,
+                            block_x,
+                            block_y,
+                            BlockSide::from_position(cursor_world_pos),
+                            &self.assets,
+                            &self.audio,
+                        );
                     }
                 }
             }
