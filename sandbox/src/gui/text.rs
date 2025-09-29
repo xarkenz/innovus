@@ -96,52 +96,57 @@ impl StringRenderer {
             return;
         }
 
-        const GLYPH_WIDTHS: [u32; 256] = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            4, 1, 3, 5, 5, 5, 5, 1, 3, 3, 5, 5, 1, 5, 1, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 3, 5, 5, 4, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 3, 5, 3, 5, 5,
-            3, 5, 5, 5, 5, 5, 4, 5, 5, 1, 3, 5, 2, 5, 5, 5,
-            5, 5, 5, 5, 4, 5, 5, 5, 5, 5, 5, 3, 1, 3, 5, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            5, 1, 5, 5, 5, 5, 1, 5, 5, 5, 3, 5, 5, 0, 5, 5,
-            4, 3, 3, 3, 2, 5, 5, 3, 5, 3, 3, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 3, 3, 3, 3,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 3, 3, 3, 3,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-        ];
+        fn glyph_info(character: char) -> (u32, f32) {
+            const INVALID_GLYPH_WIDTH: u32 = 6;
+            const X: u32 = u32::MAX;
+            const GLYPH_WIDTHS: [u32; 256] = [
+                X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+                X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+                4, 1, 3, 5, 5, 5, 5, 1, 3, 3, 5, 5, 2, 5, 1, 5,
+                5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 2, 5, 5, 5, 5,
+                6, 5, 5, 5, 5, 5, 5, 5, 5, 3, 5, 5, 4, 5, 5, 5,
+                5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 3, 5, 3, 5, 5,
+                3, 5, 5, 5, 5, 5, 4, 5, 5, 1, 2, 5, 2, 5, 5, 5,
+                5, 5, 4, 5, 4, 5, 5, 5, 5, 5, 5, 3, 1, 3, 5, X,
+                X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+                X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+                4, 1, 5, 5, 5, 5, 1, 5, 3, 7, 4, 5, 5, 0, 7, 5,
+                4, 5, 4, 4, 2, 6, 6, 1, 2, 3, 4, 5, 5, 5, 5, 5,
+                5, 5, 5, 5, 5, 5, 7, 5, 5, 5, 5, 5, 3, 3, 3, 3,
+                6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+                5, 5, 5, 5, 5, 5, 7, 5, 5, 5, 5, 5, 3, 3, 3, 3,
+                5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+            ];
+            match GLYPH_WIDTHS.get(character as usize) {
+                Some(&width) if width != X => (character as u32, width as f32),
+                _ => (0, INVALID_GLYPH_WIDTH as f32)
+            }
+        }
         const OFFSETS: [(Vector<f32, 2>, Vector<u32, 2>); 4] = [
-            (Vector([0.0, 0.0]), Vector([0, 8])), // Bottom left
+            (Vector([0.0, 0.0]), Vector([0, 12])), // Bottom left
             (Vector([0.0, 1.0]), Vector([0, 0])), // Top left
-            (Vector([1.0, 1.0]), Vector([8, 0])), // Top right
-            (Vector([1.0, 0.0]), Vector([8, 8])), // Bottom right
+            (Vector([1.0, 1.0]), Vector([12, 0])), // Top right
+            (Vector([1.0, 0.0]), Vector([12, 12])), // Bottom right
         ];
 
         if self.geometry.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
 
-            let glyph_max_size = 8.0;
+            let glyph_max_size = 12.0;
 
             let text_width = 3.0 + self.string
-                .bytes()
-                .map(|character| (GLYPH_WIDTHS[character as usize] + 1) as f32)
+                .chars()
+                .map(|character| glyph_info(character).1 + 1.0)
                 .sum::<f32>();
-            let bounds_size = Vector([text_width, glyph_max_size]);
+            let bounds_size = Vector([text_width, glyph_max_size + 2.0]);
             let adjusted_offset = self.offset - self.placement * bounds_size;
 
             // Background rectangle
             faces.push([0, 1, 2]);
             faces.push([2, 3, 0]);
             for (vertex_offset, _) in OFFSETS {
-                let total_offset = adjusted_offset + Vector([
-                    vertex_offset.x() * text_width,
-                    vertex_offset.y() * (glyph_max_size + 4.0),
-                ]);
+                let total_offset = adjusted_offset + vertex_offset * bounds_size;
                 vertices.push(GuiVertex::new(
                     self.anchor,
                     total_offset,
@@ -151,13 +156,13 @@ impl StringRenderer {
             }
 
             // Foreground text
-            let mut current_position = adjusted_offset + Vector([2.0, 2.0]);
-            for character in self.string.bytes() {
+            let mut current_position = adjusted_offset + Vector([2.0, 1.0]);
+            for character in self.string.chars() {
                 let index = vertices.len() as u32;
                 faces.push([index + 0, index + 1, index + 2]);
                 faces.push([index + 2, index + 3, index + 0]);
-                let char_index = character as u32;
-                let atlas_origin = Vector([char_index % 16, char_index / 16]) * 8;
+                let (glyph_index, glyph_width) = glyph_info(character);
+                let atlas_origin = Vector([glyph_index % 16, glyph_index / 16]) * 12;
                 for (vertex_offset, atlas_offset) in OFFSETS {
                     vertices.push(GuiVertex::new(
                         self.anchor,
@@ -166,8 +171,7 @@ impl StringRenderer {
                         Some((atlas_origin + atlas_offset).map(|x| x as f32))
                     ));
                 }
-                let glyph_width = (GLYPH_WIDTHS[character as usize] + 1) as f32;
-                current_position.set_x(current_position.x() + glyph_width);
+                current_position.set_x(current_position.x() + glyph_width + 1.0);
             }
 
             self.geometry.add(&vertices, &faces);

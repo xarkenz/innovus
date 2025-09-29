@@ -295,7 +295,7 @@ impl Entity for Player {
                 }
             }
             else {
-                if self.velocity.y() > -4.0 {
+                if self.velocity.y() > 0.0 {
                     body.set_image(&appearance.jump_ascend_image);
                 }
                 else {

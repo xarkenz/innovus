@@ -11,9 +11,9 @@ use crate::world::block::{Block, BlockType, ChunkLocation, BLOCK_TYPES};
 use crate::world::item::ItemType;
 use crate::world::item::types::ITEM_TYPES;
 
-pub mod entity;
-pub mod block;
 pub mod anim;
+pub mod block;
+pub mod entity;
 
 pub struct AssetPool {
     assets_path: PathBuf,

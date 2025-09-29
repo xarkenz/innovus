@@ -1,5 +1,5 @@
 use std::path::Path;
-use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight};
+use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight, Window};
 use innovus::gfx::color::RGBColor;
 use innovus::gfx::screen;
 use innovus::tools::{Clock, Vector};
@@ -87,33 +87,47 @@ impl<'world> Game<'world> {
         self.current_world = Some(World::new(generator, camera, &mut self.assets));
     }
 
-    pub fn run_frame(&mut self, inputs: &InputState) {
+    pub fn run_frame(&mut self, inputs: &InputState, window: &mut Window) {
         let dt = self.frame_clock.read();
         self.frame_clock.reset();
         self.fps_tracker[self.fps_tracker_index] = 1.0 / dt;
         self.fps_tracker_index = (self.fps_tracker_index + 1) % self.fps_tracker.len();
 
-        if inputs.key_was_pressed(Key::R) && inputs.key_is_held(Key::LeftControl) {
-            match self.assets.reload() {
-                Err(err) => eprintln!("Failed to reload assets: {err}"),
-                Ok(()) => println!("Reloaded assets."),
+        if inputs.key_is_held(Key::LeftControl) {
+            if inputs.key_was_pressed(Key::V) {
+                if let Some(pasted_text) = window.get_clipboard_string() {
+                    self.gui.enter_text(&pasted_text);
+                }
+            }
+            if inputs.key_was_pressed(Key::R) {
+                match self.assets.reload() {
+                    Err(err) => eprintln!("Failed to reload assets: {err}"),
+                    Ok(()) => println!("Reloaded assets."),
+                }
+                self.gui.invalidate_assets();
             }
         }
-        if inputs.key_was_pressed(Key::J) {
-            self.audio.play_sound(self.assets.resolve_path("sounds/block/dong.ogg")).unwrap();
+
+        if self.gui.inventory_shown() {
+            if inputs.key_was_repeated(Key::Backspace) {
+                self.gui.backspace();
+            }
+            if !inputs.entered_text().is_empty() {
+                self.gui.enter_text(inputs.entered_text());
+            }
         }
 
         let cursor_pos = inputs.cursor_pos().map(|x| x as f32);
-        let left_held = inputs.mouse_button_is_held(MouseButtonLeft);
-        let right_held = inputs.mouse_button_is_held(MouseButtonRight);
-        let middle_held = inputs.mouse_button_is_held(MouseButtonMiddle);
+        let left_held = inputs.button_is_held(MouseButtonLeft);
+        let right_held = inputs.button_is_held(MouseButtonRight);
+        let middle_held = inputs.button_is_held(MouseButtonMiddle);
 
         self.gui.set_cursor_position(cursor_pos);
 
         let clear_color;
         if let Some(world) = &mut self.current_world {
             if let Some(scroll_amount) = inputs.scroll_amount() {
-                let target_zoom = world.camera().zoom() * 1.125_f32.powf(scroll_amount.y() as f32);
+                let target_zoom = world.camera().zoom() * f32::powf(1.125, scroll_amount.y() as f32);
                 world.camera_mut().set_zoom(target_zoom);
             }
 
@@ -138,6 +152,10 @@ impl<'world> Game<'world> {
                     PlayerMode::Normal => PlayerMode::Spectating,
                     PlayerMode::Spectating => PlayerMode::Normal,
                 });
+            }
+            if inputs.key_was_pressed(Key::Escape) {
+                self.gui.set_inventory_shown(!self.gui.inventory_shown());
+                self.gui.clear_text();
             }
 
             if left_held || right_held || middle_held {

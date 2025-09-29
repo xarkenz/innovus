@@ -58,6 +58,12 @@ impl BlockPreview {
 
             let block_x = self.position.x().rem_euclid(CHUNK_SIZE as f32) as usize;
             let block_y = self.position.y().rem_euclid(CHUNK_SIZE as f32) as usize;
+            if block_x >= 16 || block_y >= 16 {
+                // FIXME: at one point the game crashed, supposedly because this case occurred.
+                //        i have no idea how it would have happened, but hopefully this will help
+                //        figure it out the next time it happens
+                eprintln!("x={block_x}, y={block_y}, fx={:.8}, fy={:.8}", self.position.x(), self.position.y());
+            }
             let slot = chunk.block_slot_at(block_x, block_y);
             if slot.block().block_type() != &AIR {
                 return;

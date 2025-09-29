@@ -53,9 +53,12 @@ pub struct GuiManager {
     cursor_offset: Vector<f32, 2>,
     cursor_renderer: CursorRenderer,
     hotbar: Geometry<GuiVertex>,
+    inventory: Geometry<GuiVertex>,
+    inventory_shown: bool,
     fps_display: StringRenderer,
     player_info_display: StringRenderer,
     item_display: StringRenderer,
+    input_test: StringRenderer,
 }
 
 impl GuiManager {
@@ -69,9 +72,11 @@ impl GuiManager {
             cursor_offset: Vector::zero(),
             cursor_renderer: CursorRenderer::new(Vector::zero(), &AIR),
             hotbar: Geometry::new_render().unwrap(),
+            inventory: Geometry::new_render().unwrap(),
+            inventory_shown: false,
             fps_display: StringRenderer::new(
                 Vector([-1.0, 1.0]),
-                Vector([0.0, -4.0]),
+                Vector([0.0, 0.0]),
                 Vector([0.0, 1.0]),
                 Vector([1.0, 1.0, 1.0, 1.0]),
                 Vector([0.0, 0.0, 0.0, 0.4]),
@@ -79,7 +84,7 @@ impl GuiManager {
             ),
             player_info_display: StringRenderer::new(
                 Vector([1.0, 1.0]),
-                Vector([0.0, -4.0]),
+                Vector([0.0, 0.0]),
                 Vector([1.0, 1.0]),
                 Vector([1.0, 1.0, 1.0, 1.0]),
                 Vector([0.0, 0.0, 0.0, 0.4]),
@@ -91,6 +96,14 @@ impl GuiManager {
                 Vector([0.5, 0.0]),
                 Vector([1.0, 1.0, 1.0, 1.0]),
                 Vector([0.0, 0.0, 0.0, 0.4]),
+                String::new(),
+            ),
+            input_test: StringRenderer::new(
+                Vector([0.0, 0.5]),
+                Vector([0.0, 0.0]),
+                Vector([0.5, 0.5]),
+                Vector([0.0, 0.0, 0.0, 1.0]),
+                Vector([1.0, 1.0, 1.0, 1.0]),
                 String::new(),
             ),
         }
@@ -148,6 +161,19 @@ impl GuiManager {
         self.cursor_renderer.set_offset(self.cursor_offset);
     }
 
+    pub fn inventory_shown(&self) -> bool {
+        self.inventory_shown
+    }
+
+    pub fn set_inventory_shown(&mut self, shown: bool) {
+        self.inventory_shown = shown;
+    }
+
+    pub fn invalidate_assets(&mut self) {
+        self.hotbar.clear();
+        self.inventory.clear();
+    }
+
     pub fn update_fps_display(&mut self, average_fps: f32) {
         self.fps_display.set_string(format!("Average FPS: {average_fps:.1}"));
     }
@@ -177,10 +203,48 @@ impl GuiManager {
         }
     }
 
+    pub fn enter_text(&mut self, text: &str) {
+        let mut string = self.input_test.string().to_string();
+        string.push_str(text);
+        self.input_test.set_string(string);
+    }
+
+    pub fn backspace(&mut self) {
+        let mut string = self.input_test.string().to_string();
+        string.pop();
+        self.input_test.set_string(string);
+    }
+
+    pub fn clear_text(&mut self) {
+        self.input_test.set_string(String::new());
+    }
+
     pub fn render(&mut self, assets: &mut AssetPool) {
-        assets.gui_texture().bind();
         assets.gui_shaders().set_uniform("offset_scale", self.offset_scale);
         assets.gui_shaders().set_uniform("tex_atlas", assets.gui_texture());
+
+        if self.inventory.is_empty() {
+            let atlas_region = assets.get_gui_image("gui/inventory").unwrap();
+            let anchor = Vector([0.0, 0.0]);
+            let to_f32 = |x: u32| x as f32;
+            self.inventory.add(
+                &[
+                    GuiVertex::new(anchor, Vector([-106.0, -60.0]), None, Some(atlas_region.min_x_max_y().map(to_f32))),
+                    GuiVertex::new(anchor, Vector([-106.0, 60.0]), None, Some(atlas_region.min().map(to_f32))),
+                    GuiVertex::new(anchor, Vector([106.0, 60.0]), None, Some(atlas_region.max_x_min_y().map(to_f32))),
+                    GuiVertex::new(anchor, Vector([106.0, -60.0]), None, Some(atlas_region.max().map(to_f32))),
+                ],
+                &[
+                    [0, 1, 2],
+                    [2, 3, 0],
+                ],
+            );
+        }
+        if self.inventory_shown {
+            assets.gui_texture().bind();
+            self.inventory.render();
+            self.input_test.render(assets);
+        }
 
         if self.hotbar.is_empty() {
             let atlas_region = assets.get_gui_image("gui/hotbar").unwrap();
@@ -199,6 +263,7 @@ impl GuiManager {
                 ],
             );
         }
+        assets.gui_texture().bind();
         self.hotbar.render();
 
         self.fps_display.render(assets);

@@ -1,9 +1,9 @@
 use innovus::tools::*;
 use crate::world::item::{Item, ItemType};
 
-pub mod types;
 mod chunk;
 pub mod preview;
+pub mod types;
 
 pub use types::BLOCK_TYPES;
 pub use chunk::*;
@@ -194,13 +194,13 @@ impl std::fmt::Debug for BlockType {
     }
 }
 
-pub const QUADRANT_OFFSETS: [Vector2f; 4] = [
+pub const QUADRANT_OFFSETS: [Vector<f32, 2>; 4] = [
     Vector([0.0, 0.5]), // Top left
     Vector([0.5, 0.5]), // Top right
     Vector([0.0, 0.0]), // Bottom left
     Vector([0.5, 0.0]), // Bottom right
 ];
-pub const QUADRANT_VERTEX_OFFSETS: [Vector2f; 4] = [
+pub const QUADRANT_VERTEX_OFFSETS: [Vector<f32, 2>; 4] = [
     Vector([0.0, 0.0]), // Bottom left
     Vector([0.0, 0.5]), // Top left
     Vector([0.5, 0.5]), // Top right

@@ -4,11 +4,11 @@ use crate::game::Game;
 use crate::tools::input::InputState;
 use crate::world::gen::types::OverworldGenerator;
 
-pub mod tools;
-pub mod world;
+pub mod audio;
 pub mod game;
 pub mod gui;
-pub mod audio;
+pub mod tools;
+pub mod world;
 
 fn main() {
     let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
@@ -26,6 +26,7 @@ fn main() {
     window.set_cursor_pos_polling(true);
     window.set_mouse_button_polling(true);
     window.set_key_polling(true);
+    window.set_char_polling(true);
     window.set_scroll_polling(true);
     window.set_cursor_mode(glfw::CursorMode::Hidden);
 
@@ -58,6 +59,9 @@ fn main() {
                 WindowEvent::Key(key, _scancode, action, mods) => {
                     input_state.handle_key(key, action, mods);
                 }
+                WindowEvent::Char(character) => {
+                    input_state.handle_char(character);
+                }
                 WindowEvent::MouseButton(button, action, mods) => {
                     input_state.handle_mouse_button(button, action, mods);
                 }
@@ -71,7 +75,7 @@ fn main() {
             }
         }
 
-        game.run_frame(&input_state);
+        game.run_frame(&input_state, &mut window);
 
         window.swap_buffers();
     }

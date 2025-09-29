@@ -20,7 +20,7 @@ const fn get_key_index(key: Key) -> Option<usize> {
     }
 }
 
-const fn get_mouse_button_index(button: MouseButton) -> Option<usize> {
+const fn get_button_index(button: MouseButton) -> Option<usize> {
     let button = button as usize;
     if FIRST_MOUSE_BUTTON_VALUE <= button && button <= LAST_MOUSE_BUTTON_VALUE {
         Some(button - FIRST_MOUSE_BUTTON_VALUE)
@@ -34,16 +34,21 @@ const fn get_mouse_button_index(button: MouseButton) -> Option<usize> {
 #[derive(Copy, Clone, Debug)]
 enum ButtonState {
     Pressed,
+    Repeated,
     Held,
     Released,
     Idle,
 }
 
 impl ButtonState {
+    fn is_held(&self) -> bool {
+        matches!(self, Self::Pressed | Self::Repeated | Self::Held)
+    }
+
     fn stabilize(&mut self) {
         *self = match *self {
-            ButtonState::Pressed => ButtonState::Held,
-            ButtonState::Released => ButtonState::Idle,
+            Self::Pressed | Self::Repeated => Self::Held,
+            Self::Released => Self::Idle,
             state => state
         }
     }
@@ -51,7 +56,8 @@ impl ButtonState {
 
 pub struct InputState {
     keys: [ButtonState; KEY_ARRAY_SIZE],
-    mouse_buttons: [ButtonState; MOUSE_BUTTON_ARRAY_SIZE],
+    entered_text: String,
+    buttons: [ButtonState; MOUSE_BUTTON_ARRAY_SIZE],
     cursor_pos: Vector<f64, 2>,
     scroll_amount: Option<Vector<f64, 2>>,
 }
@@ -60,7 +66,8 @@ impl InputState {
     pub fn new() -> Self {
         Self {
             keys: [ButtonState::Idle; KEY_ARRAY_SIZE],
-            mouse_buttons: [ButtonState::Idle; MOUSE_BUTTON_ARRAY_SIZE],
+            entered_text: String::new(),
+            buttons: [ButtonState::Idle; MOUSE_BUTTON_ARRAY_SIZE],
             cursor_pos: Vector::zero(),
             scroll_amount: None,
         }
@@ -70,7 +77,8 @@ impl InputState {
         for state in &mut self.keys {
             state.stabilize();
         }
-        for state in &mut self.mouse_buttons {
+        self.entered_text.clear();
+        for state in &mut self.buttons {
             state.stabilize();
         }
         self.scroll_amount = None;
@@ -81,19 +89,23 @@ impl InputState {
         if let Some(key_index) = get_key_index(key) {
             match action {
                 Action::Press => self.keys[key_index] = ButtonState::Pressed,
+                Action::Repeat => self.keys[key_index] = ButtonState::Repeated,
                 Action::Release => self.keys[key_index] = ButtonState::Released,
-                _ => {}
             }
         }
     }
 
+    pub fn handle_char(&mut self, character: char) {
+        self.entered_text.push(character);
+    }
+
     pub fn handle_mouse_button(&mut self, button: MouseButton, action: Action, mods: Modifiers) {
         let _ = mods;
-        if let Some(button_index) = get_mouse_button_index(button) {
+        if let Some(button_index) = get_button_index(button) {
             match action {
-                Action::Press => self.mouse_buttons[button_index] = ButtonState::Pressed,
-                Action::Release => self.mouse_buttons[button_index] = ButtonState::Released,
-                _ => {}
+                Action::Press => self.buttons[button_index] = ButtonState::Pressed,
+                Action::Repeat => self.buttons[button_index] = ButtonState::Repeated,
+                Action::Release => self.buttons[button_index] = ButtonState::Released,
             }
         }
     }
@@ -108,7 +120,7 @@ impl InputState {
 
     pub fn key_is_held(&self, key: Key) -> bool {
         get_key_index(key).is_some_and(|key_index| {
-            matches!(self.keys[key_index], ButtonState::Pressed | ButtonState::Held)
+            self.keys[key_index].is_held()
         })
     }
 
@@ -118,27 +130,43 @@ impl InputState {
         })
     }
 
+    pub fn key_was_repeated(&self, key: Key) -> bool {
+        get_key_index(key).is_some_and(|key_index| {
+            matches!(self.keys[key_index], ButtonState::Pressed | ButtonState::Repeated)
+        })
+    }
+
     pub fn key_was_released(&self, key: Key) -> bool {
         get_key_index(key).is_some_and(|key_index| {
             matches!(self.keys[key_index], ButtonState::Released)
         })
     }
 
-    pub fn mouse_button_is_held(&self, button: MouseButton) -> bool {
-        get_mouse_button_index(button).is_some_and(|button_index| {
-            matches!(self.mouse_buttons[button_index], ButtonState::Pressed | ButtonState::Held)
+    pub fn entered_text(&self) -> &str {
+        &self.entered_text
+    }
+
+    pub fn button_is_held(&self, button: MouseButton) -> bool {
+        get_button_index(button).is_some_and(|button_index| {
+            self.buttons[button_index].is_held()
         })
     }
 
-    pub fn mouse_button_was_pressed(&self, button: MouseButton) -> bool {
-        get_mouse_button_index(button).is_some_and(|button_index| {
-            matches!(self.mouse_buttons[button_index], ButtonState::Pressed)
+    pub fn button_was_pressed(&self, button: MouseButton) -> bool {
+        get_button_index(button).is_some_and(|button_index| {
+            matches!(self.buttons[button_index], ButtonState::Pressed)
         })
     }
 
-    pub fn mouse_button_was_released(&self, button: MouseButton) -> bool {
-        get_mouse_button_index(button).is_some_and(|button_index| {
-            matches!(self.mouse_buttons[button_index], ButtonState::Released)
+    pub fn button_was_repeated(&self, button: MouseButton) -> bool {
+        get_button_index(button).is_some_and(|button_index| {
+            matches!(self.buttons[button_index], ButtonState::Pressed | ButtonState::Repeated)
+        })
+    }
+
+    pub fn button_was_released(&self, button: MouseButton) -> bool {
+        get_button_index(button).is_some_and(|button_index| {
+            matches!(self.buttons[button_index], ButtonState::Released)
         })
     }
 
