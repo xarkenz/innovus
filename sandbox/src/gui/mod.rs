@@ -8,6 +8,7 @@ use render::cursor::CursorRenderer;
 use render::text::StringRenderer;
 
 pub mod render;
+pub mod hotbar;
 
 pub struct GuiManager {
     viewport_size: Vector<f32, 2>,
@@ -17,7 +18,7 @@ pub struct GuiManager {
     cursor_position: Vector<f32, 2>,
     cursor_offset: Vector<f32, 2>,
     cursor_renderer: CursorRenderer,
-    hotbar: MeshRenderer<GuiVertex>,
+    hotbar: hotbar::Hotbar,
     inventory: MeshRenderer<GuiVertex>,
     inventory_shown: bool,
     fps_display: StringRenderer,
@@ -27,17 +28,17 @@ pub struct GuiManager {
 }
 
 impl GuiManager {
-    pub fn new(viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>, gui_scale: f32) -> Self {
-        Self {
+    pub fn new(viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>, gui_scale: f32, assets: &mut AssetPool) -> Result<Self, String> {
+        Ok(Self {
             viewport_size,
             content_scale,
             gui_scale,
             offset_scale: Self::compute_offset_scale(viewport_size, content_scale * gui_scale),
             cursor_position: Vector::zero(),
             cursor_offset: Vector::zero(),
-            cursor_renderer: CursorRenderer::new(Vector::zero(), &AIR),
-            hotbar: MeshRenderer::create().unwrap(),
-            inventory: MeshRenderer::create().unwrap(),
+            cursor_renderer: CursorRenderer::new(Vector([-1.0, 1.0]), Vector::zero(), &AIR),
+            hotbar: hotbar::Hotbar::new(assets)?,
+            inventory: MeshRenderer::create()?,
             inventory_shown: false,
             fps_display: StringRenderer::new(
                 Vector([-1.0, 1.0]),
@@ -71,7 +72,7 @@ impl GuiManager {
                 Vector([1.0, 1.0, 1.0, 1.0]),
                 String::new(),
             ),
-        }
+        })
     }
 
     pub fn viewport_size(&self) -> Vector<f32, 2> {
@@ -118,12 +119,14 @@ impl GuiManager {
     }
 
     fn compute_cursor_offset(&mut self) {
-        self.cursor_offset = Vector([
-            self.cursor_position.x() * 2.0,
-            self.cursor_position.y() * -2.0,
-        ]);
-        self.cursor_offset /= self.content_scale * self.gui_scale;
+        self.cursor_offset = self.cursor_position
+            * Vector([2.0, -2.0])
+            / (self.content_scale * self.gui_scale);
         self.cursor_renderer.set_offset(self.cursor_offset);
+    }
+
+    pub fn anchor_adjustment(&self, from_anchor: Vector<f32, 2>, to_anchor: Vector<f32, 2>) -> Vector<f32, 2> {
+        (from_anchor - to_anchor) / 2.0 / self.offset_scale
     }
 
     pub fn inventory_shown(&self) -> bool {
@@ -134,9 +137,10 @@ impl GuiManager {
         self.inventory_shown = shown;
     }
 
-    pub fn invalidate_assets(&mut self) {
-        self.hotbar.clear();
+    pub fn reload_assets(&mut self, assets: &mut AssetPool) -> Result<(), String> {
+        self.hotbar.reload_assets(assets)?;
         self.inventory.clear();
+        Ok(())
     }
 
     pub fn update_fps_display(&mut self, average_fps: f32) {
@@ -211,25 +215,7 @@ impl GuiManager {
             self.input_test.render(assets);
         }
 
-        if self.hotbar.is_empty() {
-            let atlas_region = assets.get_gui_image("gui/hotbar").unwrap();
-            let anchor = Vector([0.0, -1.0]);
-            let to_f32 = |x: u32| x as f32;
-            self.hotbar.add(
-                &[
-                    GuiVertex::new(anchor, Vector([-106.0, 0.0]), None, Some(atlas_region.min_x_max_y().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([-106.0, 32.0]), None, Some(atlas_region.min().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([106.0, 32.0]), None, Some(atlas_region.max_x_min_y().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([106.0, 0.0]), None, Some(atlas_region.max().map(to_f32))),
-                ],
-                &[
-                    [0, 1, 2],
-                    [2, 3, 0],
-                ],
-            );
-        }
-        assets.gui_texture().bind();
-        self.hotbar.render();
+        self.hotbar.render(assets);
 
         self.fps_display.render(assets);
         self.player_info_display.render(assets);

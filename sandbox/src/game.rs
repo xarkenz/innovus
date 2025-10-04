@@ -33,14 +33,15 @@ impl<'world> Game<'world> {
     pub fn start(assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>) -> Result<Self, String> {
         screen::set_blend_func(screen::BlendFunc::Transparency);
 
+        let mut assets = AssetPool::load(assets_path)?;
         let mut game = Self {
             frame_clock: Clock::start(),
             fps_tracker: [f32::INFINITY; 120],
             fps_tracker_index: 0,
             viewport_size,
             content_scale,
-            assets: AssetPool::load(assets_path)?,
-            gui: GuiManager::new(viewport_size, content_scale, 8.0),
+            gui: GuiManager::new(viewport_size, content_scale, 8.0, &mut assets)?,
+            assets,
             audio: AudioEngine::new()?,
             current_world: None,
             last_block_pos: None,
@@ -104,7 +105,9 @@ impl<'world> Game<'world> {
                     Err(err) => eprintln!("Failed to reload assets: {err}"),
                     Ok(()) => println!("Reloaded assets."),
                 }
-                self.gui.invalidate_assets();
+                if let Err(err) = self.gui.reload_assets(&mut self.assets) {
+                    eprintln!("Failed to reload assets: {err}");
+                }
             }
         }
 

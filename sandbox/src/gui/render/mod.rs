@@ -1,5 +1,5 @@
 use std::mem::offset_of;
-use innovus::gfx::{Vertex, VertexAttribute, VertexAttributeType};
+use innovus::gfx::{Mesh, Vertex, VertexAttribute, VertexAttributeType};
 use innovus::tools::{Rectangle, Vector};
 
 pub mod text;
@@ -77,5 +77,41 @@ impl GuiImage {
 
     pub fn set_atlas_region(&mut self, region: Rectangle<u32>) {
         self.atlas_region = region;
+    }
+
+    pub fn generate_mesh(&self, anchor: Vector<f32, 2>, offset: Vector<f32, 2>) -> Mesh<GuiVertex> {
+        let to_f32 = |x: u32| x as f32;
+        Mesh::with_data(
+            vec![
+                GuiVertex::new(
+                    anchor,
+                    offset + self.bounds.min(),
+                    Some(self.color),
+                    Some(self.atlas_region.min_x_max_y().map(to_f32)),
+                ),
+                GuiVertex::new(
+                    anchor,
+                    offset + self.bounds.min_x_max_y(),
+                    Some(self.color),
+                    Some(self.atlas_region.min().map(to_f32)),
+                ),
+                GuiVertex::new(
+                    anchor,
+                    offset + self.bounds.max(),
+                    Some(self.color),
+                    Some(self.atlas_region.max_x_min_y().map(to_f32)),
+                ),
+                GuiVertex::new(
+                    anchor,
+                    offset + self.bounds.max_x_min_y(),
+                    Some(self.color),
+                    Some(self.atlas_region.max().map(to_f32)),
+                ),
+            ],
+            vec![
+                [0, 1, 2],
+                [2, 3, 0],
+            ],
+        )
     }
 }
