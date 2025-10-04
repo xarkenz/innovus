@@ -31,7 +31,7 @@ pub struct Game<'world> {
 
 impl<'world> Game<'world> {
     pub fn start(assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>) -> Result<Self, String> {
-        screen::set_blend(screen::Blend::Transparency);
+        screen::set_blend_func(screen::BlendFunc::Transparency);
 
         let mut game = Self {
             frame_clock: Clock::start(),

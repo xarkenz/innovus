@@ -1,5 +1,5 @@
 use innovus::gfx::color::RGBColor;
-use innovus::gfx::{Geometry, Vertex2D};
+use innovus::gfx::{MeshRenderer, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::noise::scramble;
 
@@ -46,14 +46,14 @@ impl Default for ParticleInfo {
 
 pub struct ParticleManager {
     active_particles: Vec<ParticleInfo>,
-    geometry: Geometry<Vertex2D>,
+    geometry: MeshRenderer<Vertex2D>,
 }
 
 impl ParticleManager {
     pub fn new() -> Self {
         Self {
             active_particles: Vec::new(),
-            geometry: Geometry::new_render().unwrap(),
+            geometry: MeshRenderer::create().unwrap(),
         }
     }
 

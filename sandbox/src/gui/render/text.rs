@@ -1,6 +1,6 @@
-use innovus::gfx::Geometry;
+use innovus::gfx::MeshRenderer;
 use innovus::tools::Vector;
-use crate::gui::GuiVertex;
+use crate::gui::render::GuiVertex;
 use crate::tools::asset::AssetPool;
 
 pub struct StringRenderer {
@@ -10,7 +10,7 @@ pub struct StringRenderer {
     text_color: Vector<f32, 4>,
     background_color: Vector<f32, 4>,
     string: String,
-    geometry: Geometry<GuiVertex>,
+    geometry: MeshRenderer<GuiVertex>,
 }
 
 impl StringRenderer {
@@ -29,7 +29,7 @@ impl StringRenderer {
             text_color,
             background_color,
             string,
-            geometry: Geometry::new_render().unwrap(),
+            geometry: MeshRenderer::create().unwrap(),
         }
     }
 
@@ -135,18 +135,21 @@ impl StringRenderer {
 
             let glyph_max_size = 12.0;
 
-            let text_width = 3.0 + self.string
+            let text_width = self.string
                 .chars()
                 .map(|character| glyph_info(character).1 + 1.0)
-                .sum::<f32>();
-            let bounds_size = Vector([text_width, glyph_max_size + 2.0]);
-            let adjusted_offset = self.offset - self.placement * bounds_size;
+                .sum::<f32>()
+                - 1.0;
+            let text_size = Vector([text_width, glyph_max_size]);
+            let text_offset = self.offset - self.placement * text_size;
+            let background_size = text_size + Vector([2.0, 0.0]);
+            let background_offset = text_offset - Vector([1.0, 0.0]);
 
             // Background rectangle
             faces.push([0, 1, 2]);
             faces.push([2, 3, 0]);
             for (vertex_offset, _) in OFFSETS {
-                let total_offset = adjusted_offset + vertex_offset * bounds_size;
+                let total_offset = background_offset + vertex_offset * background_size;
                 vertices.push(GuiVertex::new(
                     self.anchor,
                     total_offset,
@@ -156,7 +159,7 @@ impl StringRenderer {
             }
 
             // Foreground text
-            let mut current_position = adjusted_offset + Vector([2.0, 1.0]);
+            let mut current_offset = text_offset;
             for character in self.string.chars() {
                 let index = vertices.len() as u32;
                 faces.push([index + 0, index + 1, index + 2]);
@@ -166,12 +169,12 @@ impl StringRenderer {
                 for (vertex_offset, atlas_offset) in OFFSETS {
                     vertices.push(GuiVertex::new(
                         self.anchor,
-                        current_position + vertex_offset * glyph_max_size,
+                        current_offset + vertex_offset * glyph_max_size,
                         Some(self.text_color),
                         Some((atlas_origin + atlas_offset).map(|x| x as f32))
                     ));
                 }
-                current_position.set_x(current_position.x() + glyph_width + 1.0);
+                current_offset.set_x(current_offset.x() + glyph_width + 1.0);
             }
 
             self.geometry.add(&vertices, &faces);

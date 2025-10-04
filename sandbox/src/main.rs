@@ -1,4 +1,5 @@
 use glfw::{Context, WindowEvent};
+use innovus::gfx::screen;
 use innovus::tools::Vector;
 use crate::game::Game;
 use crate::tools::input::InputState;
@@ -31,7 +32,10 @@ fn main() {
     window.set_cursor_mode(glfw::CursorMode::Hidden);
 
     // glfw.set_swap_interval(glfw::SwapInterval::Sync(1));
-    innovus::gfx::screen::bind_glfw(&glfw);
+    screen::bind_glfw(&glfw);
+    screen::set_culling(false);
+    screen::set_depth_testing(false);
+    screen::set_blend_func(screen::BlendFunc::Transparency);
 
     let mut input_state = InputState::new();
 

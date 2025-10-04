@@ -9,12 +9,7 @@ pub fn bind_glfw(manager: &glfw::Glfw) {
 
 pub fn set_clear_color(color: RGBColor) {
     unsafe {
-        gl::ClearColor(
-            color.r() as GLfloat,
-            color.g() as GLfloat,
-            color.b() as GLfloat,
-            1.0,
-        );
+        gl::ClearColor(color.r(), color.g(), color.b(), 1.0);
     }
 }
 
@@ -24,23 +19,23 @@ pub fn clear() {
     }
 }
 
-pub enum Blend {
+pub enum BlendFunc {
     None,
     Transparency,
     Custom(GLenum, GLenum),
 }
 
-pub fn set_blend(blend: Blend) {
+pub fn set_blend_func(blend: BlendFunc) {
     unsafe {
-        if let Blend::None = blend {
+        if let BlendFunc::None = blend {
             gl::Disable(gl::BLEND);
         }
         else {
             gl::Enable(gl::BLEND);
             match blend {
-                Blend::None => unreachable!(),
-                Blend::Transparency => gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA),
-                Blend::Custom(src, dest) => gl::BlendFunc(src, dest),
+                BlendFunc::None => unreachable!(),
+                BlendFunc::Transparency => gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA),
+                BlendFunc::Custom(src, dest) => gl::BlendFunc(src, dest),
             }
         }
     }

@@ -1,4 +1,4 @@
-use innovus::gfx::{Geometry, Vertex2D};
+use innovus::gfx::{MeshRenderer, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::asset::AssetPool;
 use crate::world::block::{Block, BlockSide, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
@@ -9,7 +9,7 @@ pub struct BlockPreview {
     position: Vector<f32, 2>,
     item_type: &'static ItemType,
     opacity: f32,
-    geometry: Geometry<Vertex2D>,
+    geometry: MeshRenderer<Vertex2D>,
 }
 
 impl BlockPreview {
@@ -18,7 +18,7 @@ impl BlockPreview {
             position,
             item_type,
             opacity,
-            geometry: Geometry::new_render().unwrap(),
+            geometry: MeshRenderer::create().unwrap(),
         }
     }
 

@@ -507,7 +507,7 @@ impl Vertex for Vertex2D {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct GeometrySlice {
+pub struct MeshSlice {
     pub first_vertex: usize,
     pub vertex_count: usize,
     pub first_face: usize,
@@ -515,20 +515,14 @@ pub struct GeometrySlice {
 }
 
 #[derive(Clone, Debug)]
-pub struct Geometry<V: Vertex> {
-    vao: GLuint,
-    vbo: GLuint,
-    ebo: GLuint,
+pub struct Mesh<V: Vertex> {
     vertices: Vec<V>,
     triangles: Vec<[u32; 3]>,
 }
 
-impl<V: Vertex> Geometry<V> {
+impl<V: Vertex> Mesh<V> {
     pub fn new() -> Self {
         Self {
-            vao: 0,
-            vbo: 0,
-            ebo: 0,
             vertices: Vec::new(),
             triangles: Vec::new(),
         }
@@ -536,98 +530,9 @@ impl<V: Vertex> Geometry<V> {
 
     pub fn with_data(vertices: Vec<V>, triangles: Vec<[u32; 3]>) -> Self {
         Self {
-            vao: 0,
-            vbo: 0,
-            ebo: 0,
             vertices,
             triangles,
         }
-    }
-
-    pub fn new_render() -> Result<Self, String> {
-        let mut geometry = Self::new();
-        geometry.enable_render()?;
-        Ok(geometry)
-    }
-
-    pub fn enable_render(&mut self) -> Result<(), String> {
-        if self.vao != 0 {
-            return Ok(());
-        }
-
-        unsafe {
-            gl::GenVertexArrays(1, &mut self.vao);
-            if self.vao == 0 {
-                return Err(
-                    "Geometry::enable_render(): failed to create GL vertex array object.".into(),
-                );
-            }
-            gl::BindVertexArray(self.vao);
-
-            gl::GenBuffers(1, &mut self.vbo);
-            if self.vbo == 0 {
-                return Err(
-                    "Geometry::enable_render(): failed to create GL vertex buffer object.".into(),
-                );
-            }
-            gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
-
-            gl::GenBuffers(1, &mut self.ebo);
-            if self.ebo == 0 {
-                return Err(
-                    "Geometry::enable_render(): failed to create GL element buffer object.".into(),
-                );
-            }
-            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ebo);
-
-            for (index, attribute) in V::ATTRIBUTES.iter().enumerate() {
-                gl::EnableVertexAttribArray(index as GLuint);
-                match attribute.data_type {
-                    VertexAttributeType::I32 | VertexAttributeType::U32 => {
-                        gl::VertexAttribIPointer(
-                            index as GLuint,
-                            attribute.component_count as GLint,
-                            attribute.data_type as GLenum,
-                            size_of::<V>() as GLsizei,
-                            attribute.offset as *const GLvoid,
-                        );
-                    }
-                    _ => {
-                        gl::VertexAttribPointer(
-                            index as GLuint,
-                            attribute.component_count as GLint,
-                            attribute.data_type as GLenum,
-                            gl::FALSE,
-                            size_of::<V>() as GLsizei,
-                            attribute.offset as *const GLvoid,
-                        );
-                    }
-                }
-            }
-
-            // Vertex array must be unbound before anything else!
-            // Otherwise, the buffers unbind from the vertex array
-            gl::BindVertexArray(0);
-            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
-            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
-        }
-
-        self.update_vertex_buffer();
-        self.update_element_buffer();
-
-        Ok(())
-    }
-
-    pub fn vao(&self) -> GLuint {
-        self.vao
-    }
-
-    pub fn vbo(&self) -> GLuint {
-        self.vbo
-    }
-
-    pub fn ebo(&self) -> GLuint {
-        self.ebo
     }
 
     pub fn is_empty(&self) -> bool {
@@ -650,90 +555,6 @@ impl<V: Vertex> Geometry<V> {
         &mut self.triangles
     }
 
-    pub fn render(&self) {
-        if self.vao == 0 {
-            panic!("Geometry::render(): must call 'Geometry::enable_render()' before rendering.");
-        }
-
-        unsafe {
-            gl::BindVertexArray(self.vao);
-            gl::DrawElements(
-                gl::TRIANGLES,
-                self.triangles.len() as GLsizei * 3,
-                gl::UNSIGNED_INT,
-                std::ptr::null(),
-            );
-            gl::BindVertexArray(0);
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.vertices.clear();
-        self.triangles.clear();
-
-        self.update_vertex_buffer();
-        self.update_element_buffer();
-    }
-
-    pub fn update_vertex_buffer(&self) {
-        if self.vbo != 0 {
-            unsafe {
-                gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
-                gl::BufferData(
-                    gl::ARRAY_BUFFER,
-                    (self.vertices.len() * size_of::<V>()) as GLsizeiptr,
-                    self.vertices.as_ptr() as *const GLvoid,
-                    gl::DYNAMIC_DRAW,
-                );
-                gl::BindBuffer(gl::ARRAY_BUFFER, 0);
-            }
-        }
-    }
-
-    pub fn update_element_buffer(&self) {
-        if self.ebo != 0 {
-            unsafe {
-                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ebo);
-                gl::BufferData(
-                    gl::ELEMENT_ARRAY_BUFFER,
-                    (self.triangles.len() * size_of::<[u32; 3]>()) as GLsizeiptr,
-                    self.triangles.as_ptr() as *const GLvoid,
-                    gl::DYNAMIC_DRAW,
-                );
-                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
-            }
-        }
-    }
-
-    pub fn update_buffer_slice(&self, slice: &GeometrySlice) {
-        if slice.vertex_count != 0 {
-            unsafe {
-                gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
-                gl::BufferSubData(
-                    gl::ARRAY_BUFFER,
-                    (slice.first_vertex * size_of::<V>()) as GLintptr,
-                    (slice.vertex_count * size_of::<V>()) as GLsizeiptr,
-                    self.vertices[slice.first_vertex..(slice.first_vertex + slice.vertex_count)]
-                        .as_ptr() as *const GLvoid,
-                );
-                gl::BindBuffer(gl::ARRAY_BUFFER, 0);
-            }
-        }
-        if slice.face_count != 0 {
-            unsafe {
-                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ebo);
-                gl::BufferSubData(
-                    gl::ELEMENT_ARRAY_BUFFER,
-                    (slice.first_face * size_of::<[u32; 3]>()) as GLintptr,
-                    (slice.face_count * size_of::<[u32; 3]>()) as GLsizeiptr,
-                    self.triangles[slice.first_face..(slice.first_face + slice.face_count)]
-                        .as_ptr() as *const GLvoid,
-                );
-                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
-            }
-        }
-    }
-
     pub fn vertex_at(&self, index: usize) -> &V {
         &self.vertices[index]
     }
@@ -742,25 +563,32 @@ impl<V: Vertex> Geometry<V> {
         &mut self.vertices[index]
     }
 
-    pub fn add(&mut self, vertices: &[V], triangles: &[[u32; 3]]) -> GeometrySlice {
+    pub fn as_slice(&self) -> MeshSlice {
+        MeshSlice {
+            first_vertex: 0,
+            vertex_count: self.vertices.len(),
+            first_face: 0,
+            face_count: self.triangles.len(),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.vertices.clear();
+        self.triangles.clear();
+    }
+
+    pub fn add(&mut self, vertices: &[V], triangles: &[[u32; 3]]) -> MeshSlice {
         let first_vertex = self.vertices.len();
         let vertex_count = vertices.len();
         let first_face = self.triangles.len();
         let face_count = triangles.len();
 
-        if !triangles.is_empty() {
-            for &face in triangles {
-                self.triangles.push(face.map(|index| first_vertex as u32 + index))
-            }
-            self.update_element_buffer();
+        for &face in triangles {
+            self.triangles.push(face.map(|index| first_vertex as u32 + index))
         }
+        self.vertices.extend_from_slice(vertices);
 
-        if !vertices.is_empty() {
-            self.vertices.extend_from_slice(vertices);
-            self.update_vertex_buffer();
-        }
-
-        GeometrySlice {
+        MeshSlice {
             first_vertex,
             vertex_count,
             first_face,
@@ -768,31 +596,24 @@ impl<V: Vertex> Geometry<V> {
         }
     }
 
-    pub fn add_geometry(&mut self, geometry: &Self) -> GeometrySlice {
-        self.add(geometry.vertices(), geometry.triangles())
-    }
-
-    pub fn as_slice(&self) -> GeometrySlice {
-        GeometrySlice {
-            first_vertex: 0,
-            vertex_count: self.vertices.len(),
-            first_face: 0,
-            face_count: self.triangles.len(),
-        }
+    pub fn add_mesh(&mut self, mesh: &Self) -> MeshSlice {
+        self.add(mesh.vertices(), mesh.triangles())
     }
 }
 
-impl Geometry<Vertex3D> {
-    fn generate_icosahedron(
-        center: Vector<f32, 3>,
-        radius: f32,
-        color: Vector<f32, 4>,
-    ) -> (Vec<Vertex3D>, Vec<[u32; 3]>) {
+impl<V: Vertex> Default for Mesh<V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Mesh<Vertex3D> {
+    pub fn icosahedron(center: Vector<f32, 3>, radius: f32, color: Vector<f32, 4>) -> Self {
         const MINOR: f32 = 0.525731112119133606;
         const MAJOR: f32 = 0.850650808352039932;
         let minor = MINOR * radius;
         let major = MAJOR * radius;
-        (
+        Self::with_data(
             vec![
                 Vertex3D::new(
                     center + Vector([-minor, 0.0, major]),
@@ -892,20 +713,14 @@ impl Geometry<Vertex3D> {
         )
     }
 
-    pub fn add_icosphere(
-        &mut self,
-        center: Vector<f32, 3>,
-        radius: f32,
-        color: Vector<f32, 4>,
-        subdivisions: u32,
-    ) -> GeometrySlice {
-        let (mut vertices, mut faces) = Self::generate_icosahedron(center, radius, color);
+    pub fn icosphere(center: Vector<f32, 3>, radius: f32, color: Vector<f32, 4>, subdivisions: u32) -> Self {
+        let mut mesh = Self::icosahedron(center, radius, color);
 
         for _ in 0..subdivisions {
             let mut add_vertices: Vec<Vertex3D> = Vec::new();
-            let mut new_faces: Vec<[u32; 3]> = Vec::new();
+            let mut new_triangles: Vec<[u32; 3]> = Vec::new();
             let mut edge_midpoint_map: Vec<((u32, u32), u32)> = Vec::new();
-            for face in faces {
+            for triangle in mesh.triangles {
                 let mut fetch_midpoint = |mut v1, mut v2| {
                     if v1 > v2 {
                         swap(&mut v1, &mut v2);
@@ -915,8 +730,8 @@ impl Geometry<Vertex3D> {
                             return *midpoint;
                         }
                     }
-                    let idx = (vertices.len() + add_vertices.len()) as u32;
-                    let normal = (vertices[v1 as usize].normal + vertices[v2 as usize].normal).normalized();
+                    let idx = (mesh.vertices.len() + add_vertices.len()) as u32;
+                    let normal = (mesh.vertices[v1 as usize].normal + mesh.vertices[v2 as usize].normal).normalized();
                     add_vertices.push(Vertex3D::new(
                         normal * radius + center,
                         Some(color),
@@ -927,23 +742,23 @@ impl Geometry<Vertex3D> {
                     idx
                 };
                 let midpoints: [u32; 3] = [
-                    fetch_midpoint(face[0], face[1]),
-                    fetch_midpoint(face[1], face[2]),
-                    fetch_midpoint(face[2], face[0]),
+                    fetch_midpoint(triangle[0], triangle[1]),
+                    fetch_midpoint(triangle[1], triangle[2]),
+                    fetch_midpoint(triangle[2], triangle[0]),
                 ];
-                new_faces.push([face[0], midpoints[0], midpoints[2]]);
-                new_faces.push([face[1], midpoints[1], midpoints[0]]);
-                new_faces.push([face[2], midpoints[2], midpoints[1]]);
-                new_faces.push(midpoints);
+                new_triangles.push([triangle[0], midpoints[0], midpoints[2]]);
+                new_triangles.push([triangle[1], midpoints[1], midpoints[0]]);
+                new_triangles.push([triangle[2], midpoints[2], midpoints[1]]);
+                new_triangles.push(midpoints);
             }
-            vertices.append(&mut add_vertices);
-            faces = new_faces;
+            mesh.vertices.append(&mut add_vertices);
+            mesh.triangles = new_triangles;
         }
 
-        self.add(&vertices, &faces)
+        mesh
     }
 
-    pub fn transform(&mut self, slice: &GeometrySlice, matrix: Transform3D<f32>) {
+    pub fn transform(&mut self, slice: &MeshSlice, matrix: Transform3D<f32>) {
         for index in 0..slice.vertex_count {
             let index = slice.first_vertex + index;
             let vertex = self.vertex_at_mut(index);
@@ -952,10 +767,9 @@ impl Geometry<Vertex3D> {
                 vertex.normal = matrix.affine() * vertex.normal;
             }
         }
-        self.update_buffer_slice(slice);
     }
 
-    pub fn rotate_x(&mut self, slice: &GeometrySlice, angle: f32, axis_y: f32, axis_z: f32) {
+    pub fn rotate_x(&mut self, slice: &MeshSlice, angle: f32, axis_y: f32, axis_z: f32) {
         let mut rotation = Transform3D::identity();
         rotation.translate(Vector([0.0, axis_y, axis_z]));
         rotation.rotate_x(angle);
@@ -963,7 +777,7 @@ impl Geometry<Vertex3D> {
         self.transform(slice, rotation);
     }
 
-    pub fn rotate_y(&mut self, slice: &GeometrySlice, angle: f32, axis_x: f32, axis_z: f32) {
+    pub fn rotate_y(&mut self, slice: &MeshSlice, angle: f32, axis_x: f32, axis_z: f32) {
         let mut rotation = Transform3D::identity();
         rotation.translate(Vector([axis_x, 0.0, axis_z]));
         rotation.rotate_y(angle);
@@ -971,7 +785,7 @@ impl Geometry<Vertex3D> {
         self.transform(slice, rotation);
     }
 
-    pub fn rotate_z(&mut self, slice: &GeometrySlice, angle: f32, axis_x: f32, axis_y: f32) {
+    pub fn rotate_z(&mut self, slice: &MeshSlice, angle: f32, axis_x: f32, axis_y: f32) {
         let mut rotation = Transform3D::identity();
         rotation.translate(Vector([axis_x, axis_y, 0.0]));
         rotation.rotate_z(angle);
@@ -981,19 +795,19 @@ impl Geometry<Vertex3D> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ParseGeometryError {
+pub struct ParseMeshError {
     message: String,
 }
 
-impl Error for ParseGeometryError {}
+impl Error for ParseMeshError {}
 
-impl std::fmt::Display for ParseGeometryError {
+impl std::fmt::Display for ParseMeshError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.message)
     }
 }
 
-impl From<ParseFloatError> for ParseGeometryError {
+impl From<ParseFloatError> for ParseMeshError {
     fn from(error: ParseFloatError) -> Self {
         Self {
             message: error.to_string(),
@@ -1001,7 +815,7 @@ impl From<ParseFloatError> for ParseGeometryError {
     }
 }
 
-impl From<ParseIntError> for ParseGeometryError {
+impl From<ParseIntError> for ParseMeshError {
     fn from(error: ParseIntError) -> Self {
         Self {
             message: error.to_string(),
@@ -1009,25 +823,25 @@ impl From<ParseIntError> for ParseGeometryError {
     }
 }
 
-impl FromStr for Geometry<Vertex3D> {
-    type Err = ParseGeometryError;
+impl FromStr for Mesh<Vertex3D> {
+    type Err = ParseMeshError;
 
     fn from_str(data: &str) -> Result<Self, Self::Err> {
-        fn parse_f32(s: &str) -> Result<f32, ParseGeometryError> {
-            s.parse::<f32>().map_err(ParseGeometryError::from)
+        fn parse_f32(s: &str) -> Result<f32, ParseMeshError> {
+            s.parse::<f32>().map_err(ParseMeshError::from)
         }
-        fn parse_clamp_f32(s: &str) -> Result<f32, ParseGeometryError> {
+        fn parse_clamp_f32(s: &str) -> Result<f32, ParseMeshError> {
             match parse_f32(s)? {
                 num if 0.0 <= num && num <= 1.0 => Ok(num),
-                _ => Err(ParseGeometryError {
+                _ => Err(ParseMeshError {
                     message: format!("'{}' not in range 0-1", s),
                 }),
             }
         }
-        fn parse_usize(s: &str) -> Result<usize, ParseGeometryError> {
-            s.parse::<usize>().map_err(ParseGeometryError::from)
+        fn parse_usize(s: &str) -> Result<usize, ParseMeshError> {
+            s.parse::<usize>().map_err(ParseMeshError::from)
         }
-        fn parse_face_element(s: &str) -> Result<[usize; 4], ParseGeometryError> {
+        fn parse_face_element(s: &str) -> Result<[usize; 4], ParseMeshError> {
             let mut indices: [usize; 4] = [0; 4];
             let mut next_index: usize = 0;
             let mut index_start: Option<usize> = None;
@@ -1045,7 +859,7 @@ impl FromStr for Geometry<Vertex3D> {
                     if c == '/' {
                         next_index += 1;
                         if next_index >= indices.len() {
-                            return Err(ParseGeometryError {
+                            return Err(ParseMeshError {
                                 message: "4 indices allowed per face element at maximum"
                                     .to_string(),
                             });
@@ -1057,7 +871,7 @@ impl FromStr for Geometry<Vertex3D> {
                 indices[next_index] = parse_usize(&s[index_start.unwrap()..s.len()])?;
             }
             if indices[0] == 0 {
-                Err(ParseGeometryError {
+                Err(ParseMeshError {
                     message: "face element index cannot be 0".into(),
                 })
             }
@@ -1065,8 +879,8 @@ impl FromStr for Geometry<Vertex3D> {
                 Ok(indices)
             }
         }
-        fn missing_error<T>() -> Result<T, ParseGeometryError> {
-            Err(ParseGeometryError { message: "missing command argument".into() })
+        fn missing_error<T>() -> Result<T, ParseMeshError> {
+            Err(ParseMeshError { message: "missing command argument".into() })
         }
 
         let mut positions: Vec<Vector<f32, 3>> = Vec::new();
@@ -1117,22 +931,22 @@ impl FromStr for Geometry<Vertex3D> {
             ]);
             for element in face {
                 if element[0] == 0 || element[0] > positions.len() {
-                    return Err(ParseGeometryError {
+                    return Err(ParseMeshError {
                         message: format!("invalid element position index: {}", element[0]),
                     });
                 }
                 if element[1] > textures.len() {
-                    return Err(ParseGeometryError {
+                    return Err(ParseMeshError {
                         message: format!("invalid element UV coordinate index: {}", element[1]),
                     });
                 }
                 if element[2] > normals.len() {
-                    return Err(ParseGeometryError {
+                    return Err(ParseMeshError {
                         message: format!("invalid element normal index: {}", element[2]),
                     });
                 }
                 if element[3] > colors.len() {
-                    return Err(ParseGeometryError {
+                    return Err(ParseMeshError {
                         message: format!("invalid element color index: {}", element[3]),
                     });
                 }
@@ -1158,12 +972,238 @@ impl FromStr for Geometry<Vertex3D> {
     }
 }
 
-impl<V: Vertex> Drop for Geometry<V> {
+#[derive(Clone, Debug)]
+pub struct MeshRenderer<V: Vertex> {
+    vertex_array_id: GLuint,
+    vertex_buffer_id: GLuint,
+    element_buffer_id: GLuint,
+    mesh: Mesh<V>,
+}
+
+impl<V: Vertex> MeshRenderer<V> {
+    pub fn create() -> Result<Self, String> {
+        Self::create_with(Mesh::new())
+    }
+
+    pub fn create_with(mesh: Mesh<V>) -> Result<Self, String> {
+        let mut renderer = Self {
+            vertex_array_id: 0,
+            vertex_buffer_id: 0,
+            element_buffer_id: 0,
+            mesh,
+        };
+
+        unsafe {
+            gl::GenVertexArrays(1, &mut renderer.vertex_array_id);
+            if renderer.vertex_array_id == 0 {
+                return Err("failed to create GL vertex array object.".into());
+            }
+            gl::BindVertexArray(renderer.vertex_array_id);
+
+            gl::GenBuffers(1, &mut renderer.vertex_buffer_id);
+            if renderer.vertex_buffer_id == 0 {
+                return Err("failed to create GL vertex buffer object.".into());
+            }
+            gl::BindBuffer(gl::ARRAY_BUFFER, renderer.vertex_buffer_id);
+
+            gl::GenBuffers(1, &mut renderer.element_buffer_id);
+            if renderer.element_buffer_id == 0 {
+                return Err("failed to create GL element buffer object.".into());
+            }
+            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, renderer.element_buffer_id);
+
+            for (index, attribute) in V::ATTRIBUTES.iter().enumerate() {
+                gl::EnableVertexAttribArray(index as GLuint);
+                match attribute.data_type {
+                    VertexAttributeType::I32 | VertexAttributeType::U32 => {
+                        gl::VertexAttribIPointer(
+                            index as GLuint,
+                            attribute.component_count as GLint,
+                            attribute.data_type as GLenum,
+                            size_of::<V>() as GLsizei,
+                            attribute.offset as *const GLvoid,
+                        );
+                    }
+                    _ => {
+                        gl::VertexAttribPointer(
+                            index as GLuint,
+                            attribute.component_count as GLint,
+                            attribute.data_type as GLenum,
+                            gl::FALSE,
+                            size_of::<V>() as GLsizei,
+                            attribute.offset as *const GLvoid,
+                        );
+                    }
+                }
+            }
+
+            // It is critical that the vertex array be unbound so that it can be used properly and
+            // not be messed up by other API calls. (For example, something else might accidentally
+            // bind a different buffer than the one we created to the vertex array.)
+            gl::BindVertexArray(0);
+        }
+
+        renderer.upload_vertex_buffer();
+        renderer.upload_element_buffer();
+
+        Ok(renderer)
+    }
+
+    pub fn vertex_array_id(&self) -> GLuint {
+        self.vertex_array_id
+    }
+
+    pub fn vertex_buffer_id(&self) -> GLuint {
+        self.vertex_buffer_id
+    }
+
+    pub fn element_buffer_id(&self) -> GLuint {
+        self.element_buffer_id
+    }
+
+    pub fn mesh(&self) -> &Mesh<V> {
+        &self.mesh
+    }
+
+    pub fn mesh_mut(&mut self) -> &mut Mesh<V> {
+        &mut self.mesh
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.mesh.is_empty()
+    }
+
+    pub fn vertices(&self) -> &[V] {
+        self.mesh.vertices()
+    }
+
+    pub fn vertices_mut(&mut self) -> &mut [V] {
+        self.mesh.vertices_mut()
+    }
+
+    pub fn triangles(&self) -> &[[u32; 3]] {
+        self.mesh.triangles()
+    }
+
+    pub fn triangles_mut(&mut self) -> &mut [[u32; 3]] {
+        self.mesh.triangles_mut()
+    }
+
+    pub fn vertex_at(&self, index: usize) -> &V {
+        self.mesh.vertex_at(index)
+    }
+
+    pub fn vertex_at_mut(&mut self, index: usize) -> &mut V {
+        self.mesh.vertex_at_mut(index)
+    }
+
+    pub fn as_slice(&self) -> MeshSlice {
+        self.mesh.as_slice()
+    }
+
+    pub fn clear(&mut self) {
+        self.mesh.clear();
+
+        self.upload_vertex_buffer();
+        self.upload_element_buffer();
+    }
+
+    pub fn add(&mut self, vertices: &[V], triangles: &[[u32; 3]]) -> MeshSlice {
+        let slice = self.mesh.add(vertices, triangles);
+
+        if !triangles.is_empty() {
+            self.upload_element_buffer();
+        }
+        if !vertices.is_empty() {
+            self.upload_vertex_buffer();
+        }
+
+        slice
+    }
+
+    pub fn add_mesh(&mut self, mesh: &Mesh<V>) -> MeshSlice {
+        self.add(mesh.vertices(), mesh.triangles())
+    }
+
+    pub fn upload_vertex_buffer(&self) {
+        if self.vertex_buffer_id != 0 {
+            unsafe {
+                gl::BindBuffer(gl::ARRAY_BUFFER, self.vertex_buffer_id);
+                gl::BufferData(
+                    gl::ARRAY_BUFFER,
+                    (self.vertices().len() * size_of::<V>()) as GLsizeiptr,
+                    self.vertices().as_ptr() as *const GLvoid,
+                    gl::DYNAMIC_DRAW,
+                );
+                gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+            }
+        }
+    }
+
+    pub fn upload_element_buffer(&self) {
+        if self.element_buffer_id != 0 {
+            unsafe {
+                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.element_buffer_id);
+                gl::BufferData(
+                    gl::ELEMENT_ARRAY_BUFFER,
+                    (self.triangles().len() * size_of::<[u32; 3]>()) as GLsizeiptr,
+                    self.triangles().as_ptr() as *const GLvoid,
+                    gl::DYNAMIC_DRAW,
+                );
+                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
+            }
+        }
+    }
+
+    pub fn upload_buffer_slice(&self, slice: &MeshSlice) {
+        if slice.vertex_count != 0 {
+            unsafe {
+                gl::BindBuffer(gl::ARRAY_BUFFER, self.vertex_buffer_id);
+                gl::BufferSubData(
+                    gl::ARRAY_BUFFER,
+                    (slice.first_vertex * size_of::<V>()) as GLintptr,
+                    (slice.vertex_count * size_of::<V>()) as GLsizeiptr,
+                    self.vertices()[slice.first_vertex..(slice.first_vertex + slice.vertex_count)]
+                        .as_ptr() as *const GLvoid,
+                );
+                gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+            }
+        }
+        if slice.face_count != 0 {
+            unsafe {
+                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.element_buffer_id);
+                gl::BufferSubData(
+                    gl::ELEMENT_ARRAY_BUFFER,
+                    (slice.first_face * size_of::<[u32; 3]>()) as GLintptr,
+                    (slice.face_count * size_of::<[u32; 3]>()) as GLsizeiptr,
+                    self.triangles()[slice.first_face..(slice.first_face + slice.face_count)]
+                        .as_ptr() as *const GLvoid,
+                );
+                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
+            }
+        }
+    }
+
+    pub fn render(&self) {
+        unsafe {
+            gl::BindVertexArray(self.vertex_array_id);
+            gl::DrawElements(
+                gl::TRIANGLES,
+                self.triangles().len() as GLsizei * 3,
+                gl::UNSIGNED_INT,
+                std::ptr::null(),
+            );
+            gl::BindVertexArray(0);
+        }
+    }
+}
+
+impl<V: Vertex> Drop for MeshRenderer<V> {
     fn drop(&mut self) {
         unsafe {
-            gl::DeleteVertexArrays(1, &self.vao);
-            gl::DeleteBuffers(1, &self.vbo);
-            gl::DeleteBuffers(1, &self.ebo);
+            gl::DeleteVertexArrays(1, &self.vertex_array_id);
+            gl::DeleteBuffers(1, &self.vertex_buffer_id);
+            gl::DeleteBuffers(1, &self.element_buffer_id);
         }
     }
 }

@@ -1,4 +1,4 @@
-use innovus::gfx::{Geometry, Vertex2D};
+use innovus::gfx::{MeshRenderer, Vertex2D};
 use innovus::tools::{Rectangle, Vector};
 use innovus::tools::arena::{ArenaHandle, BoundedArena, UnboundedArena};
 use crate::tools::asset::entity::EntityImage;
@@ -214,14 +214,14 @@ impl EntityRenderer {
 const PIECES_PER_BATCH: usize = 512;
 
 struct RendererBatch {
-    geometry: Geometry<Vertex2D>,
+    geometry: MeshRenderer<Vertex2D>,
     pieces: BoundedArena<EntityPiece>,
 }
 
 impl RendererBatch {
     pub fn new() -> Self {
         Self {
-            geometry: Geometry::new_render().unwrap(),
+            geometry: MeshRenderer::create().unwrap(),
             pieces: BoundedArena::new(PIECES_PER_BATCH),
         }
     }
@@ -293,7 +293,7 @@ impl RendererBatch {
         }
 
         if any_changed {
-            self.geometry.update_vertex_buffer();
+            self.geometry.upload_vertex_buffer();
         }
         self.geometry.render();
     }

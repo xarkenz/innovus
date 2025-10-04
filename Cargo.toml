@@ -2,14 +2,14 @@
 name = "innovus"
 version = "0.1.0"
 edition = "2021"
-default-run = "javagame"
+default-run = "sandbox"
 
 [lib]
 name = "innovus"
 path = "innovus/src/lib.rs"
 
 [[bin]]
-name = "javagame"
+name = "sandbox"
 path = "sandbox/src/main.rs"
 
 [[bin]]

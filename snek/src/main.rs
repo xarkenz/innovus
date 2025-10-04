@@ -46,20 +46,20 @@ fn get_space_center(node: &(i32, i32)) -> Vector<f32, 3> {
     ])
 }
 
-fn load_snek_geometry(
-    geometry: &mut Geometry<Vertex3D>,
+fn load_snek_body(
+    renderer: &mut MeshRenderer<Vertex3D>,
     nodes: &VecDeque<(i32, i32)>,
     face: &(i32, i32),
 ) {
     const ARROW_COLOR: Vector<f32, 4> = Vector([0.8, 0.3, 0.1, 1.0]);
     let head = nodes.back().unwrap(); // nodes should never be empty
-    geometry.clear();
+    renderer.clear();
     for node in nodes {
         let major = if *node == *head { 1.3 } else { 1.0 };
         //let minor = major * 0.8;
         let mut center = get_space_center(node);
         center.set_y(major);
-        geometry.add_icosphere(center, major, Vector([0.1, 0.4, 0.8, 1.0]), 2);
+        renderer.add_mesh(&Mesh::icosphere(center, major, Vector([0.1, 0.4, 0.8, 1.0]), 2));
     }
     let pos = get_space_center(&(head.0 + face.0, head.1 + face.1));
     let arrow_verts = if face.0 < 0 {
@@ -87,7 +87,7 @@ fn load_snek_geometry(
             Vector([pos.x() - 1.0, 1.0, pos.z() - 1.0]),
         )
     };
-    geometry.add(
+    renderer.add(
         &[
             Vertex3D::colored(arrow_verts.0, ARROW_COLOR),
             Vertex3D::colored(arrow_verts.1, ARROW_COLOR),
@@ -125,21 +125,18 @@ fn main() {
     test_tex.upload_image(&test_image);
 
     screen::set_clear_color(RGBColor::new(0.6, 0.9, 1.0));
-    screen::set_blend(screen::Blend::Transparency);
+    screen::set_blend_func(screen::BlendFunc::Transparency);
     screen::set_viewport(0, 0, 800, 800);
     screen::set_culling(true);
     screen::set_depth_testing(true);
 
-    let mut board_geometry = Geometry::from_str(include_str!("../assets/snek_board.obj")).unwrap();
-    board_geometry.enable_render().unwrap();
-    let mut snek_geometry = Geometry::new();
-    snek_geometry.enable_render().unwrap();
-    let mut kooper = Geometry::from_str(include_str!("../assets/koopa.obj")).unwrap();
-    kooper.enable_render().unwrap();
+    let board_renderer = MeshRenderer::create_with(Mesh::from_str(include_str!("../assets/snek_board.obj")).unwrap()).unwrap();
+    let mut snek_renderer = MeshRenderer::create().unwrap();
+    let mut kooper_renderer = MeshRenderer::create_with(Mesh::from_str(include_str!("../assets/koopa.obj")).unwrap()).unwrap();
 
     {
-        let kooper_vertices = kooper.vertices().to_vec();
-        for vertex in kooper.vertices_mut() {
+        let kooper_vertices = kooper_renderer.vertices().to_vec();
+        for vertex in kooper_renderer.vertices_mut() {
             vertex.normal = Vector::zero();
             let mut count: f32 = 0.0;
             for test in kooper_vertices.iter() {
@@ -158,17 +155,19 @@ fn main() {
         transform_thingy.rotate_z(-consts::FRAC_PI_2);
         transform_thingy.rotate_y(consts::FRAC_PI_2);
         transform_thingy.translate(Vector([0.0, 0.0, -10.0]));
-        kooper.transform(&kooper.as_slice(), transform_thingy);
+        let slice = kooper_renderer.as_slice();
+        kooper_renderer.mesh_mut().transform(&slice, transform_thingy);
+        kooper_renderer.upload_vertex_buffer();
     }
 
     let pt_light_pos = Vector([0.0, 50.0, 0.0]);
     let pt_light_color = Vector([1.0, 1.0, 1.0]);
     let ambient_color = Vector([0.5, 0.4, 0.3]);
 
-    let (mut width, mut height) = (800_i32, 800_i32);
+    let mut width: i32 = 800;
+    let mut height: i32 = 800;
     let clock = Clock::start();
     let mut prev_time = clock.read();
-    let (mut prev_x, mut prev_y) = (0.0_f32, 0.0_f32);
 
     let mut camera_state: usize = 0;
     let mut camera_pos = Vector([0.0, 8.0, 20.0]);
@@ -190,7 +189,7 @@ fn main() {
     let mut snek_face: (i32, i32) = (1, 0);
     let mut snek_prev_face: (i32, i32) = (1, 0);
     let mut snek_prev_tail: (i32, i32) = (0, 5);
-    load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+    load_snek_body(&mut snek_renderer, &snek_nodes, &snek_face);
 
     while !window.should_close() {
         glfw.poll_events();
@@ -201,22 +200,13 @@ fn main() {
                     height = h;
                     screen::set_viewport(0, 0, w, h);
                 }
-                glfw::WindowEvent::CursorPos(x, y) => {
-                    let (x, y) = (x as f32, y as f32);
-                    let (dx, dy) = (prev_x - x, prev_y - y);
-                    if window.get_mouse_button(glfw::MouseButtonLeft) == Action::Press {
-                        // drag action
-                    }
-                    prev_x = x;
-                    prev_y = y;
-                }
                 glfw::WindowEvent::MouseButton(button, action, _mods) => match action {
                     Action::Press => match button {
                         MouseButton::Button1 => {
                             snek_prev_tail = snek_nodes.pop_front().unwrap();
                             let head = snek_nodes.back().unwrap();
                             snek_nodes.push_back((head.0 + snek_face.0, head.1 + snek_face.1));
-                            load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                            load_snek_body(&mut snek_renderer, &snek_nodes, &snek_face);
                             snek_prev_face = snek_face;
                         }
                         _ => {}
@@ -238,25 +228,25 @@ fn main() {
                         Key::Up | Key::W => {
                             if snek_prev_face.0 != 0 || snek_prev_face.1 <= 0 {
                                 snek_face = (0, -1);
-                                load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                                load_snek_body(&mut snek_renderer, &snek_nodes, &snek_face);
                             }
                         }
                         Key::Left | Key::A => {
                             if snek_prev_face.1 != 0 || snek_prev_face.0 <= 0 {
                                 snek_face = (-1, 0);
-                                load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                                load_snek_body(&mut snek_renderer, &snek_nodes, &snek_face);
                             }
                         }
                         Key::Down | Key::S => {
                             if snek_prev_face.0 != 0 || snek_prev_face.1 >= 0 {
                                 snek_face = (0, 1);
-                                load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                                load_snek_body(&mut snek_renderer, &snek_nodes, &snek_face);
                             }
                         }
                         Key::Right | Key::D => {
                             if snek_prev_face.1 != 0 || snek_prev_face.0 >= 0 {
                                 snek_face = (1, 0);
-                                load_snek_geometry(&mut snek_geometry, &snek_nodes, &snek_face);
+                                load_snek_body(&mut snek_renderer, &snek_nodes, &snek_face);
                             }
                         }
                         _ => {}
@@ -268,7 +258,7 @@ fn main() {
         }
 
         let time = clock.read();
-        let dt = time - prev_time;
+        let _dt = time - prev_time;
         prev_time = time;
 
         if camera_state == 0 {
@@ -307,8 +297,8 @@ fn main() {
         shader_program.set_uniform("tex_atlas", &test_tex);
 
         screen::clear();
-        board_geometry.render();
-        snek_geometry.render();
+        board_renderer.render();
+        snek_renderer.render();
         // kooper.render();
         window.swap_buffers();
     }

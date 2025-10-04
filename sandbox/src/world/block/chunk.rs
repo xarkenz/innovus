@@ -1,6 +1,6 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::BTreeMap;
-use innovus::gfx::{Geometry, Vertex2D};
+use innovus::gfx::{MeshRenderer, Vertex2D};
 use innovus::tools::{Rectangle, Vector};
 use innovus::tools::phys::{Collider, ColliderHandle, Physics};
 use crate::tools::asset::AssetPool;
@@ -98,7 +98,7 @@ pub struct Chunk {
     block_slots: [[BlockSlot; CHUNK_SIZE]; CHUNK_SIZE],
     collision_map: Option<[[Box<[ColliderHandle]>; CHUNK_SIZE]; CHUNK_SIZE]>,
     render_all: bool,
-    geometry: Geometry<Vertex2D>,
+    mesh: MeshRenderer<Vertex2D>,
     height_map: [i64; CHUNK_SIZE],
 }
 
@@ -109,7 +109,7 @@ impl Chunk {
             block_slots: Default::default(),
             collision_map: None,
             render_all: true,
-            geometry: Geometry::new_render().unwrap(),
+            mesh: MeshRenderer::create().unwrap(),
             height_map: Default::default(),
         }
     }
@@ -274,7 +274,7 @@ impl Chunk {
     }
 
     pub fn render(&mut self, assets: &AssetPool, chunk_map: &ChunkMap) {
-        if self.geometry.is_empty() {
+        if self.mesh.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
             for block_y in 0..CHUNK_SIZE {
@@ -298,7 +298,7 @@ impl Chunk {
                     }
                 }
             }
-            self.geometry.add(&vertices, &faces);
+            self.mesh.add(&vertices, &faces);
         }
 
         for y in 0..CHUNK_SIZE {
@@ -309,10 +309,10 @@ impl Chunk {
                 }
             }
         }
-        self.geometry.update_vertex_buffer();
+        self.mesh.upload_vertex_buffer();
         self.render_all = false;
 
-        self.geometry.render();
+        self.mesh.render();
     }
 
     fn update_block_vertices(&mut self, x: usize, y: usize, assets: &AssetPool, chunk_map: &ChunkMap) {
@@ -362,7 +362,7 @@ impl Chunk {
             for ((quadrant_offset, atlas_offset), vertex_lights) in quadrant_info {
                 let vertex_info = std::iter::zip(QUADRANT_VERTEX_OFFSETS, vertex_lights);
                 for (vertex_offset, vertex_light) in vertex_info {
-                    let vertex = self.geometry.vertex_at_mut(index);
+                    let vertex = self.mesh.vertex_at_mut(index);
                     vertex.color = Vector([vertex_light, vertex_light, vertex_light, 1.0]);
                     let total_offset = quadrant_offset + vertex_offset;
                     vertex.uv = Vector([
@@ -377,7 +377,7 @@ impl Chunk {
             // Make block invisible since it has no appearance (e.g. air)
             let mut index = first_index;
             for _ in 0..VERTICES_PER_BLOCK {
-                let vertex = self.geometry.vertex_at_mut(index);
+                let vertex = self.mesh.vertex_at_mut(index);
                 vertex.color = Vector::zero();
                 vertex.uv = Vector::filled(f32::NAN);
                 index += 1;

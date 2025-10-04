@@ -1,48 +1,13 @@
-use std::mem::offset_of;
-use innovus::gfx::{Geometry, Vertex, VertexAttribute, VertexAttributeType};
+use innovus::gfx::MeshRenderer;
 use innovus::tools::Vector;
-use crate::gui::cursor::CursorRenderer;
-use crate::gui::text::StringRenderer;
 use crate::tools::asset::AssetPool;
 use crate::world::item::Item;
 use crate::world::item::types::AIR;
+use render::GuiVertex;
+use render::cursor::CursorRenderer;
+use render::text::StringRenderer;
 
-pub mod cursor;
-pub mod text;
-
-#[repr(C)]
-#[derive(Clone, Debug)]
-pub struct GuiVertex {
-    pub anchor: Vector<f32, 2>,
-    pub offset: Vector<f32, 2>,
-    pub color: Vector<f32, 4>,
-    pub uv: Vector<f32, 2>,
-}
-
-impl GuiVertex {
-    pub fn new(
-        anchor: Vector<f32, 2>,
-        offset: Vector<f32, 2>,
-        color: Option<Vector<f32, 4>>,
-        uv: Option<Vector<f32, 2>>,
-    ) -> Self {
-        Self {
-            anchor,
-            offset,
-            color: color.unwrap_or(Vector::one()),
-            uv: uv.unwrap_or(Vector::filled(f32::NAN)),
-        }
-    }
-}
-
-impl Vertex for GuiVertex {
-    const ATTRIBUTES: &'static [VertexAttribute] = &[
-        VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, anchor)),
-        VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, offset)),
-        VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
-        VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
-    ];
-}
+pub mod render;
 
 pub struct GuiManager {
     viewport_size: Vector<f32, 2>,
@@ -52,8 +17,8 @@ pub struct GuiManager {
     cursor_position: Vector<f32, 2>,
     cursor_offset: Vector<f32, 2>,
     cursor_renderer: CursorRenderer,
-    hotbar: Geometry<GuiVertex>,
-    inventory: Geometry<GuiVertex>,
+    hotbar: MeshRenderer<GuiVertex>,
+    inventory: MeshRenderer<GuiVertex>,
     inventory_shown: bool,
     fps_display: StringRenderer,
     player_info_display: StringRenderer,
@@ -71,8 +36,8 @@ impl GuiManager {
             cursor_position: Vector::zero(),
             cursor_offset: Vector::zero(),
             cursor_renderer: CursorRenderer::new(Vector::zero(), &AIR),
-            hotbar: Geometry::new_render().unwrap(),
-            inventory: Geometry::new_render().unwrap(),
+            hotbar: MeshRenderer::create().unwrap(),
+            inventory: MeshRenderer::create().unwrap(),
             inventory_shown: false,
             fps_display: StringRenderer::new(
                 Vector([-1.0, 1.0]),
@@ -229,10 +194,10 @@ impl GuiManager {
             let to_f32 = |x: u32| x as f32;
             self.inventory.add(
                 &[
-                    GuiVertex::new(anchor, Vector([-106.0, -60.0]), None, Some(atlas_region.min_x_max_y().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([-106.0, 60.0]), None, Some(atlas_region.min().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([106.0, 60.0]), None, Some(atlas_region.max_x_min_y().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([106.0, -60.0]), None, Some(atlas_region.max().map(to_f32))),
+                    GuiVertex::new(anchor, Vector([-106.0, -62.0]), None, Some(atlas_region.min_x_max_y().map(to_f32))),
+                    GuiVertex::new(anchor, Vector([-106.0, 62.0]), None, Some(atlas_region.min().map(to_f32))),
+                    GuiVertex::new(anchor, Vector([106.0, 62.0]), None, Some(atlas_region.max_x_min_y().map(to_f32))),
+                    GuiVertex::new(anchor, Vector([106.0, -62.0]), None, Some(atlas_region.max().map(to_f32))),
                 ],
                 &[
                     [0, 1, 2],

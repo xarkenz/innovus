@@ -1,13 +1,13 @@
-use innovus::gfx::Geometry;
+use innovus::gfx::MeshRenderer;
 use innovus::tools::Vector;
-use crate::gui::GuiVertex;
+use crate::gui::render::GuiVertex;
 use crate::tools::asset::AssetPool;
 use crate::world::item::ItemType;
 
 pub struct CursorRenderer {
     offset: Vector<f32, 2>,
     item_type: &'static ItemType,
-    geometry: Geometry<GuiVertex>,
+    geometry: MeshRenderer<GuiVertex>,
 }
 
 impl CursorRenderer {
@@ -15,7 +15,7 @@ impl CursorRenderer {
         Self {
             offset,
             item_type,
-            geometry: Geometry::new_render().unwrap(),
+            geometry: MeshRenderer::create().unwrap(),
         }
     }
 
