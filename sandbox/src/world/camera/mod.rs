@@ -102,11 +102,6 @@ impl Camera {
             -100.0,
         );
 
-        if self.position.equals_delta(self.target, pixel_size) {
-            self.snap_to_target();
-        }
-        else {
-            self.position = self.position.lerp(self.target, (self.speed * dt).min(1.0));
-        }
+        self.position = self.position.lerp(self.target, (self.speed * dt).min(1.0));
     }
 }
