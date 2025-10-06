@@ -3,24 +3,24 @@ use innovus::tools::Vector;
 use crate::gui::render::GuiVertex;
 use crate::tools::asset::AssetPool;
 
-pub struct StringRenderer {
+pub struct TextLineRenderer {
     anchor: Vector<f32, 2>,
     offset: Vector<f32, 2>,
     placement: Vector<f32, 2>,
     text_color: Vector<f32, 4>,
     background_color: Vector<f32, 4>,
-    string: String,
-    geometry: MeshRenderer<GuiVertex>,
+    text: String,
+    mesh: MeshRenderer<GuiVertex>,
 }
 
-impl StringRenderer {
+impl TextLineRenderer {
     pub fn new(
         anchor: Vector<f32, 2>,
         offset: Vector<f32, 2>,
         placement: Vector<f32, 2>,
         text_color: Vector<f32, 4>,
         background_color: Vector<f32, 4>,
-        string: String,
+        text: String,
     ) -> Self {
         Self {
             anchor,
@@ -28,8 +28,8 @@ impl StringRenderer {
             placement,
             text_color,
             background_color,
-            string,
-            geometry: MeshRenderer::create().unwrap(),
+            text,
+            mesh: MeshRenderer::create().unwrap(),
         }
     }
 
@@ -78,21 +78,21 @@ impl StringRenderer {
         self.invalidate();
     }
 
-    pub fn string(&self) -> &str {
-        &self.string
+    pub fn text(&self) -> &str {
+        &self.text
     }
 
-    pub fn set_string(&mut self, string: String) {
-        self.string = string;
+    pub fn set_text(&mut self, string: String) {
+        self.text = string;
         self.invalidate();
     }
 
     pub fn invalidate(&mut self) {
-        self.geometry.clear();
+        self.mesh.clear();
     }
 
-    pub fn render(&mut self, assets: &AssetPool) {
-        if self.string.is_empty() {
+    pub fn render(&mut self, assets: &mut AssetPool) {
+        if self.text.is_empty() {
             return;
         }
 
@@ -129,58 +129,64 @@ impl StringRenderer {
             (Vector([1.0, 0.0]), Vector([12, 12])), // Bottom right
         ];
 
-        if self.geometry.is_empty() {
+        if self.mesh.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
 
             let glyph_max_size = 12.0;
 
-            let text_width = self.string
+            let text_width = self.text
                 .chars()
                 .map(|character| glyph_info(character).1 + 1.0)
                 .sum::<f32>()
                 - 1.0;
             let text_size = Vector([text_width, glyph_max_size]);
             let text_offset = self.offset - self.placement * text_size;
-            let background_size = text_size + Vector([2.0, 0.0]);
-            let background_offset = text_offset - Vector([1.0, 0.0]);
 
-            // Background rectangle
-            faces.push([0, 1, 2]);
-            faces.push([2, 3, 0]);
-            for (vertex_offset, _) in OFFSETS {
-                let total_offset = background_offset + vertex_offset * background_size;
-                vertices.push(GuiVertex::new(
-                    self.anchor,
-                    total_offset,
-                    Some(self.background_color),
-                    None,
-                ));
+            if self.background_color.w() > 0.0 {
+                // Background rectangle
+                let background_size = text_size + Vector([2.0, 0.0]);
+                let background_offset = text_offset - Vector([1.0, 0.0]);
+                faces.push([0, 1, 2]);
+                faces.push([2, 3, 0]);
+                for (vertex_offset, _) in OFFSETS {
+                    let total_offset = background_offset + vertex_offset * background_size;
+                    vertices.push(GuiVertex::new(
+                        self.anchor,
+                        total_offset,
+                        Some(self.background_color),
+                        None,
+                    ));
+                }
             }
+
+            let atlas_region = assets.get_gui_image("font/unicode_0").unwrap();
+            let image_size = atlas_region.size() / 16;
 
             // Foreground text
             let mut current_offset = text_offset;
-            for character in self.string.chars() {
+            for character in self.text.chars() {
                 let index = vertices.len() as u32;
                 faces.push([index + 0, index + 1, index + 2]);
                 faces.push([index + 2, index + 3, index + 0]);
-                let (glyph_index, glyph_width) = glyph_info(character);
-                let atlas_origin = Vector([glyph_index % 16, glyph_index / 16]) * 12;
+                let (image_index, glyph_width) = glyph_info(character);
+                let image_origin = atlas_region.min()
+                    + Vector([image_index % 16, image_index / 16]) * image_size;
                 for (vertex_offset, atlas_offset) in OFFSETS {
                     vertices.push(GuiVertex::new(
                         self.anchor,
                         current_offset + vertex_offset * glyph_max_size,
                         Some(self.text_color),
-                        Some((atlas_origin + atlas_offset).map(|x| x as f32))
+                        Some((image_origin + atlas_offset).map(|x| x as f32)),
                     ));
                 }
                 current_offset.set_x(current_offset.x() + glyph_width + 1.0);
             }
 
-            self.geometry.add(&vertices, &faces);
+            self.mesh.add(&vertices, &faces);
         }
 
-        assets.font_texture().bind();
-        self.geometry.render();
+        assets.gui_texture().bind();
+        self.mesh.render();
     }
 }

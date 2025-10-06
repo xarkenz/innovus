@@ -32,7 +32,6 @@ pub struct AssetPool {
     entity_texture: Texture2D,
     entity_atlas: ImageAtlas,
     entity_images: HashMap<String, EntityImage>,
-    font_texture: Texture2D,
     color_palettes: HashMap<String, ColorPalette>,
     text_strings: HashMap<String, String>,
 }
@@ -65,7 +64,6 @@ impl AssetPool {
             entity_texture: create_texture(0),
             entity_atlas: ImageAtlas::new(Default::default()),
             entity_images: HashMap::new(),
-            font_texture: create_texture(0),
             color_palettes: HashMap::new(),
             text_strings: HashMap::new(),
         };
@@ -107,7 +105,6 @@ impl AssetPool {
         self.reload_block_appearances()?;
         self.reload_item_images()?;
         self.clear_entity_images();
-        self.reload_font()?;
         self.clear_color_palettes();
         self.reload_shaders()?;
         self.reload_text_strings()?;
@@ -284,16 +281,6 @@ impl AssetPool {
     pub fn clear_entity_images(&mut self) {
         self.entity_images.clear();
         self.entity_atlas.clear();
-    }
-
-    pub fn font_texture(&self) -> &Texture2D {
-        &self.font_texture
-    }
-
-    pub fn reload_font(&mut self) -> Result<(), String> {
-        let font_image = self.load_image("images/font/unicode_0")?;
-        self.font_texture.upload_image(&font_image);
-        Ok(())
     }
 
     pub fn get_color_palette(&mut self, key: &str) -> Result<&ColorPalette, String> {
