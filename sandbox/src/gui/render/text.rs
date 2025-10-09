@@ -1,63 +1,41 @@
-use innovus::gfx::MeshRenderer;
+use innovus::gfx::{Mesh, MeshRenderer};
 use innovus::tools::Vector;
 use crate::gui::render::GuiVertex;
 use crate::tools::asset::AssetPool;
 
-pub struct TextLineRenderer {
-    anchor: Vector<f32, 2>,
-    offset: Vector<f32, 2>,
-    placement: Vector<f32, 2>,
+pub struct TextLine {
+    fixed_point: Vector<f32, 2>,
     text_color: Vector<f32, 4>,
     background_color: Vector<f32, 4>,
     text: String,
-    mesh: MeshRenderer<GuiVertex>,
+    mesh: Mesh<GuiVertex>,
 }
 
-impl TextLineRenderer {
+impl TextLine {
     pub fn new(
-        anchor: Vector<f32, 2>,
-        offset: Vector<f32, 2>,
-        placement: Vector<f32, 2>,
+        fixed_point: Vector<f32, 2>,
         text_color: Vector<f32, 4>,
         background_color: Vector<f32, 4>,
         text: String,
     ) -> Self {
         Self {
-            anchor,
-            offset,
-            placement,
+            fixed_point,
             text_color,
             background_color,
             text,
-            mesh: MeshRenderer::create().unwrap(),
+            mesh: Mesh::new(),
         }
     }
 
-    pub fn anchor(&self) -> Vector<f32, 2> {
-        self.anchor
+    pub fn fixed_point(&self) -> Vector<f32, 2> {
+        self.fixed_point
     }
 
-    pub fn set_anchor(&mut self, anchor: Vector<f32, 2>) {
-        self.anchor = anchor;
-        self.invalidate();
-    }
-
-    pub fn offset(&self) -> Vector<f32, 2> {
-        self.offset
-    }
-
-    pub fn set_offset(&mut self, position: Vector<f32, 2>) {
-        self.offset = position;
-        self.invalidate();
-    }
-
-    pub fn placement(&self) -> Vector<f32, 2> {
-        self.placement
-    }
-
-    pub fn set_placement(&mut self, position: Vector<f32, 2>) {
-        self.placement = position;
-        self.invalidate();
+    pub fn set_fixed_point(&mut self, fixed_point: Vector<f32, 2>) {
+        if fixed_point != self.fixed_point {
+            self.invalidate();
+        }
+        self.fixed_point = fixed_point;
     }
 
     pub fn text_color(&self) -> Vector<f32, 4> {
@@ -65,8 +43,10 @@ impl TextLineRenderer {
     }
 
     pub fn set_text_color(&mut self, color: Vector<f32, 4>) {
+        if color != self.text_color {
+            self.invalidate();
+        }
         self.text_color = color;
-        self.invalidate();
     }
 
     pub fn background_color(&self) -> Vector<f32, 4> {
@@ -74,24 +54,28 @@ impl TextLineRenderer {
     }
 
     pub fn set_background_color(&mut self, color: Vector<f32, 4>) {
+        if color != self.background_color {
+            self.invalidate();
+        }
         self.background_color = color;
-        self.invalidate();
     }
 
     pub fn text(&self) -> &str {
         &self.text
     }
 
-    pub fn set_text(&mut self, string: String) {
-        self.text = string;
-        self.invalidate();
+    pub fn set_text(&mut self, text: String) {
+        if text != self.text {
+            self.invalidate();
+        }
+        self.text = text;
     }
 
     pub fn invalidate(&mut self) {
         self.mesh.clear();
     }
 
-    pub fn render(&mut self, assets: &mut AssetPool) {
+    pub fn append_to_mesh(&mut self, mesh: &mut Mesh<GuiVertex>, offset: Vector<f32, 2>, assets: &mut AssetPool) {
         if self.text.is_empty() {
             return;
         }
@@ -130,9 +114,6 @@ impl TextLineRenderer {
         ];
 
         if self.mesh.is_empty() {
-            let mut vertices = Vec::new();
-            let mut faces = Vec::new();
-
             let glyph_max_size = 12.0;
 
             let text_width = self.text
@@ -141,23 +122,22 @@ impl TextLineRenderer {
                 .sum::<f32>()
                 - 1.0;
             let text_size = Vector([text_width, glyph_max_size]);
-            let text_offset = self.offset - self.placement * text_size;
+            let text_offset = -self.fixed_point * text_size;
 
             if self.background_color.w() > 0.0 {
                 // Background rectangle
                 let background_size = text_size + Vector([2.0, 0.0]);
                 let background_offset = text_offset - Vector([1.0, 0.0]);
-                faces.push([0, 1, 2]);
-                faces.push([2, 3, 0]);
-                for (vertex_offset, _) in OFFSETS {
-                    let total_offset = background_offset + vertex_offset * background_size;
-                    vertices.push(GuiVertex::new(
-                        self.anchor,
-                        total_offset,
-                        Some(self.background_color),
-                        None,
-                    ));
-                }
+                self.mesh.add(
+                    &OFFSETS.map(|(vertex_offset, _)| {
+                        GuiVertex::new(
+                            background_offset + vertex_offset * background_size,
+                            Some(self.background_color),
+                            None,
+                        )
+                    }),
+                    &[[0, 1, 2], [2, 3, 0]],
+                );
             }
 
             let atlas_region = assets.get_gui_image("font/unicode_0").unwrap();
@@ -166,27 +146,85 @@ impl TextLineRenderer {
             // Foreground text
             let mut current_offset = text_offset;
             for character in self.text.chars() {
-                let index = vertices.len() as u32;
-                faces.push([index + 0, index + 1, index + 2]);
-                faces.push([index + 2, index + 3, index + 0]);
                 let (image_index, glyph_width) = glyph_info(character);
                 let image_origin = atlas_region.min()
                     + Vector([image_index % 16, image_index / 16]) * image_size;
-                for (vertex_offset, atlas_offset) in OFFSETS {
-                    vertices.push(GuiVertex::new(
-                        self.anchor,
-                        current_offset + vertex_offset * glyph_max_size,
-                        Some(self.text_color),
-                        Some((image_origin + atlas_offset).map(|x| x as f32)),
-                    ));
-                }
+                self.mesh.add(
+                    &OFFSETS.map(|(vertex_offset, atlas_offset)| {
+                        GuiVertex::new(
+                            current_offset + vertex_offset * glyph_max_size,
+                            Some(self.text_color),
+                            Some((image_origin + atlas_offset).map(|x| x as f32)),
+                        )
+                    }),
+                    &[[0, 1, 2], [2, 3, 0]],
+                );
+
                 current_offset.set_x(current_offset.x() + glyph_width + 1.0);
             }
-
-            self.mesh.add(&vertices, &faces);
         }
 
-        assets.gui_texture().bind();
-        self.mesh.render();
+        let slice = mesh.add_mesh(&self.mesh);
+        for vertex in mesh.slice_vertices_mut(slice) {
+            vertex.offset += offset;
+        }
+    }
+}
+
+pub struct TextLineRenderer {
+    text_line: TextLine,
+    anchor: Vector<f32, 2>,
+    offset: Vector<f32, 2>,
+    mesh: MeshRenderer<GuiVertex>,
+}
+
+impl TextLineRenderer {
+    pub fn create(text_line: TextLine, anchor: Vector<f32, 2>, offset: Vector<f32, 2>) -> Self {
+        Self {
+            text_line,
+            anchor,
+            offset,
+            mesh: MeshRenderer::create().unwrap(),
+        }
+    }
+
+    pub fn data(&self) -> &TextLine {
+        &self.text_line
+    }
+
+    pub fn data_mut(&mut self) -> &mut TextLine {
+        &mut self.text_line
+    }
+
+    pub fn anchor(&self) -> Vector<f32, 2> {
+        self.anchor
+    }
+
+    pub fn set_anchor(&mut self, anchor: Vector<f32, 2>) {
+        self.anchor = anchor;
+    }
+
+    pub fn offset(&self) -> Vector<f32, 2> {
+        self.offset
+    }
+
+    pub fn set_offset(&mut self, offset: Vector<f32, 2>) {
+        self.offset = offset;
+    }
+
+    pub fn render(&mut self, assets: &mut AssetPool) {
+        if !self.text_line.text().is_empty() {
+            self.mesh.clear();
+            self.text_line.append_to_mesh(
+                self.mesh.data_mut(),
+                self.offset,
+                assets,
+            );
+            self.mesh.upload_buffers();
+
+            assets.gui_texture().bind();
+            assets.gui_shaders().set_uniform("anchor", self.anchor);
+            self.mesh.render();
+        }
     }
 }

@@ -46,6 +46,7 @@ impl CursorRenderer {
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {
+        assets.gui_shaders().set_uniform("anchor", self.anchor);
         let cursor_atlas_region = assets.get_gui_image("gui/cursor").unwrap();
         let to_f32 = |x: u32| x as f32;
 
@@ -53,25 +54,21 @@ impl CursorRenderer {
         self.mesh.add(
             &[
                 GuiVertex::new(
-                    self.anchor,
                     self.offset + Vector([0.0, -16.0]),
                     None,
                     Some(cursor_atlas_region.min_x_max_y().map(to_f32)),
                 ),
                 GuiVertex::new(
-                    self.anchor,
                     self.offset + Vector([0.0, 0.0]),
                     None,
                     Some(cursor_atlas_region.min().map(to_f32)),
                 ),
                 GuiVertex::new(
-                    self.anchor,
                     self.offset + Vector([16.0, 0.0]),
                     None,
                     Some(cursor_atlas_region.max_x_min_y().map(to_f32)),
                 ),
                 GuiVertex::new(
-                    self.anchor,
                     self.offset + Vector([16.0, -16.0]),
                     None,
                     Some(cursor_atlas_region.max().map(to_f32)),
@@ -91,25 +88,21 @@ impl CursorRenderer {
             self.mesh.add(
                 &[
                     GuiVertex::new(
-                        self.anchor,
                         self.offset + Vector([4.0, -20.0]),
                         None,
                         Some(item_atlas_region.min_x_max_y().map(to_f32)),
                     ),
                     GuiVertex::new(
-                        self.anchor,
                         self.offset + Vector([4.0, -4.0]),
                         None,
                         Some(item_atlas_region.min().map(to_f32)),
                     ),
                     GuiVertex::new(
-                        self.anchor,
                         self.offset + Vector([20.0, -4.0]),
                         None,
                         Some(item_atlas_region.max_x_min_y().map(to_f32)),
                     ),
                     GuiVertex::new(
-                        self.anchor,
                         self.offset + Vector([20.0, -20.0]),
                         None,
                         Some(item_atlas_region.max().map(to_f32)),

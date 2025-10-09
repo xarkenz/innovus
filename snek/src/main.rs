@@ -156,7 +156,7 @@ fn main() {
         transform_thingy.rotate_y(consts::FRAC_PI_2);
         transform_thingy.translate(Vector([0.0, 0.0, -10.0]));
         let slice = kooper_renderer.as_slice();
-        kooper_renderer.mesh_mut().transform(&slice, transform_thingy);
+        kooper_renderer.data_mut().transform(&slice, transform_thingy);
         kooper_renderer.upload_vertex_buffer();
     }
 

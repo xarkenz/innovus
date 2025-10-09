@@ -8,7 +8,6 @@ pub mod cursor;
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct GuiVertex {
-    pub anchor: Vector<f32, 2>,
     pub offset: Vector<f32, 2>,
     pub color: Vector<f32, 4>,
     pub uv: Vector<f32, 2>,
@@ -16,13 +15,11 @@ pub struct GuiVertex {
 
 impl GuiVertex {
     pub fn new(
-        anchor: Vector<f32, 2>,
         offset: Vector<f32, 2>,
         color: Option<Vector<f32, 4>>,
         uv: Option<Vector<f32, 2>>,
     ) -> Self {
         Self {
-            anchor,
             offset,
             color: color.unwrap_or(Vector::one()),
             uv: uv.unwrap_or(Vector::filled(f32::NAN)),
@@ -32,7 +29,6 @@ impl GuiVertex {
 
 impl Vertex for GuiVertex {
     const ATTRIBUTES: &'static [VertexAttribute] = &[
-        VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, anchor)),
         VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, offset)),
         VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
         VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
@@ -79,39 +75,35 @@ impl GuiImage {
         self.atlas_region = region;
     }
 
-    pub fn generate_mesh(&self, anchor: Vector<f32, 2>, offset: Vector<f32, 2>) -> Mesh<GuiVertex> {
+    pub fn append_to_mesh(&self, mesh: &mut Mesh<GuiVertex>, offset: Vector<f32, 2>) {
         let to_f32 = |x: u32| x as f32;
-        Mesh::with_data(
-            vec![
+        mesh.add(
+            &[
                 GuiVertex::new(
-                    anchor,
                     offset + self.bounds.min(),
                     Some(self.color),
                     Some(self.atlas_region.min_x_max_y().map(to_f32)),
                 ),
                 GuiVertex::new(
-                    anchor,
                     offset + self.bounds.min_x_max_y(),
                     Some(self.color),
                     Some(self.atlas_region.min().map(to_f32)),
                 ),
                 GuiVertex::new(
-                    anchor,
                     offset + self.bounds.max(),
                     Some(self.color),
                     Some(self.atlas_region.max_x_min_y().map(to_f32)),
                 ),
                 GuiVertex::new(
-                    anchor,
                     offset + self.bounds.max_x_min_y(),
                     Some(self.color),
                     Some(self.atlas_region.max().map(to_f32)),
                 ),
             ],
-            vec![
+            &[
                 [0, 1, 2],
                 [2, 3, 0],
             ],
-        )
+        );
     }
 }

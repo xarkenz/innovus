@@ -5,7 +5,7 @@ use crate::world::item::Item;
 use crate::world::item::types::AIR;
 use render::GuiVertex;
 use render::cursor::CursorRenderer;
-use render::text::TextLineRenderer;
+use render::text::{TextLine, TextLineRenderer};
 
 pub mod render;
 pub mod hotbar;
@@ -23,7 +23,6 @@ pub struct GuiManager {
     inventory_shown: bool,
     fps_display: TextLineRenderer,
     player_info_display: TextLineRenderer,
-    item_display: TextLineRenderer,
     input_test: TextLineRenderer,
 }
 
@@ -40,37 +39,35 @@ impl GuiManager {
             hotbar: hotbar::Hotbar::new(assets)?,
             inventory: MeshRenderer::create()?,
             inventory_shown: false,
-            fps_display: TextLineRenderer::new(
+            fps_display: TextLineRenderer::create(
+                TextLine::new(
+                    Vector([0.0, 1.0]),
+                    Vector([1.0, 1.0, 1.0, 1.0]),
+                    Vector([0.0, 0.0, 0.0, 0.4]),
+                    String::new(),
+                ),
                 Vector([-1.0, 1.0]),
                 Vector([0.0, 0.0]),
-                Vector([0.0, 1.0]),
-                Vector([1.0, 1.0, 1.0, 1.0]),
-                Vector([0.0, 0.0, 0.0, 0.4]),
-                String::new(),
             ),
-            player_info_display: TextLineRenderer::new(
+            player_info_display: TextLineRenderer::create(
+                TextLine::new(
+                    Vector([1.0, 1.0]),
+                    Vector([1.0, 1.0, 1.0, 1.0]),
+                    Vector([0.0, 0.0, 0.0, 0.4]),
+                    String::new(),
+                ),
                 Vector([1.0, 1.0]),
                 Vector([0.0, 0.0]),
-                Vector([1.0, 1.0]),
-                Vector([1.0, 1.0, 1.0, 1.0]),
-                Vector([0.0, 0.0, 0.0, 0.4]),
-                String::new(),
             ),
-            item_display: TextLineRenderer::new(
-                Vector([0.0, -1.0]),
-                Vector([0.0, 32.0]),
-                Vector([0.5, 0.0]),
-                Vector([1.0, 1.0, 1.0, 1.0]),
-                Vector([0.0, 0.0, 0.0, 0.4]),
-                String::new(),
-            ),
-            input_test: TextLineRenderer::new(
+            input_test: TextLineRenderer::create(
+                TextLine::new(
+                    Vector([0.5, 0.5]),
+                    Vector([0.0, 0.0, 0.0, 1.0]),
+                    Vector([1.0, 1.0, 1.0, 1.0]),
+                    String::new(),
+                ),
                 Vector([0.0, 0.5]),
                 Vector([0.0, 0.0]),
-                Vector([0.5, 0.5]),
-                Vector([0.0, 0.0, 0.0, 1.0]),
-                Vector([1.0, 1.0, 1.0, 1.0]),
-                String::new(),
             ),
         })
     }
@@ -129,6 +126,14 @@ impl GuiManager {
         (from_anchor - to_anchor) / 2.0 / self.offset_scale
     }
 
+    pub fn hotbar(&self) -> &hotbar::Hotbar {
+        &self.hotbar
+    }
+
+    pub fn hotbar_mut(&mut self) -> &mut hotbar::Hotbar {
+        &mut self.hotbar
+    }
+
     pub fn inventory_shown(&self) -> bool {
         self.inventory_shown
     }
@@ -144,11 +149,11 @@ impl GuiManager {
     }
 
     pub fn update_fps_display(&mut self, average_fps: f32) {
-        self.fps_display.set_text(format!("Average FPS: {average_fps:.1}"));
+        self.fps_display.data_mut().set_text(format!("Average FPS: {average_fps:.1}"));
     }
 
     pub fn update_player_info_display(&mut self, position: Vector<f32, 2>, velocity: Vector<f32, 2>) {
-        self.player_info_display.set_text(format!(
+        self.player_info_display.data_mut().set_text(format!(
             "P=({:.0}, {:.0}); V=({:.1}, {:.1})",
             position.x().floor(),
             position.y().floor(),
@@ -160,12 +165,12 @@ impl GuiManager {
     pub fn update_item_display(&mut self, item: &Item, assets: &AssetPool) {
         self.cursor_renderer.set_item_type(item.item_type());
         if item.item_type() == &AIR {
-            self.item_display.set_text(String::new());
+            self.hotbar.set_held_item_text(String::new());
         }
         else {
             let item_key = format!("item.{}", item.item_type());
             let item_name = assets.get_text_string(&item_key);
-            self.item_display.set_text(match item.count() {
+            self.hotbar.set_held_item_text(match item.count() {
                 1 => item_name.to_string(),
                 count => format!("{item_name} ({count})")
             });
@@ -173,19 +178,19 @@ impl GuiManager {
     }
 
     pub fn enter_text(&mut self, text: &str) {
-        let mut string = self.input_test.text().to_string();
+        let mut string = self.input_test.data().text().to_string();
         string.push_str(text);
-        self.input_test.set_text(string);
+        self.input_test.data_mut().set_text(string);
     }
 
     pub fn backspace(&mut self) {
-        let mut string = self.input_test.text().to_string();
+        let mut string = self.input_test.data().text().to_string();
         string.pop();
-        self.input_test.set_text(string);
+        self.input_test.data_mut().set_text(string);
     }
 
     pub fn clear_text(&mut self) {
-        self.input_test.set_text(String::new());
+        self.input_test.data_mut().set_text(String::new());
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {
@@ -194,14 +199,13 @@ impl GuiManager {
 
         if self.inventory.is_empty() {
             let atlas_region = assets.get_gui_image("gui/inventory").unwrap();
-            let anchor = Vector([0.0, 0.0]);
             let to_f32 = |x: u32| x as f32;
             self.inventory.add(
                 &[
-                    GuiVertex::new(anchor, Vector([-106.0, -62.0]), None, Some(atlas_region.min_x_max_y().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([-106.0, 62.0]), None, Some(atlas_region.min().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([106.0, 62.0]), None, Some(atlas_region.max_x_min_y().map(to_f32))),
-                    GuiVertex::new(anchor, Vector([106.0, -62.0]), None, Some(atlas_region.max().map(to_f32))),
+                    GuiVertex::new(Vector([-106.0, -62.0]), None, Some(atlas_region.min_x_max_y().map(to_f32))),
+                    GuiVertex::new(Vector([-106.0, 62.0]), None, Some(atlas_region.min().map(to_f32))),
+                    GuiVertex::new(Vector([106.0, 62.0]), None, Some(atlas_region.max_x_min_y().map(to_f32))),
+                    GuiVertex::new(Vector([106.0, -62.0]), None, Some(atlas_region.max().map(to_f32))),
                 ],
                 &[
                     [0, 1, 2],
@@ -211,6 +215,7 @@ impl GuiManager {
         }
         if self.inventory_shown {
             assets.gui_texture().bind();
+            assets.gui_shaders().set_uniform("anchor", Vector([0.0f32, 0.0f32]));
             self.inventory.render();
             self.input_test.render(assets);
         }
@@ -219,7 +224,6 @@ impl GuiManager {
 
         self.fps_display.render(assets);
         self.player_info_display.render(assets);
-        self.item_display.render(assets);
         self.cursor_renderer.render(assets);
     }
 }

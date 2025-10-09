@@ -510,8 +510,8 @@ impl Vertex for Vertex2D {
 pub struct MeshSlice {
     pub first_vertex: usize,
     pub vertex_count: usize,
-    pub first_face: usize,
-    pub face_count: usize,
+    pub first_triangle: usize,
+    pub triangle_count: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -563,12 +563,28 @@ impl<V: Vertex> Mesh<V> {
         &mut self.vertices[index]
     }
 
+    pub fn slice_vertices(&self, slice: MeshSlice) -> &[V] {
+        &self.vertices[slice.first_vertex .. slice.first_vertex + slice.vertex_count]
+    }
+
+    pub fn slice_vertices_mut(&mut self, slice: MeshSlice) -> &mut [V] {
+        &mut self.vertices[slice.first_vertex .. slice.first_vertex + slice.vertex_count]
+    }
+
+    pub fn slice_triangles(&self, slice: MeshSlice) -> &[[u32; 3]] {
+        &self.triangles[slice.first_triangle.. slice.first_triangle + slice.triangle_count]
+    }
+
+    pub fn slice_triangles_mut(&mut self, slice: MeshSlice) -> &mut [[u32; 3]] {
+        &mut self.triangles[slice.first_triangle.. slice.first_triangle + slice.triangle_count]
+    }
+
     pub fn as_slice(&self) -> MeshSlice {
         MeshSlice {
             first_vertex: 0,
             vertex_count: self.vertices.len(),
-            first_face: 0,
-            face_count: self.triangles.len(),
+            first_triangle: 0,
+            triangle_count: self.triangles.len(),
         }
     }
 
@@ -591,8 +607,8 @@ impl<V: Vertex> Mesh<V> {
         MeshSlice {
             first_vertex,
             vertex_count,
-            first_face,
-            face_count,
+            first_triangle: first_face,
+            triangle_count: face_count,
         }
     }
 
@@ -1061,11 +1077,11 @@ impl<V: Vertex> MeshRenderer<V> {
         self.element_buffer_id
     }
 
-    pub fn mesh(&self) -> &Mesh<V> {
+    pub fn data(&self) -> &Mesh<V> {
         &self.mesh
     }
 
-    pub fn mesh_mut(&mut self) -> &mut Mesh<V> {
+    pub fn data_mut(&mut self) -> &mut Mesh<V> {
         &mut self.mesh
     }
 
@@ -1155,6 +1171,11 @@ impl<V: Vertex> MeshRenderer<V> {
         }
     }
 
+    pub fn upload_buffers(&self) {
+        self.upload_vertex_buffer();
+        self.upload_element_buffer();
+    }
+
     pub fn upload_buffer_slice(&self, slice: &MeshSlice) {
         if slice.vertex_count != 0 {
             unsafe {
@@ -1169,14 +1190,14 @@ impl<V: Vertex> MeshRenderer<V> {
                 gl::BindBuffer(gl::ARRAY_BUFFER, 0);
             }
         }
-        if slice.face_count != 0 {
+        if slice.triangle_count != 0 {
             unsafe {
                 gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.element_buffer_id);
                 gl::BufferSubData(
                     gl::ELEMENT_ARRAY_BUFFER,
-                    (slice.first_face * size_of::<[u32; 3]>()) as GLintptr,
-                    (slice.face_count * size_of::<[u32; 3]>()) as GLsizeiptr,
-                    self.triangles()[slice.first_face..(slice.first_face + slice.face_count)]
+                    (slice.first_triangle * size_of::<[u32; 3]>()) as GLintptr,
+                    (slice.triangle_count * size_of::<[u32; 3]>()) as GLsizeiptr,
+                    self.triangles()[slice.first_triangle..(slice.first_triangle + slice.triangle_count)]
                         .as_ptr() as *const GLvoid,
                 );
                 gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
@@ -1185,15 +1206,17 @@ impl<V: Vertex> MeshRenderer<V> {
     }
 
     pub fn render(&self) {
-        unsafe {
-            gl::BindVertexArray(self.vertex_array_id);
-            gl::DrawElements(
-                gl::TRIANGLES,
-                self.triangles().len() as GLsizei * 3,
-                gl::UNSIGNED_INT,
-                std::ptr::null(),
-            );
-            gl::BindVertexArray(0);
+        if !self.triangles().is_empty() {
+            unsafe {
+                gl::BindVertexArray(self.vertex_array_id);
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    self.triangles().len() as GLsizei * 3,
+                    gl::UNSIGNED_INT,
+                    std::ptr::null(),
+                );
+                gl::BindVertexArray(0);
+            }
         }
     }
 }
