@@ -2,8 +2,9 @@ use std::mem::offset_of;
 use innovus::gfx::{Mesh, Vertex, VertexAttribute, VertexAttributeType};
 use innovus::tools::{Rectangle, Vector};
 
-pub mod text;
 pub mod cursor;
+pub mod item;
+pub mod text;
 
 #[repr(C)]
 #[derive(Clone, Debug)]
