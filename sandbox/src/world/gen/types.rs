@@ -77,9 +77,9 @@ impl WorldGenerator for OverworldGenerator {
                     block_type = &block::types::DIRT;
                 }
                 else {
-                    let small_offset = Vector([x as f32, y as f32]) / CHUNK_SIZE as f32;
+                    let small_offset = Vector([x as f32, y as f32]).div(CHUNK_SIZE as f32);
                     let small_caves_value = small_caves_cell.compute_value(small_offset, smooth_step);
-                    let big_offset = big_offset_base + small_offset / 2.0;
+                    let big_offset = big_offset_base + small_offset.mul(0.5);
                     let big_caves_value = big_caves_cell.compute_value(big_offset, smooth_step);
                     let mut value = 0.8 * small_caves_value + 0.5 * big_caves_value;
 

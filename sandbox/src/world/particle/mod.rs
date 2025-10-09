@@ -68,8 +68,8 @@ impl ParticleManager {
                 false
             }
             else {
-                particle.position += particle.velocity * dt;
-                particle.velocity += particle.acceleration * dt;
+                particle.position += particle.velocity.mul(dt);
+                particle.velocity += particle.acceleration.mul(dt);
                 true
             }
         })
@@ -91,7 +91,7 @@ impl ParticleManager {
             let opacity = particle.lifetime.min(1.0);
             for offset in OFFSETS {
                 vertices.push(Vertex2D::new(
-                    (particle.position + offset * particle.size / 16.0).with_z(0.0),
+                    (particle.position + offset.mul(particle.size / 16.0)).with_z(0.0),
                     Some(particle.color.0.with_w(opacity)),
                     None,
                 ));

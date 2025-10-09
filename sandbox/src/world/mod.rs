@@ -60,7 +60,7 @@ impl<'world> World<'world> {
     }
 
     pub fn sky_color(&self) -> RGBColor {
-        RGBColor(self.sky_color * self.sky_light)
+        RGBColor(self.sky_color.mul(self.sky_light))
     }
 
     pub fn camera(&self) -> &Camera {
@@ -131,7 +131,7 @@ impl<'world> World<'world> {
                         chunk_location.y() as f32 * CHUNK_SIZE as f32 + block_y as f32 + 0.5,
                     ]);
                     for _ in 0..16 {
-                        let velocity = random_unit_vector() * 3.0 + random_unit_vector() * 1.0;
+                        let velocity = random_unit_vector().mul(3.0) + random_unit_vector().mul(1.0);
                         let Some(&color) = choose_random(palette.colors()) else {
                             continue;
                         };

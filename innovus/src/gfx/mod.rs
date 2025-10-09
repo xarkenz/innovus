@@ -749,7 +749,7 @@ impl Mesh<Vertex3D> {
                     let idx = (mesh.vertices.len() + add_vertices.len()) as u32;
                     let normal = (mesh.vertices[v1 as usize].normal + mesh.vertices[v2 as usize].normal).normalized();
                     add_vertices.push(Vertex3D::new(
-                        normal * radius + center,
+                        normal.mul(radius) + center,
                         Some(color),
                         None,
                         Some(normal),

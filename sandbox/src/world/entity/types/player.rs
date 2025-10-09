@@ -198,7 +198,7 @@ impl Entity for Player {
                 movement::DEFAULT_FRICTION_DECELERATION,
             ));
 
-            self.position += self.velocity * dt;
+            self.position += self.velocity.mul(dt);
         }
         else if let Some(collider) = &self.collider {
             let collider = physics.get_collider_mut(collider).unwrap();

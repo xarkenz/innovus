@@ -82,7 +82,7 @@ impl<'world> Game<'world> {
         let camera = Camera::new(
             Vector::zero(),
             self.viewport_size,
-            self.content_scale * 48.0,
+            self.content_scale.mul(48.0),
             5.0,
         );
         self.current_world = Some(World::new(generator, camera, &mut self.assets));
@@ -130,7 +130,7 @@ impl<'world> Game<'world> {
         let clear_color;
         if let Some(world) = &mut self.current_world {
             if let Some(scroll_amount) = inputs.scroll_amount() {
-                let target_zoom = world.camera().zoom() * f32::powf(1.125, scroll_amount.y() as f32);
+                let target_zoom = world.camera().zoom().mul(f32::powf(1.125, scroll_amount.y() as f32));
                 world.camera_mut().set_zoom(target_zoom);
             }
 

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use super::*;
 
 use std::collections::BinaryHeap;
@@ -185,7 +186,7 @@ impl Collider {
     pub fn broad_phase(&self, dt: f32) -> Rectangle<f32> {
         let mut phase = self.rectangle;
         if !self.fixed {
-            phase.expand_toward(self.velocity * dt);
+            phase.expand_toward(self.velocity.mul(dt));
         }
         phase
     }
@@ -250,7 +251,7 @@ impl Collider {
             Vector::zero()
         }
         else {
-            (self.velocity + other.velocity) * 0.5
+            (self.velocity + other.velocity).mul(0.5)
         }
     }
 }
@@ -315,7 +316,7 @@ impl Physics {
                 let collider = self.colliders.get_current_mut(index).unwrap();
 
                 // Advance to the collision site
-                collider.rectangle.shift_by(collider.velocity * (collision.time - time_used[index]));
+                collider.rectangle.shift_by(collider.velocity.mul(collision.time - time_used[index]));
                 // Record the amount of time passed once collision site is reached
                 time_used[index] = collision.time;
                 // Set the post-collision velocity of the collider
@@ -347,7 +348,7 @@ impl Physics {
 
         // Advance all colliders to their final position
         for (handle, collider) in self.colliders.values_mut() {
-            collider.rectangle.shift_by(collider.velocity * (dt - time_used[handle.slot]));
+            collider.rectangle.shift_by(collider.velocity.mul(dt - time_used[handle.slot]));
         }
     }
 

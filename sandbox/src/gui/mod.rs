@@ -32,7 +32,7 @@ impl GuiManager {
             viewport_size,
             content_scale,
             gui_scale,
-            offset_scale: Self::compute_offset_scale(viewport_size, content_scale * gui_scale),
+            offset_scale: Self::compute_offset_scale(viewport_size, content_scale.mul(gui_scale)),
             cursor_position: Vector::zero(),
             cursor_offset: Vector::zero(),
             cursor_renderer: CursorRenderer::new(Vector([-1.0, 1.0]), Vector::zero(), &AIR),
@@ -78,7 +78,7 @@ impl GuiManager {
 
     pub fn set_viewport_size(&mut self, viewport_size: Vector<f32, 2>) {
         self.viewport_size = viewport_size;
-        self.offset_scale = Self::compute_offset_scale(viewport_size, self.content_scale * self.gui_scale);
+        self.offset_scale = Self::compute_offset_scale(viewport_size, self.content_scale.mul(self.gui_scale));
         self.compute_cursor_offset();
     }
 
@@ -88,7 +88,7 @@ impl GuiManager {
 
     pub fn set_content_scale(&mut self, content_scale: Vector<f32, 2>) {
         self.content_scale = content_scale;
-        self.offset_scale = Self::compute_offset_scale(self.viewport_size, content_scale * self.gui_scale);
+        self.offset_scale = Self::compute_offset_scale(self.viewport_size, content_scale.mul(self.gui_scale));
         self.compute_cursor_offset();
     }
 
@@ -98,7 +98,7 @@ impl GuiManager {
 
     pub fn set_gui_scale(&mut self, gui_scale: f32) {
         self.gui_scale = gui_scale;
-        self.offset_scale = Self::compute_offset_scale(self.viewport_size, self.content_scale * gui_scale);
+        self.offset_scale = Self::compute_offset_scale(self.viewport_size, self.content_scale.mul(gui_scale));
         self.compute_cursor_offset();
     }
 
@@ -118,12 +118,12 @@ impl GuiManager {
     fn compute_cursor_offset(&mut self) {
         self.cursor_offset = self.cursor_position
             * Vector([2.0, -2.0])
-            / (self.content_scale * self.gui_scale);
+            / self.content_scale.mul(self.gui_scale);
         self.cursor_renderer.set_offset(self.cursor_offset);
     }
 
     pub fn anchor_adjustment(&self, from_anchor: Vector<f32, 2>, to_anchor: Vector<f32, 2>) -> Vector<f32, 2> {
-        (from_anchor - to_anchor) / 2.0 / self.offset_scale
+        (from_anchor - to_anchor).mul(0.5) / self.offset_scale
     }
 
     pub fn hotbar(&self) -> &hotbar::Hotbar {

@@ -50,8 +50,8 @@ impl EntityImage {
 
         Ok(Self {
             world_offset: Rectangle::from_size(
-                Vector([x, y]) / 16.0,
-                Vector([width, height]) / 16.0,
+                Vector([x, y]).div(16.0),
+                Vector([width, height]).div(16.0),
             ),
             atlas_base_region,
             animation,

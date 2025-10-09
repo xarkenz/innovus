@@ -80,7 +80,7 @@ impl Camera {
     }
 
     pub fn get_world_pos(&self, screen_pos: Vector<f32, 2>) -> Vector<f32, 2> {
-        (screen_pos - self.size * 0.5) * Vector([1.0, -1.0]) / self.zoom + self.position
+        (screen_pos - self.size.mul(0.5)) * Vector([1.0, -1.0]) / self.zoom + self.position
     }
 
     pub fn update(&mut self, dt: f32) {

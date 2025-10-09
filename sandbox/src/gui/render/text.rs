@@ -141,7 +141,7 @@ impl TextLine {
             }
 
             let atlas_region = assets.get_gui_image("font/unicode_0").unwrap();
-            let image_size = atlas_region.size() / 16;
+            let image_size = atlas_region.size().div(16);
 
             // Foreground text
             let mut current_offset = text_offset;
@@ -152,7 +152,7 @@ impl TextLine {
                 self.mesh.add(
                     &OFFSETS.map(|(vertex_offset, atlas_offset)| {
                         GuiVertex::new(
-                            current_offset + vertex_offset * glyph_max_size,
+                            current_offset + vertex_offset.mul(glyph_max_size),
                             Some(self.text_color),
                             Some((image_origin + atlas_offset).map(|x| x as f32)),
                         )
