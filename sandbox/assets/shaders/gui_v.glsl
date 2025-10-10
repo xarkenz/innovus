@@ -15,5 +15,5 @@ void main() {
     frag_color = vertex_color;
     frag_uv = vertex_uv / textureSize(tex_atlas, 0);
 
-    gl_Position = vec4(anchor + vertex_offset * offset_scale, 0.0, 1.0);
+    gl_Position = vec4(((anchor * 2.0) - vec2(1.0) + vertex_offset * offset_scale) * vec2(1.0, -1.0), 0.0, 1.0);
 }

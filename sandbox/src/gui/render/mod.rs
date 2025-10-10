@@ -83,22 +83,22 @@ impl GuiImage {
                 GuiVertex::new(
                     offset + self.bounds.min(),
                     Some(self.color),
-                    Some(self.atlas_region.min_x_max_y().map(to_f32)),
+                    Some(self.atlas_region.min().map(to_f32)),
                 ),
                 GuiVertex::new(
                     offset + self.bounds.min_x_max_y(),
                     Some(self.color),
-                    Some(self.atlas_region.min().map(to_f32)),
+                    Some(self.atlas_region.min_x_max_y().map(to_f32)),
                 ),
                 GuiVertex::new(
                     offset + self.bounds.max(),
                     Some(self.color),
-                    Some(self.atlas_region.max_x_min_y().map(to_f32)),
+                    Some(self.atlas_region.max().map(to_f32)),
                 ),
                 GuiVertex::new(
                     offset + self.bounds.max_x_min_y(),
                     Some(self.color),
-                    Some(self.atlas_region.max().map(to_f32)),
+                    Some(self.atlas_region.max_x_min_y().map(to_f32)),
                 ),
             ],
             &[

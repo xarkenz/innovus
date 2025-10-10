@@ -3,10 +3,23 @@ use innovus::tools::Vector;
 use crate::gui::render::GuiVertex;
 use crate::tools::asset::AssetPool;
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum TextBackground {
+    None,
+    Rectangle {
+        color: Vector<f32, 4>,
+        margin: Vector<f32, 2>,
+    },
+    DropShadow {
+        color: Vector<f32, 4>,
+        offset: Vector<f32, 2>,
+    },
+}
+
 pub struct TextLine {
     fixed_point: Vector<f32, 2>,
     text_color: Vector<f32, 4>,
-    background_color: Vector<f32, 4>,
+    background: TextBackground,
     text: String,
     mesh: Mesh<GuiVertex>,
 }
@@ -15,13 +28,13 @@ impl TextLine {
     pub fn new(
         fixed_point: Vector<f32, 2>,
         text_color: Vector<f32, 4>,
-        background_color: Vector<f32, 4>,
+        background: TextBackground,
         text: String,
     ) -> Self {
         Self {
             fixed_point,
             text_color,
-            background_color,
+            background,
             text,
             mesh: Mesh::new(),
         }
@@ -49,15 +62,15 @@ impl TextLine {
         self.text_color = color;
     }
 
-    pub fn background_color(&self) -> Vector<f32, 4> {
-        self.background_color
+    pub fn background(&self) -> &TextBackground {
+        &self.background
     }
 
-    pub fn set_background_color(&mut self, color: Vector<f32, 4>) {
-        if color != self.background_color {
+    pub fn set_background(&mut self, background: TextBackground) {
+        if background != self.background {
             self.invalidate();
         }
-        self.background_color = color;
+        self.background = background;
     }
 
     pub fn text(&self) -> &str {
@@ -69,6 +82,13 @@ impl TextLine {
             self.invalidate();
         }
         self.text = text;
+    }
+
+    pub fn clear_text(&mut self) {
+        if !self.text.is_empty() {
+            self.invalidate();
+        }
+        self.text.clear();
     }
 
     pub fn invalidate(&mut self) {
@@ -107,10 +127,10 @@ impl TextLine {
             }
         }
         const OFFSETS: [(Vector<f32, 2>, Vector<u32, 2>); 4] = [
-            (Vector([0.0, 0.0]), Vector([0, 12])), // Bottom left
-            (Vector([0.0, 1.0]), Vector([0, 0])), // Top left
-            (Vector([1.0, 1.0]), Vector([12, 0])), // Top right
-            (Vector([1.0, 0.0]), Vector([12, 12])), // Bottom right
+            (Vector([0.0, 0.0]), Vector([0, 0])), // Top left
+            (Vector([0.0, 1.0]), Vector([0, 12])), // Bottom left
+            (Vector([1.0, 1.0]), Vector([12, 12])), // Bottom right
+            (Vector([1.0, 0.0]), Vector([12, 0])), // Top right
         ];
 
         if self.mesh.is_empty() {
@@ -124,15 +144,14 @@ impl TextLine {
             let text_size = Vector([text_width, glyph_max_size]);
             let text_offset = -self.fixed_point * text_size;
 
-            if self.background_color.w() > 0.0 {
-                // Background rectangle
-                let background_size = text_size + Vector([2.0, 0.0]);
-                let background_offset = text_offset - Vector([1.0, 0.0]);
+            if let TextBackground::Rectangle { color, margin } = self.background {
+                let background_size = text_size + margin.mul(2.0);
+                let background_offset = text_offset - margin;
                 self.mesh.add(
                     &OFFSETS.map(|(vertex_offset, _)| {
                         GuiVertex::new(
                             background_offset + vertex_offset * background_size,
-                            Some(self.background_color),
+                            Some(color),
                             None,
                         )
                     }),
@@ -149,16 +168,24 @@ impl TextLine {
                 let (image_index, glyph_width) = glyph_info(character);
                 let image_origin = atlas_region.min()
                     + Vector([image_index % 16, image_index / 16]) * image_size;
-                self.mesh.add(
-                    &OFFSETS.map(|(vertex_offset, atlas_offset)| {
-                        GuiVertex::new(
-                            current_offset + vertex_offset.mul(glyph_max_size),
-                            Some(self.text_color),
-                            Some((image_origin + atlas_offset).map(|x| x as f32)),
-                        )
-                    }),
-                    &[[0, 1, 2], [2, 3, 0]],
-                );
+                let vertices = OFFSETS.map(|(vertex_offset, atlas_offset)| {
+                    GuiVertex::new(
+                        current_offset + vertex_offset.mul(glyph_max_size),
+                        Some(self.text_color),
+                        Some((image_origin + atlas_offset).map(|x| x as f32)),
+                    )
+                });
+
+                if let TextBackground::DropShadow { color, offset: shadow_offset } = self.background {
+                    let mut shadow_vertices = vertices.clone();
+                    for vertex in &mut shadow_vertices {
+                        vertex.offset += shadow_offset;
+                        vertex.color = color;
+                    }
+                    self.mesh.add(&shadow_vertices, &[[0, 1, 2], [2, 3, 0]]);
+                }
+
+                self.mesh.add(&vertices, &[[0, 1, 2], [2, 3, 0]]);
 
                 current_offset.set_x(current_offset.x() + glyph_width + 1.0);
             }

@@ -4,14 +4,14 @@ use crate::gui::render::GuiVertex;
 use crate::tools::asset::AssetPool;
 use crate::world::item::ItemType;
 
-pub struct CursorRenderer {
+pub struct GuiCursor {
     anchor: Vector<f32, 2>,
     offset: Vector<f32, 2>,
     item_type: &'static ItemType,
     mesh: MeshRenderer<GuiVertex>,
 }
 
-impl CursorRenderer {
+impl GuiCursor {
     pub fn new(anchor: Vector<f32, 2>, offset: Vector<f32, 2>, item_type: &'static ItemType) -> Self {
         Self {
             anchor,
@@ -50,62 +50,29 @@ impl CursorRenderer {
         let cursor_atlas_region = assets.get_gui_image("gui/cursor").unwrap();
         let to_f32 = |x: u32| x as f32;
 
-        self.mesh.clear();
-        self.mesh.add(
-            &[
-                GuiVertex::new(
-                    self.offset + Vector([0.0, -16.0]),
-                    None,
-                    Some(cursor_atlas_region.min_x_max_y().map(to_f32)),
-                ),
-                GuiVertex::new(
-                    self.offset + Vector([0.0, 0.0]),
-                    None,
-                    Some(cursor_atlas_region.min().map(to_f32)),
-                ),
-                GuiVertex::new(
-                    self.offset + Vector([16.0, 0.0]),
-                    None,
-                    Some(cursor_atlas_region.max_x_min_y().map(to_f32)),
-                ),
-                GuiVertex::new(
-                    self.offset + Vector([16.0, -16.0]),
-                    None,
-                    Some(cursor_atlas_region.max().map(to_f32)),
-                ),
-            ],
-            &[
-                [0, 1, 2],
-                [2, 3, 0],
-            ],
-        );
-
-        assets.gui_texture().bind();
-        self.mesh.render();
-
         if let Some(item_atlas_region) = assets.get_item_image(self.item_type) {
             self.mesh.clear();
             self.mesh.add(
                 &[
                     GuiVertex::new(
-                        self.offset + Vector([4.0, -20.0]),
-                        None,
-                        Some(item_atlas_region.min_x_max_y().map(to_f32)),
-                    ),
-                    GuiVertex::new(
-                        self.offset + Vector([4.0, -4.0]),
+                        self.offset + Vector([4.0, 4.0]),
                         None,
                         Some(item_atlas_region.min().map(to_f32)),
                     ),
                     GuiVertex::new(
-                        self.offset + Vector([20.0, -4.0]),
+                        self.offset + Vector([4.0, 20.0]),
                         None,
-                        Some(item_atlas_region.max_x_min_y().map(to_f32)),
+                        Some(item_atlas_region.min_x_max_y().map(to_f32)),
                     ),
                     GuiVertex::new(
-                        self.offset + Vector([20.0, -20.0]),
+                        self.offset + Vector([20.0, 20.0]),
                         None,
                         Some(item_atlas_region.max().map(to_f32)),
+                    ),
+                    GuiVertex::new(
+                        self.offset + Vector([20.0, 4.0]),
+                        None,
+                        Some(item_atlas_region.max_x_min_y().map(to_f32)),
                     ),
                 ],
                 &[
@@ -117,5 +84,38 @@ impl CursorRenderer {
             assets.item_texture().bind();
             self.mesh.render();
         }
+
+        self.mesh.clear();
+        self.mesh.add(
+            &[
+                GuiVertex::new(
+                    self.offset + Vector([0.0, 0.0]),
+                    None,
+                    Some(cursor_atlas_region.min().map(to_f32)),
+                ),
+                GuiVertex::new(
+                    self.offset + Vector([0.0, 16.0]),
+                    None,
+                    Some(cursor_atlas_region.min_x_max_y().map(to_f32)),
+                ),
+                GuiVertex::new(
+                    self.offset + Vector([16.0, 16.0]),
+                    None,
+                    Some(cursor_atlas_region.max().map(to_f32)),
+                ),
+                GuiVertex::new(
+                    self.offset + Vector([16.0, 0.0]),
+                    None,
+                    Some(cursor_atlas_region.max_x_min_y().map(to_f32)),
+                ),
+            ],
+            &[
+                [0, 1, 2],
+                [2, 3, 0],
+            ],
+        );
+
+        assets.gui_texture().bind();
+        self.mesh.render();
     }
 }

@@ -81,3 +81,9 @@ impl Item {
         (self.item_type.right_click)(target_block, self, side)
     }
 }
+
+impl Default for Item {
+    fn default() -> Self {
+        Self::new(&types::AIR, 0)
+    }
+}
