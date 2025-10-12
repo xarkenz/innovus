@@ -94,7 +94,7 @@ impl Player {
         let collider = physics.get_collider_mut(self.collider.as_ref().unwrap()).unwrap();
 
         if let Some(Vector([x, y])) = self.spawn_point {
-            collider.rectangle.shift_min_x_to(x as f32 + 0.5 - 0.5 * collider.rectangle.width());
+            collider.rectangle.shift_min_x_to(x as f32 + 0.5 - 0.5 * collider.rectangle.x_span());
             collider.rectangle.shift_min_y_to(y as f32);
             // if not colliding, return
         }
@@ -118,7 +118,7 @@ impl Entity for Player {
 
     fn attach_collision(&mut self, physics: &mut Physics) {
         self.collider = Some(physics.add_collider(phys::Collider::new(
-            Rectangle::from_size(
+            Rectangle::from_span(
                 Vector([self.position.x() - pixels(5), self.position.y()]),
                 Vector([pixels(10), pixels(26)]),
             ),
@@ -232,11 +232,11 @@ impl Entity for Player {
             let crouch_held = inputs.key_is_held(Key::S) || inputs.key_is_held(Key::LeftShift);
             if crouch_held {
                 self.crouching = true;
-                collider.rectangle.set_max_y(collider.rectangle.min_y() + pixels(23));
+                collider.rectangle.max.set_y(collider.rectangle.min.y() + pixels(23));
             }
             else {
                 self.crouching = false;
-                collider.rectangle.set_max_y(collider.rectangle.min_y() + pixels(26));
+                collider.rectangle.max.set_y(collider.rectangle.min.y() + pixels(26));
             }
 
             let speed_multiplier = if self.crouching && touching_ground {
@@ -264,8 +264,8 @@ impl Entity for Player {
                 movement::DEFAULT_FRICTION_DECELERATION,
             ));
 
-            self.position.set_x(collider.rectangle.min_x() + pixels(5));
-            self.position.set_y(collider.rectangle.min_y());
+            self.position.set_x(collider.rectangle.min.x() + pixels(5));
+            self.position.set_y(collider.rectangle.min.y());
         }
 
         if let Some(appearance) = &mut self.appearance {

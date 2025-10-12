@@ -9,7 +9,7 @@ pub struct BlockPreview {
     position: Vector<f32, 2>,
     item_type: &'static ItemType,
     opacity: f32,
-    geometry: MeshRenderer<Vertex2D>,
+    mesh: MeshRenderer<Vertex2D>,
 }
 
 impl BlockPreview {
@@ -18,7 +18,7 @@ impl BlockPreview {
             position,
             item_type,
             opacity,
-            geometry: MeshRenderer::create().unwrap(),
+            mesh: MeshRenderer::create(),
         }
     }
 
@@ -94,12 +94,12 @@ impl BlockPreview {
                     }
                 }
 
-                self.geometry.clear();
-                self.geometry.add(&vertices, &faces);
+                self.mesh.clear();
+                self.mesh.add(&vertices, &faces);
 
                 assets.block_texture().bind();
                 assets.block_shaders().bind();
-                self.geometry.render();
+                self.mesh.render();
             }
         }
     }

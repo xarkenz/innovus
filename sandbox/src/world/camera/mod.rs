@@ -84,14 +84,14 @@ impl Camera {
     }
 
     pub fn update(&mut self, dt: f32) {
-        self.view.reset_to_identity();
+        self.view.set_identity();
         self.view.look_at(
             Vector([self.position.x(), self.position.y(), 1.0]),
             Vector([self.position.x(), self.position.y(), 0.0]),
             Vector([0.0, 1.0, 0.0]),
         );
 
-        self.projection.reset_to_identity();
+        self.projection.set_identity();
         let pixel_size = self.zoom.map(|x| 1.0 / x);
         self.projection.orthographic(
             self.size.x() * -pixel_size.x() / 2.0,

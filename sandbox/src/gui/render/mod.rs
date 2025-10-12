@@ -81,9 +81,9 @@ impl GuiImage {
         mesh.add(
             &[
                 GuiVertex::new(
-                    offset + self.bounds.min(),
+                    offset + self.bounds.min,
                     Some(self.color),
-                    Some(self.atlas_region.min().map(to_f32)),
+                    Some(self.atlas_region.min.map(to_f32)),
                 ),
                 GuiVertex::new(
                     offset + self.bounds.min_x_max_y(),
@@ -91,9 +91,9 @@ impl GuiImage {
                     Some(self.atlas_region.min_x_max_y().map(to_f32)),
                 ),
                 GuiVertex::new(
-                    offset + self.bounds.max(),
+                    offset + self.bounds.max,
                     Some(self.color),
-                    Some(self.atlas_region.max().map(to_f32)),
+                    Some(self.atlas_region.max.map(to_f32)),
                 ),
                 GuiVertex::new(
                     offset + self.bounds.max_x_min_y(),

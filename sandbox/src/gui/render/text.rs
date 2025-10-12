@@ -160,13 +160,13 @@ impl TextLine {
             }
 
             let atlas_region = assets.get_gui_image("font/unicode_0").unwrap();
-            let image_size = atlas_region.size().div(16);
+            let image_size = atlas_region.span().div(16);
 
             // Foreground text
             let mut current_offset = text_offset;
             for character in self.text.chars() {
                 let (image_index, glyph_width) = glyph_info(character);
-                let image_origin = atlas_region.min()
+                let image_origin = atlas_region.min
                     + Vector([image_index % 16, image_index / 16]) * image_size;
                 let vertices = OFFSETS.map(|(vertex_offset, atlas_offset)| {
                     GuiVertex::new(
@@ -211,7 +211,7 @@ impl TextLineRenderer {
             text_line,
             anchor,
             offset,
-            mesh: MeshRenderer::create().unwrap(),
+            mesh: MeshRenderer::create(),
         }
     }
 

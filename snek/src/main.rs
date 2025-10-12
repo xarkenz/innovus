@@ -130,9 +130,9 @@ fn main() {
     screen::set_culling(true);
     screen::set_depth_testing(true);
 
-    let board_renderer = MeshRenderer::create_with(Mesh::from_str(include_str!("../assets/snek_board.obj")).unwrap()).unwrap();
-    let mut snek_renderer = MeshRenderer::create().unwrap();
-    let mut kooper_renderer = MeshRenderer::create_with(Mesh::from_str(include_str!("../assets/koopa.obj")).unwrap()).unwrap();
+    let board_renderer = MeshRenderer::create_with(Mesh::from_str(include_str!("../assets/snek_board.obj")).unwrap());
+    let mut snek_renderer = MeshRenderer::create();
+    let mut kooper_renderer = MeshRenderer::create_with(Mesh::from_str(include_str!("../assets/koopa.obj")).unwrap());
 
     {
         let kooper_vertices = kooper_renderer.vertices().to_vec();
@@ -278,12 +278,12 @@ fn main() {
         camera_pos.set_y(cam_r * cam_v.sin());
         camera_pos.set_z(cam_r * cam_h.cos() * cam_v.cos());
 
-        camera_view.reset_to_identity();
+        camera_view.set_identity();
         camera_view.rotate_x(cam_p_anim.value());
         camera_view.rotate_y(cam_a_anim.value());
         camera_view.translate(-camera_pos);
 
-        camera_proj.reset_to_identity();
+        camera_proj.set_identity();
         camera_proj.perspective(90.0, width as f32 / height as f32, 1.0, 100.0);
 
         shader_program.set_uniform("time", time);

@@ -23,7 +23,7 @@ impl Hotbar {
             anchor: Vector([0.5, 1.0]),
             offset: Vector([-106.0, -32.0]),
             background_image: GuiImage::new(
-                Rectangle::from_size(Vector::zero(), Vector([212.0, 32.0])),
+                Rectangle::from_span(Vector::zero(), Vector([212.0, 32.0])),
                 Vector::one(),
                 assets.get_gui_image("gui/hotbar")?,
             ),
@@ -49,9 +49,9 @@ impl Hotbar {
                 item_grid.slot_mut(4).set_item(Item::new(&types::MAGMIUM_PICKAXE, 1));
                 item_grid
             },
-            background_layer: MeshRenderer::create()?,
-            item_layer: MeshRenderer::create()?,
-            foreground_layer: MeshRenderer::create()?,
+            background_layer: MeshRenderer::create(),
+            item_layer: MeshRenderer::create(),
+            foreground_layer: MeshRenderer::create(),
         })
     }
 

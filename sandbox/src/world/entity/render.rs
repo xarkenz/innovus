@@ -130,7 +130,7 @@ impl EntityPiece {
         }
 
         let mut region = self.image.atlas_base_region;
-        region.shift_y_by(self.frame * region.height());
+        region.shift_y_by(self.frame * region.y_span());
         if self.flip_x {
             region.flip_x();
         }
@@ -214,14 +214,14 @@ impl EntityRenderer {
 const PIECES_PER_BATCH: usize = 512;
 
 struct RendererBatch {
-    geometry: MeshRenderer<Vertex2D>,
+    mesh: MeshRenderer<Vertex2D>,
     pieces: BoundedArena<EntityPiece>,
 }
 
 impl RendererBatch {
     pub fn new() -> Self {
         Self {
-            geometry: MeshRenderer::create().unwrap(),
+            mesh: MeshRenderer::create(),
             pieces: BoundedArena::new(PIECES_PER_BATCH),
         }
     }
@@ -253,7 +253,7 @@ impl RendererBatch {
     }
 
     pub fn render(&mut self) {
-        if self.geometry.is_empty() {
+        if self.mesh.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
             for _ in 0..PIECES_PER_BATCH {
@@ -264,7 +264,7 @@ impl RendererBatch {
                 faces.push([index + 0, index + 1, index + 2]);
                 faces.push([index + 2, index + 3, index + 0]);
             }
-            self.geometry.add(&vertices, &faces);
+            self.mesh.add(&vertices, &faces);
         }
 
         let mut any_changed = false;
@@ -275,14 +275,14 @@ impl RendererBatch {
                 let bounds = piece.get_world_bounds();
                 let atlas_region = piece.atlas_region();
                 let vertices = [
-                    (bounds.min(), atlas_region.min()),
+                    (bounds.min, atlas_region.min),
                     (bounds.min_x_max_y(), atlas_region.min_x_max_y()),
-                    (bounds.max(), atlas_region.max()),
+                    (bounds.max, atlas_region.max),
                     (bounds.max_x_min_y(), atlas_region.max_x_min_y()),
                 ];
                 let mut vertex_index = handle.slot * 4;
                 for (position, uv) in vertices {
-                    let vertex = self.geometry.vertex_at_mut(vertex_index);
+                    let vertex = self.mesh.vertex_at_mut(vertex_index);
                     vertex.position = position.with_z(1.0);
                     vertex.color = color;
                     vertex.uv = uv.map(|x| x as f32);
@@ -293,8 +293,8 @@ impl RendererBatch {
         }
 
         if any_changed {
-            self.geometry.upload_vertex_buffer();
+            self.mesh.upload_vertex_buffer();
         }
-        self.geometry.render();
+        self.mesh.render();
     }
 }

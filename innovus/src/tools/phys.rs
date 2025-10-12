@@ -180,7 +180,7 @@ impl Collider {
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
-        self.rectangle.intersects(&other.rectangle)
+        self.rectangle.intersects_inclusive(&other.rectangle)
     }
 
     pub fn broad_phase(&self, dt: f32) -> Rectangle<f32> {
@@ -194,9 +194,9 @@ impl Collider {
     pub fn sweep_collision(&self, other: &Self, dt: f32) -> Option<(f32, CollisionSide)> {
         // Determine the time of collision in the x-direction, or infinity if no collision
         let mut x_time = match self.velocity.x().partial_cmp(&other.velocity.x()) {
-            Some(Ordering::Less) => (other.rectangle.max_x() - self.rectangle.min_x())
+            Some(Ordering::Less) => (other.rectangle.max.x() - self.rectangle.min.x())
                 / (self.velocity.x() - other.velocity.x()),
-            Some(Ordering::Greater) => (self.rectangle.max_x() - other.rectangle.min_x())
+            Some(Ordering::Greater) => (self.rectangle.max.x() - other.rectangle.min.x())
                 / (other.velocity.x() - self.velocity.x()),
             _ => f32::INFINITY
         };
@@ -204,8 +204,8 @@ impl Collider {
             // Ensure that collision occurs in the y-direction as well
             let self_dy = self.velocity.y() * x_time;
             let other_dy = other.velocity.y() * x_time;
-            if self.rectangle.min_y() + self_dy >= other.rectangle.max_y() + other_dy
-                || self.rectangle.max_y() + self_dy <= other.rectangle.min_y() + other_dy
+            if self.rectangle.min.y() + self_dy >= other.rectangle.max.y() + other_dy
+                || self.rectangle.max.y() + self_dy <= other.rectangle.min.y() + other_dy
             {
                 x_time = f32::INFINITY;
             }
@@ -216,9 +216,9 @@ impl Collider {
 
         // Determine the time of collision in the y-direction, or infinity if no collision
         let mut y_time = match self.velocity.y().partial_cmp(&other.velocity.y()) {
-            Some(Ordering::Less) => (other.rectangle.max_y() - self.rectangle.min_y())
+            Some(Ordering::Less) => (other.rectangle.max.y() - self.rectangle.min.y())
                 / (self.velocity.y() - other.velocity.y()),
-            Some(Ordering::Greater) => (self.rectangle.max_y() - other.rectangle.min_y())
+            Some(Ordering::Greater) => (self.rectangle.max.y() - other.rectangle.min.y())
                 / (other.velocity.y() - self.velocity.y()),
             _ => f32::NAN
         };
@@ -226,8 +226,8 @@ impl Collider {
             // Ensure that collision occurs in the x-direction as well
             let self_dx = self.velocity.x() * y_time;
             let other_dx = other.velocity.x() * y_time;
-            if self.rectangle.min_x() + self_dx >= other.rectangle.max_x() + other_dx
-                || self.rectangle.max_x() + self_dx <= other.rectangle.min_x() + other_dx
+            if self.rectangle.min.x() + self_dx >= other.rectangle.max.x() + other_dx
+                || self.rectangle.max.x() + self_dx <= other.rectangle.min.x() + other_dx
             {
                 y_time = f32::INFINITY;
             }
@@ -306,7 +306,7 @@ impl Physics {
             // Double-check that there is still a broad phase intersection between the colliders.
             // This is necessary because the colliders' velocities may have changed since the
             // initial sweep (due to previous collisions).
-            if !collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
+            if !collider_1.broad_phase(dt).intersects_inclusive(&collider_2.broad_phase(dt)) {
                 continue;
             }
 
@@ -372,7 +372,7 @@ impl Physics {
                 // check if there is broad phase intersection. The broad phase is a
                 // rectangle encompassing the projected motion of a collider, so if their
                 // broad phases don't intersect, we can discard the pair.
-                if !collider_1.broad_phase(dt).intersects(&collider_2.broad_phase(dt)) {
+                if !collider_1.broad_phase(dt).intersects_inclusive(&collider_2.broad_phase(dt)) {
                     continue;
                 }
                 // Now, check for an actual collision between the two colliders.

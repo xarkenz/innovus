@@ -42,14 +42,14 @@ impl EntityImage {
         let animation = ImageAnimation::try_parse(key, &metadata["animation"])?;
         let mut atlas_base_region = atlas_region;
         if let Some(ImageAnimation { frame_count, .. }) = animation {
-            if frame_count == 0 || atlas_region.height() % frame_count != 0 {
-                return Err(format!("invalid frame count for {key}: image height ({}) not divisible by animation.frame_count ({frame_count})", atlas_region.height()));
+            if frame_count == 0 || atlas_region.y_span() % frame_count != 0 {
+                return Err(format!("invalid frame count for {key}: image height ({}) not divisible by animation.frame_count ({frame_count})", atlas_region.y_span()));
             }
-            atlas_base_region.set_max_y(atlas_region.min_y() + atlas_region.height() / frame_count);
+            atlas_base_region.max.set_y(atlas_region.min.y() + atlas_region.y_span() / frame_count);
         }
 
         Ok(Self {
-            world_offset: Rectangle::from_size(
+            world_offset: Rectangle::from_span(
                 Vector([x, y]).div(16.0),
                 Vector([width, height]).div(16.0),
             ),

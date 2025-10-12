@@ -46,14 +46,14 @@ impl Default for ParticleInfo {
 
 pub struct ParticleManager {
     active_particles: Vec<ParticleInfo>,
-    geometry: MeshRenderer<Vertex2D>,
+    mesh: MeshRenderer<Vertex2D>,
 }
 
 impl ParticleManager {
     pub fn new() -> Self {
         Self {
             active_particles: Vec::new(),
-            geometry: MeshRenderer::create().unwrap(),
+            mesh: MeshRenderer::create(),
         }
     }
 
@@ -83,7 +83,7 @@ impl ParticleManager {
             Vector([1.0, 0.0]), // Bottom right
         ];
 
-        self.geometry.clear();
+        self.mesh.clear();
         let mut vertices = Vec::new();
         let mut triangles = Vec::new();
         for particle in &self.active_particles {
@@ -101,8 +101,8 @@ impl ParticleManager {
         }
 
         if !vertices.is_empty() {
-            self.geometry.add(&vertices, &triangles);
-            self.geometry.render();
+            self.mesh.add(&vertices, &triangles);
+            self.mesh.render();
         }
     }
 }

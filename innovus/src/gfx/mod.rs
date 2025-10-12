@@ -997,11 +997,27 @@ pub struct MeshRenderer<V: Vertex> {
 }
 
 impl<V: Vertex> MeshRenderer<V> {
-    pub fn create() -> Result<Self, String> {
+    pub fn create() -> Self {
         Self::create_with(Mesh::new())
     }
 
-    pub fn create_with(mesh: Mesh<V>) -> Result<Self, String> {
+    pub fn create_with(mesh: Mesh<V>) -> Self {
+        // Ensure the length of V::ATTRIBUTES does not exceed the limit (which must be at least 16,
+        // according to the OpenGL reference)
+        if V::ATTRIBUTES.len() > 16 {
+            let mut max_vertex_attributes: GLint = 0;
+            unsafe {
+                gl::GetIntegerv(gl::MAX_VERTEX_ATTRIBS, &mut max_vertex_attributes);
+            }
+            if V::ATTRIBUTES.len() > max_vertex_attributes as usize {
+                panic!(
+                    "the length of {}::ATTRIBUTES ({}) exceeds the OpenGL limit on this device ({max_vertex_attributes})",
+                    std::any::type_name::<V>(),
+                    V::ATTRIBUTES.len(),
+                );
+            }
+        }
+
         let mut renderer = Self {
             vertex_array_id: 0,
             vertex_buffer_id: 0,
@@ -1011,21 +1027,12 @@ impl<V: Vertex> MeshRenderer<V> {
 
         unsafe {
             gl::GenVertexArrays(1, &mut renderer.vertex_array_id);
-            if renderer.vertex_array_id == 0 {
-                return Err("failed to create GL vertex array object.".into());
-            }
             gl::BindVertexArray(renderer.vertex_array_id);
 
             gl::GenBuffers(1, &mut renderer.vertex_buffer_id);
-            if renderer.vertex_buffer_id == 0 {
-                return Err("failed to create GL vertex buffer object.".into());
-            }
             gl::BindBuffer(gl::ARRAY_BUFFER, renderer.vertex_buffer_id);
 
             gl::GenBuffers(1, &mut renderer.element_buffer_id);
-            if renderer.element_buffer_id == 0 {
-                return Err("failed to create GL element buffer object.".into());
-            }
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, renderer.element_buffer_id);
 
             for (index, attribute) in V::ATTRIBUTES.iter().enumerate() {
@@ -1040,7 +1047,7 @@ impl<V: Vertex> MeshRenderer<V> {
                             attribute.offset as *const GLvoid,
                         );
                     }
-                    _ => {
+                    VertexAttributeType::F32 => {
                         gl::VertexAttribPointer(
                             index as GLuint,
                             attribute.component_count as GLint,
@@ -1062,7 +1069,7 @@ impl<V: Vertex> MeshRenderer<V> {
         renderer.upload_vertex_buffer();
         renderer.upload_element_buffer();
 
-        Ok(renderer)
+        renderer
     }
 
     pub fn vertex_array_id(&self) -> GLuint {
@@ -1184,8 +1191,7 @@ impl<V: Vertex> MeshRenderer<V> {
                     gl::ARRAY_BUFFER,
                     (slice.first_vertex * size_of::<V>()) as GLintptr,
                     (slice.vertex_count * size_of::<V>()) as GLsizeiptr,
-                    self.vertices()[slice.first_vertex..(slice.first_vertex + slice.vertex_count)]
-                        .as_ptr() as *const GLvoid,
+                    &raw const self.vertices()[slice.first_vertex] as *const GLvoid,
                 );
                 gl::BindBuffer(gl::ARRAY_BUFFER, 0);
             }
@@ -1197,8 +1203,7 @@ impl<V: Vertex> MeshRenderer<V> {
                     gl::ELEMENT_ARRAY_BUFFER,
                     (slice.first_triangle * size_of::<[u32; 3]>()) as GLintptr,
                     (slice.triangle_count * size_of::<[u32; 3]>()) as GLsizeiptr,
-                    self.triangles()[slice.first_triangle..(slice.first_triangle + slice.triangle_count)]
-                        .as_ptr() as *const GLvoid,
+                    &raw const self.triangles()[slice.first_triangle] as *const GLvoid,
                 );
                 gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
             }
@@ -1423,17 +1428,25 @@ impl ImageAtlas {
     }
 }
 
-#[repr(u32)]
-#[non_exhaustive]
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum TextureSampling {
-    Nearest = gl::NEAREST,
-    Linear = gl::LINEAR,
+impl Default for ImageAtlas {
+    fn default() -> Self {
+        Self::new(ImageAtlasFlow::default())
+    }
 }
 
 #[repr(u32)]
-#[non_exhaustive]
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum TextureSampling {
+    Nearest = gl::NEAREST,
+    Linear = gl::LINEAR,
+    NearestMipmapThenNearest = gl::NEAREST_MIPMAP_NEAREST,
+    NearestMipmapThenLinear = gl::LINEAR_MIPMAP_NEAREST,
+    LinearMipmapThenNearest = gl::NEAREST_MIPMAP_LINEAR,
+    LinearMipmapThenLinear = gl::LINEAR_MIPMAP_LINEAR,
+}
+
+#[repr(u32)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TextureWrap {
     ClampToEdge = gl::CLAMP_TO_EDGE,
     ClampToBorder = gl::CLAMP_TO_BORDER,
@@ -1490,6 +1503,9 @@ impl Texture2D {
     }
 
     pub fn set_magnify_sampling(&mut self, sampling: TextureSampling) {
+        let (TextureSampling::Nearest | TextureSampling::Linear) = sampling else {
+            panic!("{sampling:?} is not allowed for set_magnify_sampling");
+        };
         self.set_parameter_i32(gl::TEXTURE_MAG_FILTER, sampling as i32);
     }
 
@@ -1517,7 +1533,7 @@ impl Texture2D {
                 gl::UNSIGNED_BYTE,
                 std::ptr::null(),
             );
-            // Download the image onto the texture
+            // Upload the image onto the texture
             gl::TexSubImage2D(
                 gl::TEXTURE_2D,
                 0,

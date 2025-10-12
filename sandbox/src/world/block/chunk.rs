@@ -10,7 +10,10 @@ use super::*;
 pub const CHUNK_SIZE: usize = 16;
 
 pub fn resolve_relative_coordinate(value: isize) -> (i64, usize) {
-    (value.div_euclid(CHUNK_SIZE as isize) as i64, value.rem_euclid(CHUNK_SIZE as isize) as usize)
+    (
+        value.div_euclid(CHUNK_SIZE as isize) as i64,
+        value.rem_euclid(CHUNK_SIZE as isize) as usize,
+    )
 }
 
 pub fn light_value(effective_light: u8) -> f32 {
@@ -30,7 +33,10 @@ pub struct BlockCoord {
 
 impl BlockCoord {
     pub fn new(chunk: i64, offset: usize) -> Self {
-        Self { chunk, offset }
+        Self {
+            chunk,
+            offset,
+        }
     }
 }
 
@@ -109,7 +115,7 @@ impl Chunk {
             block_slots: Default::default(),
             collision_map: None,
             render_all: true,
-            mesh: MeshRenderer::create().unwrap(),
+            mesh: MeshRenderer::create(),
             height_map: Default::default(),
         }
     }
@@ -424,12 +430,12 @@ impl Chunk {
             .map(|&bounds| {
                 let mut collider_bounds = Rectangle::new(
                     Vector([
-                        bounds.min_x() as f32 / 32.0,
-                        bounds.min_y() as f32 / 32.0,
+                        bounds.min.x() as f32 / 32.0,
+                        bounds.min.y() as f32 / 32.0,
                     ]),
                     Vector([
-                        bounds.max_x() as f32 / 32.0,
-                        bounds.max_y() as f32 / 32.0,
+                        bounds.max.x() as f32 / 32.0,
+                        bounds.max.y() as f32 / 32.0,
                     ]),
                 );
                 collider_bounds.shift_by(block_origin);
@@ -512,16 +518,16 @@ impl ChunkMap {
 
         let mut chunk_load_range = self.chunk_load_range;
         chunk_load_range.shift_by(center_chunk_location);
-        for chunk_y in chunk_load_range.min_y() ..= chunk_load_range.max_y() {
-            for chunk_x in chunk_load_range.min_x() ..= chunk_load_range.max_x() {
+        for chunk_y in chunk_load_range.min.y() ..= chunk_load_range.max.y() {
+            for chunk_x in chunk_load_range.min.x() ..= chunk_load_range.max.x() {
                 self.get_or_load_cell(Vector([chunk_x, chunk_y]), physics);
             }
         }
 
         let mut chunk_simulate_range = self.chunk_simulate_range;
         chunk_simulate_range.shift_by(center_chunk_location);
-        for chunk_y in chunk_simulate_range.min_y() ..= chunk_simulate_range.max_y() {
-            for chunk_x in chunk_simulate_range.min_x() ..= chunk_simulate_range.max_x() {
+        for chunk_y in chunk_simulate_range.min.y() ..= chunk_simulate_range.max.y() {
+            for chunk_x in chunk_simulate_range.min.x() ..= chunk_simulate_range.max.x() {
                 if let Some(mut chunk) = self.get_mut(Vector([chunk_x, chunk_y])) {
                     chunk.attach_physics(physics);
                 }

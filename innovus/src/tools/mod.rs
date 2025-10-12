@@ -1,4 +1,4 @@
-use num::{Float, Signed};
+use num::Float;
 use std::ops::*;
 use std::iter::Sum;
 use num::traits::{NumAssign, One, Zero};
@@ -12,21 +12,36 @@ pub struct Vector<T, const N: usize>(
     pub [T; N],
 );
 
-impl<T, const N: usize> Copy for Vector<T, N>
-where
-    T: Copy,
-{}
-
-impl<T, const N: usize> Clone for Vector<T, N>
-where
-    T: Clone,
-{
-    fn clone(&self) -> Self {
-        Vector(self.0.clone())
-    }
-}
-
 impl<T, const N: usize> Vector<T, N> {
+    pub fn zero() -> Self
+    where
+        T: Zero,
+    {
+        Self(std::array::from_fn(|_| T::zero()))
+    }
+
+    pub fn one() -> Self
+    where
+        T: One,
+    {
+        Self(std::array::from_fn(|_| T::one()))
+    }
+
+    pub const fn filled(value: T) -> Self
+    where
+        T: Copy,
+    {
+        Self([value; N])
+    }
+
+    pub fn as_ptr(&self) -> *const T {
+        self.0.as_ptr()
+    }
+
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        self.0.as_mut_ptr()
+    }
+
     pub fn map<F, U>(self, f: F) -> Vector<U, N>
     where
         F: FnMut(T) -> U,
@@ -49,44 +64,15 @@ impl<T, const N: usize> Vector<T, N> {
     {
         self.map(|lhs| lhs / rhs)
     }
-}
 
-impl<T, const N: usize> Vector<T, N>
-where
-    T: Copy + Zero,
-{
-    pub fn zero() -> Self {
-        Self([T::zero(); N])
-    }
-}
-
-impl<T, const N: usize> Vector<T, N>
-where
-    T: Copy + One,
-{
-    pub fn one() -> Self {
-        Self([T::one(); N])
-    }
-}
-
-impl<T, const N: usize> Vector<T, N>
-where
-    T: Copy,
-{
-    pub const fn filled(value: T) -> Self {
-        Self([value; N])
-    }
-}
-
-impl<T, const N: usize> Vector<T, N>
-where
-    T: Mul,
-{
-    pub fn dot<U>(self, rhs: Self) -> U
+    pub fn dot<Rhs>(self, rhs: Vector<Rhs, N>) -> <T as Mul<Rhs>>::Output
     where
-        U: Sum<<T as Mul>::Output>,
+        T: Mul<Rhs>,
+        <T as Mul<Rhs>>::Output: Sum,
     {
-        std::iter::zip(self.0, rhs.0).map(|(a, b)| a * b).sum()
+        std::iter::zip(self.0, rhs.0)
+            .map(|(lhs, rhs)| lhs * rhs)
+            .sum()
     }
 }
 
@@ -95,7 +81,7 @@ where
     T: Copy + Float + Sum,
 {
     pub fn magnitude(&self) -> T {
-        self.dot::<T>(*self).sqrt()
+        self.dot(*self).sqrt()
     }
 
     pub fn normalized(&self) -> Self {
@@ -234,6 +220,20 @@ where
     }
 }
 
+impl<T, const N: usize> Copy for Vector<T, N>
+where
+    T: Copy,
+{}
+
+impl<T, const N: usize> Clone for Vector<T, N>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Vector(self.0.clone())
+    }
+}
+
 impl<T, const N: usize> PartialEq for Vector<T, N>
 where
     T: PartialEq,
@@ -252,12 +252,12 @@ where
     }
 }
 
-impl<T: NumAssign + Copy, const N: usize> Eq for Vector<T, N>
+impl<T, const N: usize> Eq for Vector<T, N>
 where
     T: Eq,
 {}
 
-impl<T: NumAssign + Copy, const N: usize> Ord for Vector<T, N>
+impl<T, const N: usize> Ord for Vector<T, N>
 where
     T: Ord,
 {
@@ -294,6 +294,15 @@ where
 
     fn neg(self) -> Self::Output {
         Vector(self.0.map(|x| -x))
+    }
+}
+
+impl<T, const N: usize> Sum for Vector<T, N>
+where
+    T: Zero + Add<Output = T>,
+{
+    fn sum<I: Iterator<Item = Vector<T, N>>>(iter: I) -> Self {
+        iter.reduce(|lhs, rhs| lhs + rhs).unwrap_or(Vector::zero())
     }
 }
 
@@ -415,94 +424,80 @@ where
 }
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
-pub struct Matrix<T: Float + NumAssign, const R: usize, const C: usize>(
+pub struct Matrix<T, const R: usize, const C: usize>(
     pub [Vector<T, R>; C],
 );
 
-#[allow(type_alias_bounds)]
-pub type Transform2D<T: Float + NumAssign> = Matrix<T, 3, 3>;
+pub type Transform2D<T> = Matrix<T, 3, 3>;
 
-#[allow(type_alias_bounds)]
-pub type Transform3D<T: Float + NumAssign> = Matrix<T, 4, 4>;
+pub type Transform3D<T> = Matrix<T, 4, 4>;
 
-impl<T: Float + NumAssign, const R: usize, const C: usize> Matrix<T, R, C> {
-    pub fn zero() -> Self {
-        Matrix([Vector::zero(); C])
+impl<T, const R: usize, const C: usize> Copy for Matrix<T, R, C>
+where
+    T: Copy,
+{}
+
+impl<T, const R: usize, const C: usize> Clone for Matrix<T, R, C>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Matrix(self.0.clone())
+    }
+}
+
+impl<T, const R: usize, const C: usize> Matrix<T, R, C> {
+    pub fn zero() -> Self
+    where
+        T: Zero,
+    {
+        Matrix(std::array::from_fn(|_| Vector::zero()))
     }
 
-    pub fn content(&self) -> [Vector<T, R>; C] {
-        self.0
-    }
-
-    pub fn at(&self, row: usize, col: usize) -> T {
-        self.0[col][row]
-    }
-
-    pub fn set(&mut self, row: usize, col: usize, value: T) {
-        self.0[col][row] = value;
+    pub fn set_zero(&mut self)
+    where
+        T: Zero,
+    {
+        self.0.fill_with(Vector::zero);
     }
 
     pub fn as_ptr(&self) -> *const T {
         self.0.as_ptr() as *const T
     }
 
-    pub fn fill_zero(&mut self) {
-        self.0.fill(Vector::zero());
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        self.0.as_mut_ptr() as *mut T
     }
 
-    pub fn swap_rows(&mut self, row1: usize, row2: usize) {
-        for col in 0..C {
-            self[col].0.swap(row1, row2);
-        }
+    pub fn map_columns<F, U, const N: usize>(self, f: F) -> Matrix<U, N, C>
+    where
+        F: FnMut(Vector<T, R>) -> Vector<U, N>,
+    {
+        Matrix(self.0.map(f))
     }
 
-    pub fn mul_row(&mut self, row: usize, value: T) {
-        for col in 0..C {
-            self[col][row] *= value;
-        }
+    pub fn mul<Rhs>(self, rhs: Rhs) -> Matrix<<T as Mul<Rhs>>::Output, R, C>
+    where
+        Rhs: Copy,
+        T: Mul<Rhs>,
+    {
+        self.map_columns(|lhs| lhs.mul(rhs))
     }
 
-    pub fn div_row(&mut self, row: usize, value: T) {
-        for col in 0..C {
-            self[col][row] /= value;
-        }
-    }
-
-    pub fn add_row(&mut self, row: usize, from: usize, mul: T) {
-        for col in 0..C {
-            let to_add = self[col][from] * mul;
-            self[col][row] += to_add;
-        }
-    }
-
-    pub fn rref(&self) -> Self {
-        let mut output = *self;
-        let mut target_row: usize = 0;
-        for col in 0..C {
-            if target_row >= R {
-                break;
-            }
-            for row in target_row..R {
-                if !output[col][row].is_zero() {
-                    output.swap_rows(row, target_row);
-                    output.div_row(target_row, output[col][target_row]);
-                    for cancel_row in 0..R {
-                        if cancel_row != target_row && !output[col][cancel_row].is_zero() {
-                            output.add_row(cancel_row, target_row, -output[col][cancel_row]);
-                        }
-                    }
-                    target_row += 1;
-                    break;
-                }
-            }
-        }
-        output
+    pub fn div<Rhs>(self, rhs: Rhs) -> Matrix<<T as Div<Rhs>>::Output, R, C>
+    where
+        Rhs: Copy,
+        T: Div<Rhs>,
+    {
+        self.map_columns(|lhs| lhs.div(rhs))
     }
 }
 
-impl<T: Float + NumAssign, const N: usize> Matrix<T, N, N> {
-    pub fn identity() -> Self {
+impl<T, const N: usize> Matrix<T, N, N> {
+    pub fn identity() -> Self
+    where
+        T: Copy + Zero + One,
+    {
         let mut matrix = Matrix::zero();
         for n in 0..N {
             matrix[n][n] = T::one();
@@ -510,20 +505,38 @@ impl<T: Float + NumAssign, const N: usize> Matrix<T, N, N> {
         matrix
     }
 
-    pub fn reset_to_identity(&mut self) {
-        self.fill_zero();
+    pub fn set_identity(&mut self)
+    where
+        T: Copy + Zero + One,
+    {
+        self.set_zero();
         for n in 0..N {
             self[n][n] = T::one();
         }
     }
+
+    pub fn transpose(&mut self) {
+        if N <= 1 {
+            return;
+        }
+        for i in 0..N - 1 {
+            for j in 1..N {
+                let [col_i, col_j] = self.0.get_disjoint_mut([i, j]).unwrap();
+                std::mem::swap(&mut col_i[j], &mut col_j[i]);
+            }
+        }
+    }
 }
 
-impl<T: Float + NumAssign + Sum> Transform3D<T> {
+impl<T> Transform3D<T>
+where
+    T: Float + NumAssign + Sum,
+{
     pub fn affine(&self) -> Matrix<T, 3, 3> {
         Matrix([
-            Vector([self[0][0], self[0][1], self[0][2]]),
-            Vector([self[1][0], self[1][1], self[1][2]]),
-            Vector([self[2][0], self[2][1], self[2][2]]),
+            self[0].xyz(),
+            self[1].xyz(),
+            self[2].xyz(),
         ])
     }
 
@@ -637,7 +650,7 @@ impl<T: Float + NumAssign + Sum> Transform3D<T> {
         self[0].0 = [right.x(), up.x(), forward.x(), T::zero()];
         self[1].0 = [right.y(), up.y(), forward.y(), T::zero()];
         self[2].0 = [right.z(), up.z(), forward.z(), T::zero()];
-        self[3].0 = [-right.dot::<T>(eye), -up.dot::<T>(eye), -forward.dot::<T>(eye), T::one()];
+        self[3].0 = [-right.dot(eye), -up.dot(eye), -forward.dot(eye), T::one()];
     }
 
     pub fn new_look_at(eye: Vector<T, 3>, center: Vector<T, 3>, up: Vector<T, 3>) -> Self {
@@ -692,9 +705,39 @@ impl<T: Float + NumAssign + Sum> Transform3D<T> {
     }
 }
 
-impl<T: Float + NumAssign, const R: usize, const C: usize> Index<usize>
-    for Matrix<T, R, C>
+impl<T, const R: usize, const C: usize> PartialEq for Matrix<T, R, C>
+where
+    T: PartialEq,
 {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<T, const R: usize, const C: usize> PartialOrd for Matrix<T, R, C>
+where
+    T: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<T, const R: usize, const C: usize> Eq for Matrix<T, R, C>
+where
+    T: Eq,
+{}
+
+impl<T, const R: usize, const C: usize> Ord for Matrix<T, R, C>
+where
+    T: Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl<T, const R: usize, const C: usize> Index<usize> for Matrix<T, R, C> {
     type Output = Vector<T, R>;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -702,346 +745,381 @@ impl<T: Float + NumAssign, const R: usize, const C: usize> Index<usize>
     }
 }
 
-impl<T: Float + NumAssign, const R: usize, const C: usize> IndexMut<usize>
-    for Matrix<T, R, C>
-{
+impl<T, const R: usize, const C: usize> IndexMut<usize> for Matrix<T, R, C> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         self.0.index_mut(index)
     }
 }
 
-impl<T: Signed + Float + NumAssign, const R: usize, const C: usize> Neg
-    for Matrix<T, R, C>
+impl<T, const R: usize, const C: usize> Neg for Matrix<T, R, C>
+where
+    T: Neg,
 {
-    type Output = Self;
+    type Output = Matrix<<T as Neg>::Output, R, C>;
 
     fn neg(self) -> Self::Output {
         Matrix(self.0.map(|v| -v))
     }
 }
 
-impl<T: Float + NumAssign, const R: usize, const C: usize> Mul<T> for Matrix<T, R, C> {
-    type Output = Self;
+impl<Lhs, Rhs, const R: usize, const C: usize> Mul<Vector<Rhs, C>> for Matrix<Lhs, R, C>
+where
+    Lhs: Mul<Rhs>,
+    Rhs: Copy,
+    <Lhs as Mul<Rhs>>::Output: Zero + Sum,
+{
+    type Output = Vector<<Lhs as Mul<Rhs>>::Output, R>;
 
-    fn mul(self, rhs: T) -> Self::Output {
-        let mut output = self;
+    fn mul(self, rhs: Vector<Rhs, C>) -> Self::Output {
+        std::iter::zip(self.0, rhs.0)
+            .map(|(lhs, rhs)| lhs.mul(rhs))
+            .sum()
+    }
+}
+
+impl<Lhs, Rhs, const R: usize, const N: usize, const C: usize> Mul<Matrix<Rhs, N, C>> for Matrix<Lhs, R, N>
+where
+    Lhs: Copy + Mul<Rhs>,
+    Rhs: Copy,
+    <Lhs as Mul<Rhs>>::Output: Zero + Sum,
+{
+    type Output = Matrix<<Lhs as Mul<Rhs>>::Output, R, C>;
+
+    fn mul(self, rhs: Matrix<Rhs, N, C>) -> Self::Output {
+        rhs.map_columns(|rhs| self * rhs)
+    }
+}
+
+impl<Lhs, Rhs, const R: usize, const C: usize> MulAssign<Matrix<Rhs, C, C>> for Matrix<Lhs, R, C>
+where
+    Lhs: Copy + Zero + Mul<Rhs, Output = Lhs> + Sum,
+    Rhs: Copy,
+{
+    fn mul_assign(&mut self, rhs: Matrix<Rhs, C, C>) {
+        let lhs = *self;
         for col in 0..C {
-            output[col] = output[col].mul(rhs);
-        }
-        output
-    }
-}
-
-impl<T: Float + NumAssign, const R: usize, const C: usize> Div<T> for Matrix<T, R, C> {
-    type Output = Self;
-
-    fn div(self, rhs: T) -> Self::Output {
-        let mut output = self;
-        for col in 0..C {
-            output[col] = output[col].div(rhs);
-        }
-        output
-    }
-}
-
-impl<T: Float + NumAssign, const R: usize, const C: usize> Mul<Vector<T, C>>
-    for Matrix<T, R, C>
-{
-    type Output = Vector<T, R>;
-
-    fn mul(self, rhs: Vector<T, C>) -> Self::Output {
-        let mut output = Vector::zero();
-        for col in 0..C {
-            output += self[col].mul(rhs[col]);
-        }
-        output
-    }
-}
-
-// help me.
-impl<T: Float + NumAssign, const R: usize, const C: usize> Mul<Vector<T, C>>
-    for &Matrix<T, R, C>
-{
-    type Output = <Matrix<T, R, C> as Mul<Vector<T, C>>>::Output;
-    fn mul(self, rhs: Vector<T, C>) -> Self::Output {
-        <Matrix<T, R, C> as Mul<Vector<T, C>>>::mul(*self, rhs)
-    }
-}
-
-impl<T: Float + NumAssign, const R: usize, const C: usize> Mul<Vector<T, C>>
-    for &mut Matrix<T, R, C>
-{
-    type Output = <Matrix<T, R, C> as Mul<Vector<T, C>>>::Output;
-    fn mul(self, rhs: Vector<T, C>) -> Self::Output {
-        <Matrix<T, R, C> as Mul<Vector<T, C>>>::mul(*self, rhs)
-    }
-}
-
-impl<T: Float + NumAssign, const R: usize, const N: usize, const C: usize>
-    Mul<Matrix<T, N, C>> for Matrix<T, R, N>
-{
-    type Output = Matrix<T, R, C>;
-
-    fn mul(self, rhs: Matrix<T, N, C>) -> Self::Output {
-        let mut output = Matrix::zero();
-        for col in 0..C {
-            output[col] = self * rhs[col];
-        }
-        output
-    }
-}
-
-impl<T: Float + NumAssign, const R: usize, const N: usize, const C: usize>
-    Mul<Matrix<T, N, C>> for &Matrix<T, R, N>
-{
-    type Output = <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::Output;
-
-    fn mul(self, rhs: Matrix<T, N, C>) -> Self::Output {
-        <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::mul(*self, rhs)
-    }
-}
-
-impl<T: Float + NumAssign, const R: usize, const N: usize, const C: usize>
-    Mul<Matrix<T, N, C>> for &mut Matrix<T, R, N>
-{
-    type Output = <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::Output;
-
-    fn mul(self, rhs: Matrix<T, N, C>) -> Self::Output {
-        <Matrix<T, R, N> as Mul<Matrix<T, N, C>>>::mul(*self, rhs)
-    }
-}
-
-impl<T: Float + NumAssign, const R: usize, const C: usize> MulAssign<Matrix<T, C, C>>
-    for Matrix<T, R, C>
-{
-    fn mul_assign(&mut self, rhs: Matrix<T, C, C>) {
-        let original = *self;
-        for col in 0..C {
-            self[col] = original * rhs[col];
+            self[col] = lhs * rhs[col];
         }
     }
 }
 
-impl<T: Float + NumAssign, const R: usize, const C: usize> MulAssign<Matrix<T, C, C>>
-    for &mut Matrix<T, R, C>
+impl<T> Mul<Vector<T, 3>> for Transform3D<T>
+where
+    T: Copy + Add<Output = T> + Mul<Output = T> + Div<Output = T>,
 {
-    fn mul_assign(&mut self, rhs: Matrix<T, C, C>) {
-        <Matrix<T, R, C> as MulAssign<Matrix<T, C, C>>>::mul_assign(*self, rhs)
-    }
-}
-
-impl<T: Float + NumAssign> Mul<Vector<T, 3>> for Transform3D<T> {
     type Output = Vector<T, 3>;
 
     fn mul(self, rhs: Vector<T, 3>) -> Self::Output {
-        let scale = T::one() / (
-            self[0][3] * rhs.x() + self[1][3] * rhs.y() + self[2][3] * rhs.z() + self[3][3]
-        );
+        let factor = self[0].w() * rhs.x() + self[1].w() * rhs.y() + self[2].w() * rhs.z() + self[3].w();
         Vector([
-            (self[0][0] * rhs.x() + self[1][0] * rhs.y() + self[2][0] * rhs.z() + self[3][0])
-                * scale,
-            (self[0][1] * rhs.x() + self[1][1] * rhs.y() + self[2][1] * rhs.z() + self[3][1])
-                * scale,
-            (self[0][2] * rhs.x() + self[1][2] * rhs.y() + self[2][2] * rhs.z() + self[3][2])
-                * scale,
+            (self[0].x() * rhs.x() + self[1].x() * rhs.y() + self[2].x() * rhs.z() + self[3].x()) / factor,
+            (self[0].y() * rhs.x() + self[1].y() * rhs.y() + self[2].y() * rhs.z() + self[3].y()) / factor,
+            (self[0].z() * rhs.x() + self[1].z() * rhs.y() + self[2].z() * rhs.z() + self[3].z()) / factor,
         ])
     }
 }
 
-impl<T: Float + NumAssign, const R: usize, const C: usize> std::fmt::Debug for Matrix<T, R, C> where T: std::fmt::Debug {
+impl<T, const R: usize, const C: usize> std::fmt::Debug for Matrix<T, R, C>
+where
+    T: std::fmt::Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Matrix{:?}", self.0)
     }
 }
 
-#[derive(Copy, PartialEq, Clone)]
-pub struct Rectangle<T: NumAssign + Copy> {
-    min: Vector<T, 2>,
-    max: Vector<T, 2>,
+pub struct Rectangle<T, const N: usize = 2> {
+    pub min: Vector<T, N>,
+    pub max: Vector<T, N>,
 }
 
-impl<T: NumAssign + Copy> Rectangle<T> {
-    pub const fn new(min: Vector<T, 2>, max: Vector<T, 2>) -> Self {
+impl<T, const N: usize> Rectangle<T, N> {
+    pub const fn new(min: Vector<T, N>, max: Vector<T, N>) -> Self {
         Self {
             min,
             max,
         }
     }
 
-    pub fn from_size(min: Vector<T, 2>, size: Vector<T, 2>) -> Self {
+    pub fn from_span(min: Vector<T, N>, span: Vector<T, N>) -> Self
+    where
+        T: Copy + Add<Output = T>,
+    {
         Self {
             min,
-            max: min + size,
+            max: min + span,
         }
     }
 
-    pub fn min(&self) -> Vector<T, 2> {
-        self.min
+    pub fn span(&self) -> Vector<T, N>
+    where
+        T: Copy + Sub<Output = T>,
+    {
+        self.max - self.min
     }
 
-    pub fn min_x(&self) -> T {
-        self.min.x()
+    pub fn axis_span(&self, axis: usize) -> T
+    where
+        T: Copy + Sub<Output = T>,
+    {
+        self.max[axis] - self.min[axis]
     }
 
-    pub fn min_y(&self) -> T {
-        self.min.y()
+    pub fn flip(&mut self) {
+        std::mem::swap(&mut self.min, &mut self.max);
     }
 
-    pub fn max(&self) -> Vector<T, 2> {
-        self.max
+    pub fn flip_axis(&mut self, axis: usize) {
+        std::mem::swap(&mut self.min[axis], &mut self.max[axis]);
     }
 
-    pub fn max_x(&self) -> T {
-        self.max.x()
-    }
-
-    pub fn max_y(&self) -> T {
-        self.max.y()
-    }
-
-    pub fn min_x_max_y(&self) -> Vector<T, 2> {
-        Vector([self.min_x(), self.max_y()])
-    }
-
-    pub fn max_x_min_y(&self) -> Vector<T, 2> {
-        Vector([self.max_x(), self.min_y()])
-    }
-
-    pub fn size(&self) -> Vector<T, 2> {
-        Vector([self.width(), self.height()])
-    }
-
-    pub fn width(&self) -> T {
-        self.max_x() - self.min_x()
-    }
-
-    pub fn height(&self) -> T {
-        self.max_y() - self.min_y()
-    }
-
-    pub fn set_min(&mut self, min: Vector<T, 2>) {
-        self.min = min;
-    }
-
-    pub fn set_min_x(&mut self, x: T) {
-        self.min.set_x(x);
-    }
-
-    pub fn set_min_y(&mut self, y: T) {
-        self.min.set_y(y);
-    }
-
-    pub fn set_max(&mut self, max: Vector<T, 2>) {
-        self.max = max;
-    }
-
-    pub fn set_max_x(&mut self, x: T) {
-        self.max.set_x(x);
-    }
-
-    pub fn set_max_y(&mut self, y: T) {
-        self.max.set_y(y);
-    }
-
-    pub fn shift_by(&mut self, amount: Vector<T, 2>) {
-        self.shift_x_by(amount.x());
-        self.shift_y_by(amount.y());
-    }
-
-    pub fn shift_x_by(&mut self, amount: T) {
-        self.min.set_x(self.min.x() + amount);
-        self.max.set_x(self.max.x() + amount);
-    }
-
-    pub fn shift_y_by(&mut self, amount: T) {
-        self.min.set_y(self.min.y() + amount);
-        self.max.set_y(self.max.y() + amount);
-    }
-
-    pub fn shift_min_to(&mut self, min: Vector<T, 2>) {
-        self.shift_min_x_to(min.x());
-        self.shift_min_y_to(min.y());
-    }
-
-    pub fn shift_min_x_to(&mut self, x: T) {
-        self.max.set_x(x + self.width());
-        self.min.set_x(x);
-    }
-
-    pub fn shift_min_y_to(&mut self, y: T) {
-        self.max.set_y(y + self.height());
-        self.min.set_y(y);
-    }
-
-    pub fn shift_max_to(&mut self, max: Vector<T, 2>) {
-        self.shift_max_x_to(max.x());
-        self.shift_max_y_to(max.y());
-    }
-
-    pub fn shift_max_x_to(&mut self, x: T) {
-        self.min.set_x(x - self.width());
-        self.max.set_x(x);
-    }
-
-    pub fn shift_max_y_to(&mut self, y: T) {
-        self.min.set_y(y - self.height());
-        self.max.set_y(y);
-    }
-
-    pub fn center(&self) -> Vector<T, 2> {
+    pub fn center(&self) -> Vector<T, N>
+    where
+        T: Copy + One + Add<Output = T> + Div<Output = T>
+    {
         (self.min + self.max).div(T::one() + T::one())
     }
 
+    pub fn shift_by(&mut self, amount: Vector<T, N>)
+    where
+        T: Copy + AddAssign,
+    {
+        self.min += amount;
+        self.max += amount;
+    }
+
+    pub fn shift_axis_by(&mut self, axis: usize, amount: T)
+    where
+        T: Copy + AddAssign,
+    {
+        self.min[axis] += amount;
+        self.max[axis] += amount;
+    }
+
+    pub fn shift_min_to(&mut self, target: Vector<T, N>)
+    where
+        T: Copy + AddAssign + Sub<Output = T>,
+    {
+        self.max += target - self.min;
+        self.min = target;
+    }
+
+    pub fn shift_min_axis_to(&mut self, axis: usize, target: T)
+    where
+        T: Copy + AddAssign + Sub<Output = T>,
+    {
+        self.max[axis] += target - self.min[axis];
+        self.min[axis] = target;
+    }
+
+    pub fn shift_max_to(&mut self, target: Vector<T, N>)
+    where
+        T: Copy + AddAssign + Sub<Output = T>,
+    {
+        self.min += target - self.max;
+        self.max = target;
+    }
+
+    pub fn shift_max_axis_to(&mut self, axis: usize, target: T)
+    where
+        T: Copy + AddAssign + Sub<Output = T>,
+    {
+        self.min[axis] += target - self.max[axis];
+        self.max[axis] = target;
+    }
+
+    pub fn expand_toward(&mut self, amount: Vector<T, N>)
+    where
+        T: Copy + Zero + AddAssign + PartialOrd,
+    {
+        for axis in 0..N {
+            self.expand_axis_toward(axis, amount[axis]);
+        }
+    }
+
+    pub fn expand_axis_toward(&mut self, axis: usize, amount: T)
+    where
+        T: Copy + Zero + AddAssign + PartialOrd,
+    {
+        if amount >= T::zero() {
+            self.max[axis] += amount;
+        }
+        else {
+            self.min[axis] += amount;
+        }
+    }
+
+    pub fn contains_inclusive(&self, point: Vector<T, N>) -> bool
+    where
+        T: PartialOrd,
+    {
+        std::iter::zip(&self.min.0, &self.max.0)
+            .zip(&point.0)
+            .all(|((min, max), value)| value >= min && value <= max)
+    }
+
+    pub fn contains_exclusive(&self, point: Vector<T, N>) -> bool
+    where
+        T: PartialOrd,
+    {
+        std::iter::zip(&self.min.0, &self.max.0)
+            .zip(&point.0)
+            .all(|((min, max), value)| value > min && value < max)
+    }
+
+    pub fn intersects_inclusive(&self, other: &Self) -> bool
+    where
+        T: PartialOrd,
+    {
+        std::iter::zip(
+            std::iter::zip(&self.min.0, &self.max.0),
+            std::iter::zip(&other.min.0, &other.max.0),
+        )
+            .all(|((self_min, self_max), (other_min, other_max))| {
+                self_max > other_min && self_min < other_max
+            })
+    }
+
+    pub fn intersects_exclusive(&self, other: &Self) -> bool
+    where
+        T: PartialOrd,
+    {
+        std::iter::zip(
+            std::iter::zip(&self.min.0, &self.max.0),
+            std::iter::zip(&other.min.0, &other.max.0),
+        )
+            .all(|((self_min, self_max), (other_min, other_max))| {
+                self_max > other_min && self_min < other_max
+            })
+    }
+}
+
+impl<T> Rectangle<T, 2> {
+    pub fn min_x_max_y(&self) -> Vector<T, 2>
+    where
+        T: Copy,
+    {
+        Vector([self.min.x(), self.max.y()])
+    }
+
+    pub fn max_x_min_y(&self) -> Vector<T, 2>
+    where
+        T: Copy,
+    {
+        Vector([self.max.x(), self.min.y()])
+    }
+
+    pub fn x_span(&self) -> T
+    where
+        T: Copy + Sub<Output = T>,
+    {
+        self.axis_span(0)
+    }
+
+    pub fn y_span(&self) -> T
+    where
+        T: Copy + Sub<Output = T>,
+    {
+        self.axis_span(1)
+    }
+
     pub fn flip_x(&mut self) {
-        std::mem::swap(&mut self.min[0], &mut self.max[0]);
+        self.flip_axis(0);
     }
 
     pub fn flip_y(&mut self) {
-        std::mem::swap(&mut self.min[1], &mut self.max[1]);
+        self.flip_axis(1);
+    }
+
+    pub fn shift_x_by(&mut self, amount: T)
+    where
+        T: Copy + AddAssign,
+    {
+        self.shift_axis_by(0, amount);
+    }
+
+    pub fn shift_y_by(&mut self, amount: T)
+    where
+        T: Copy + AddAssign,
+    {
+        self.shift_axis_by(1, amount);
+    }
+
+    pub fn shift_min_x_to(&mut self, target: T)
+    where
+        T: Copy + AddAssign + Sub<Output = T>,
+    {
+        self.shift_min_axis_to(0, target);
+    }
+
+    pub fn shift_min_y_to(&mut self, target: T)
+    where
+        T: Copy + AddAssign + Sub<Output = T>,
+    {
+        self.shift_min_axis_to(1, target);
+    }
+
+    pub fn shift_max_x_to(&mut self, target: T)
+    where
+        T: Copy + AddAssign + Sub<Output = T>,
+    {
+        self.shift_max_axis_to(0, target);
+    }
+
+    pub fn shift_max_y_to(&mut self, target: T)
+    where
+        T: Copy + AddAssign + Sub<Output = T>,
+    {
+        self.shift_max_axis_to(1, target);
+    }
+
+    pub fn expand_x_toward(&mut self, amount: T)
+    where
+        T: Copy + Zero + AddAssign + PartialOrd,
+    {
+        self.expand_axis_toward(0, amount);
+    }
+
+    pub fn expand_y_toward(&mut self, amount: T)
+    where
+        T: Copy + Zero + AddAssign + PartialOrd,
+    {
+        self.expand_axis_toward(1, amount);
     }
 }
 
-impl<T: NumAssign + Copy> Rectangle<T> where T: PartialOrd {
-    pub fn expand_toward(&mut self, amount: Vector<T, 2>) {
-        self.expand_x_toward(amount.x());
-        self.expand_y_toward(amount.y());
-    }
+impl<T, const N: usize> Copy for Rectangle<T, N>
+where
+    T: Copy,
+{}
 
-    pub fn expand_x_toward(&mut self, amount: T) {
-        if amount >= T::zero() {
-            self.set_max_x(self.max_x() + amount);
-        }
-        else {
-            self.set_min_x(self.min_x() + amount);
-        }
-    }
-
-    pub fn expand_y_toward(&mut self, amount: T) {
-        if amount >= T::zero() {
-            self.set_max_y(self.max_y() + amount);
-        }
-        else {
-            self.set_min_y(self.min_y() + amount);
-        }
-    }
-
-    pub fn contains_inclusive(&self, point: Vector<T, 2>) -> bool {
-        point.x() >= self.min_x() && point.x() <= self.max_x()
-            && point.y() >= self.min_y() && point.y() <= self.max_y()
-    }
-
-    pub fn contains_exclusive(&self, point: Vector<T, 2>) -> bool {
-        point.x() > self.min_x() && point.x() < self.max_x()
-            && point.y() > self.min_y() && point.y() < self.max_y()
-    }
-
-    pub fn intersects(&self, other: &Self) -> bool {
-        self.max_x() > other.min_x() && self.min_x() < other.max_x()
-            && self.max_y() > other.min_y() && self.min_y() < other.max_y()
+impl<T, const N: usize> Clone for Rectangle<T, N>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self::new(self.min.clone(), self.max.clone())
     }
 }
 
-impl<T: NumAssign + Copy> std::fmt::Debug for Rectangle<T> where T: std::fmt::Debug {
+impl<T, const N: usize> PartialEq for Rectangle<T, N>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.min == other.min && self.max == other.max
+    }
+}
+
+impl<T, const N: usize> Eq for Rectangle<T, N>
+where
+    T: Eq,
+{}
+
+impl<T> std::fmt::Debug for Rectangle<T>
+where
+    T: std::fmt::Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Rectangle")
             .field("min", &self.min)

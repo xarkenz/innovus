@@ -131,7 +131,7 @@ impl AssetPool {
         else {
             let loaded_image = self.load_image(format!("images/{key}"))?;
             let atlas_offset = self.gui_atlas.add_image(&loaded_image);
-            let atlas_region = Rectangle::from_size(atlas_offset, loaded_image.size());
+            let atlas_region = Rectangle::from_span(atlas_offset, loaded_image.size());
             self.gui_texture.upload_image(self.gui_atlas.image());
 
             self.gui_images.insert(key.into(), atlas_region);
@@ -180,7 +180,7 @@ impl AssetPool {
 
                     let loaded_image = self.load_image(&path)?;
                     let atlas_offset = self.block_atlas.add_image(&loaded_image);
-                    let atlas_region = Rectangle::from_size(atlas_offset, loaded_image.size());
+                    let atlas_region = Rectangle::from_span(atlas_offset, loaded_image.size());
 
                     let mut block_image;
                     if let Ok(metadata) = self.load_json(&path) {
@@ -236,7 +236,7 @@ impl AssetPool {
                 continue;
             };
             let atlas_offset = self.item_atlas.add_image(&loaded_image);
-            let atlas_region = Rectangle::from_size(atlas_offset, loaded_image.size());
+            let atlas_region = Rectangle::from_span(atlas_offset, loaded_image.size());
 
             self.item_images.insert(item_type, atlas_region);
         }
@@ -267,7 +267,7 @@ impl AssetPool {
 
             let loaded_image = self.load_image(&path)?;
             let atlas_offset = self.entity_atlas.add_image(&loaded_image);
-            let atlas_region = Rectangle::from_size(atlas_offset, loaded_image.size());
+            let atlas_region = Rectangle::from_span(atlas_offset, loaded_image.size());
             self.entity_texture.upload_image(self.entity_atlas.image());
 
             let metadata = self.load_json(&path)?;

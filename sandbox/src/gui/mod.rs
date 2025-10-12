@@ -38,7 +38,7 @@ impl GuiManager {
             cursor_offset: Vector::zero(),
             cursor_renderer: GuiCursor::new(Vector::zero(), Vector::zero(), &AIR),
             hotbar: hotbar::Hotbar::new(assets)?,
-            inventory: MeshRenderer::create()?,
+            inventory: MeshRenderer::create(),
             inventory_shown: false,
             fps_display: TextLineRenderer::create(
                 TextLine::new(
@@ -211,9 +211,9 @@ impl GuiManager {
             let to_f32 = |x: u32| x as f32;
             self.inventory.add(
                 &[
-                    GuiVertex::new(Vector([-106.0, -62.0]), None, Some(atlas_region.min().map(to_f32))),
+                    GuiVertex::new(Vector([-106.0, -62.0]), None, Some(atlas_region.min.map(to_f32))),
                     GuiVertex::new(Vector([-106.0, 62.0]), None, Some(atlas_region.min_x_max_y().map(to_f32))),
-                    GuiVertex::new(Vector([106.0, 62.0]), None, Some(atlas_region.max().map(to_f32))),
+                    GuiVertex::new(Vector([106.0, 62.0]), None, Some(atlas_region.max.map(to_f32))),
                     GuiVertex::new(Vector([106.0, -62.0]), None, Some(atlas_region.max_x_min_y().map(to_f32))),
                 ],
                 &[

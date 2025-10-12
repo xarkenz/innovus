@@ -68,7 +68,7 @@ impl ItemSlot {
         if self.image.is_none() {
             self.image = assets.get_item_image(self.item.item_type()).map(|atlas_region| {
                 GuiImage::new(
-                    Rectangle::from_size(Vector::zero(), Vector([16.0, 16.0])),
+                    Rectangle::from_span(Vector::zero(), Vector([16.0, 16.0])),
                     Vector::one(),
                     atlas_region,
                 )

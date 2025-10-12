@@ -17,7 +17,7 @@ impl GuiCursor {
             anchor,
             offset,
             item_type,
-            mesh: MeshRenderer::create().unwrap(),
+            mesh: MeshRenderer::create(),
         }
     }
 
@@ -57,7 +57,7 @@ impl GuiCursor {
                     GuiVertex::new(
                         self.offset + Vector([4.0, 4.0]),
                         None,
-                        Some(item_atlas_region.min().map(to_f32)),
+                        Some(item_atlas_region.min.map(to_f32)),
                     ),
                     GuiVertex::new(
                         self.offset + Vector([4.0, 20.0]),
@@ -67,7 +67,7 @@ impl GuiCursor {
                     GuiVertex::new(
                         self.offset + Vector([20.0, 20.0]),
                         None,
-                        Some(item_atlas_region.max().map(to_f32)),
+                        Some(item_atlas_region.max.map(to_f32)),
                     ),
                     GuiVertex::new(
                         self.offset + Vector([20.0, 4.0]),
@@ -91,7 +91,7 @@ impl GuiCursor {
                 GuiVertex::new(
                     self.offset + Vector([0.0, 0.0]),
                     None,
-                    Some(cursor_atlas_region.min().map(to_f32)),
+                    Some(cursor_atlas_region.min.map(to_f32)),
                 ),
                 GuiVertex::new(
                     self.offset + Vector([0.0, 16.0]),
@@ -101,7 +101,7 @@ impl GuiCursor {
                 GuiVertex::new(
                     self.offset + Vector([16.0, 16.0]),
                     None,
-                    Some(cursor_atlas_region.max().map(to_f32)),
+                    Some(cursor_atlas_region.max.map(to_f32)),
                 ),
                 GuiVertex::new(
                     self.offset + Vector([16.0, 0.0]),

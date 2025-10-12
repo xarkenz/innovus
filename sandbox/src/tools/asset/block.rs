@@ -143,11 +143,11 @@ impl BlockImage {
     pub fn set_atlas_region(&mut self, atlas_region: Rectangle<u32>) -> Result<(), String> {
         let expected_width = self.size * self.format.shape_count();
         let expected_height = self.size;
-        if atlas_region.width() != expected_width || atlas_region.height() != expected_height {
-            return Err(format!("unexpected image size for {}: expected {expected_width}x{expected_height}, got {}x{}", self.key, atlas_region.width(), atlas_region.height()));
+        if atlas_region.x_span() != expected_width || atlas_region.y_span() != expected_height {
+            return Err(format!("unexpected image size for {}: expected {expected_width}x{expected_height}, got {}x{}", self.key, atlas_region.x_span(), atlas_region.y_span()));
         }
 
-        self.atlas_offset = atlas_region.min();
+        self.atlas_offset = atlas_region.min;
         Ok(())
     }
 
