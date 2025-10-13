@@ -203,7 +203,7 @@ impl GuiManager {
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {
-        assets.gui_shaders().set_uniform("offset_scale", self.offset_scale);
+        assets.gui_shaders().set_uniform("offset_scale", &self.offset_scale);
         assets.gui_shaders().set_uniform("tex_atlas", assets.gui_texture());
 
         if self.inventory.is_empty() {
@@ -224,7 +224,7 @@ impl GuiManager {
         }
         if self.inventory_shown {
             assets.gui_texture().bind();
-            assets.gui_shaders().set_uniform("anchor", Vector([0.5f32, 0.5f32]));
+            assets.gui_shaders().set_uniform("anchor", &Vector([0.5f32, 0.5f32]));
             self.inventory.render();
             self.input_test.render(assets);
         }

@@ -286,14 +286,14 @@ fn main() {
         camera_proj.set_identity();
         camera_proj.perspective(90.0, width as f32 / height as f32, 1.0, 100.0);
 
-        shader_program.set_uniform("time", time);
-        shader_program.set_uniform("camera_pos", camera_pos);
-        shader_program.set_uniform("camera_view", camera_view);
-        shader_program.set_uniform("camera_proj", camera_proj);
-        shader_program.set_uniform("ambient_color", ambient_color);
-        shader_program.set_uniform("pt_light_pos", pt_light_pos);
-        shader_program.set_uniform("pt_light_color", pt_light_color);
-        shader_program.set_uniform("pt_light_power", 1.0_f32);
+        shader_program.set_uniform("time", &time);
+        shader_program.set_uniform("camera_pos", &camera_pos);
+        shader_program.set_uniform("camera_view", &camera_view);
+        shader_program.set_uniform("camera_proj", &camera_proj);
+        shader_program.set_uniform("ambient_color", &ambient_color);
+        shader_program.set_uniform("pt_light_pos", &pt_light_pos);
+        shader_program.set_uniform("pt_light_color", &pt_light_color);
+        shader_program.set_uniform("pt_light_power", &1.0_f32);
         shader_program.set_uniform("tex_atlas", &test_tex);
 
         screen::clear();

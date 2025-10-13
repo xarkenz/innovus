@@ -46,7 +46,7 @@ impl GuiCursor {
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {
-        assets.gui_shaders().set_uniform("anchor", self.anchor);
+        assets.gui_shaders().set_uniform("anchor", &self.anchor);
         let cursor_atlas_region = assets.get_gui_image("gui/cursor").unwrap();
         let to_f32 = |x: u32| x as f32;
 

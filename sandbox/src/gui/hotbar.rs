@@ -117,7 +117,7 @@ impl Hotbar {
             self.foreground_layer.upload_buffers();
         }
 
-        assets.gui_shaders().set_uniform("anchor", self.anchor);
+        assets.gui_shaders().set_uniform("anchor", &self.anchor);
         assets.gui_texture().bind();
         self.background_layer.render();
         assets.item_texture().bind();

@@ -250,7 +250,7 @@ impl TextLineRenderer {
             self.mesh.upload_buffers();
 
             assets.gui_texture().bind();
-            assets.gui_shaders().set_uniform("anchor", self.anchor);
+            assets.gui_shaders().set_uniform("anchor", &self.anchor);
             self.mesh.render();
         }
     }

@@ -95,138 +95,101 @@ impl Drop for Shader {
 }
 
 pub trait ShaderUniformType {
-    fn upload_uniform(self, location: GLint);
+    fn upload_uniform(&self, location: GLint);
 }
 
-impl ShaderUniformType for GLfloat {
-    fn upload_uniform(self, location: GLint) {
+macro_rules! impl_scalar_shader_uniform {
+    ($t:ty, $f1:ident, $fv:ident) => {
+        impl ShaderUniformType for $t {
+            fn upload_uniform(&self, location: GLint) {
+                unsafe {
+                    gl::$f1(location, *self);
+                }
+            }
+        }
+
+        impl ShaderUniformType for [$t] {
+            fn upload_uniform(&self, location: GLint) {
+                unsafe {
+                    gl::$fv(location, self.len() as GLsizei, self.as_ptr() as *const _);
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_vector_shader_uniform {
+    ($t:ty, $n:expr, $f:ident) => {
+        impl ShaderUniformType for Vector<$t, $n> {
+            fn upload_uniform(&self, location: GLint) {
+                unsafe {
+                    gl::$f(location, 1, self.as_ptr() as *const _);
+                }
+            }
+        }
+
+        impl ShaderUniformType for [Vector<$t, $n>] {
+            fn upload_uniform(&self, location: GLint) {
+                unsafe {
+                    gl::$f(location, self.len() as GLsizei, self.as_ptr() as *const _);
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_matrix_shader_uniform {
+    ($t:ty, $r:expr, $c:expr, $f:ident) => {
+        impl ShaderUniformType for Matrix<$t, $r, $c> {
+            fn upload_uniform(&self, location: GLint) {
+                unsafe {
+                    gl::$f(location, 1, gl::FALSE, self.as_ptr() as *const _);
+                }
+            }
+        }
+
+        impl ShaderUniformType for [Matrix<$t, $r, $c>] {
+            fn upload_uniform(&self, location: GLint) {
+                unsafe {
+                    gl::$f(location, self.len() as GLsizei, gl::FALSE, self.as_ptr() as *const _);
+                }
+            }
+        }
+    };
+}
+
+impl_scalar_shader_uniform!(f32, Uniform1f, Uniform1fv);
+impl_scalar_shader_uniform!(i32, Uniform1i, Uniform1iv);
+impl_scalar_shader_uniform!(u32, Uniform1ui, Uniform1uiv);
+impl_vector_shader_uniform!(f32, 2, Uniform2fv);
+impl_vector_shader_uniform!(f32, 3, Uniform3fv);
+impl_vector_shader_uniform!(f32, 4, Uniform4fv);
+impl_vector_shader_uniform!(i32, 2, Uniform2iv);
+impl_vector_shader_uniform!(i32, 3, Uniform3iv);
+impl_vector_shader_uniform!(i32, 4, Uniform4iv);
+impl_vector_shader_uniform!(u32, 2, Uniform2uiv);
+impl_vector_shader_uniform!(u32, 3, Uniform3uiv);
+impl_vector_shader_uniform!(u32, 4, Uniform4uiv);
+impl_matrix_shader_uniform!(f32, 2, 2, UniformMatrix2fv);
+impl_matrix_shader_uniform!(f32, 3, 3, UniformMatrix3fv);
+impl_matrix_shader_uniform!(f32, 4, 4, UniformMatrix4fv);
+impl_matrix_shader_uniform!(f32, 4, 2, UniformMatrix2x4fv);
+impl_matrix_shader_uniform!(f32, 2, 4, UniformMatrix4x2fv);
+impl_matrix_shader_uniform!(f32, 4, 3, UniformMatrix3x4fv);
+impl_matrix_shader_uniform!(f32, 3, 4, UniformMatrix4x3fv);
+
+impl ShaderUniformType for bool {
+    fn upload_uniform(&self, location: GLint) {
         unsafe {
-            gl::Uniform1f(location, self as GLfloat);
+            gl::Uniform1ui(location, *self as GLuint);
         }
     }
 }
 
-impl ShaderUniformType for GLint {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::Uniform1i(location, self as GLint);
-        }
-    }
-}
-
-impl ShaderUniformType for GLuint {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::Uniform1ui(location, self as GLuint);
-        }
-    }
-}
-
-impl ShaderUniformType for GLboolean {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::Uniform1ui(location, self as GLuint);
-        }
-    }
-}
-
-impl ShaderUniformType for Vector<f32, 2> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::Uniform2f(location, self.x() as GLfloat, self.y() as GLfloat);
-        }
-    }
-}
-
-impl ShaderUniformType for Vector<f32, 3> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::Uniform3f(
-                location,
-                self.x() as GLfloat,
-                self.y() as GLfloat,
-                self.z() as GLfloat,
-            );
-        }
-    }
-}
-
-impl ShaderUniformType for Vector<f32, 4> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::Uniform4f(
-                location,
-                self.x() as GLfloat,
-                self.y() as GLfloat,
-                self.z() as GLfloat,
-                self.w() as GLfloat,
-            );
-        }
-    }
-}
-
-impl ShaderUniformType for Matrix<f32, 2, 2> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::UniformMatrix2fv(location, 1, gl::FALSE, self.as_ptr() as *const GLfloat);
-        }
-    }
-}
-
-impl ShaderUniformType for Matrix<f32, 3, 3> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::UniformMatrix3fv(location, 1, gl::FALSE, self.as_ptr() as *const GLfloat);
-        }
-    }
-}
-
-impl ShaderUniformType for Matrix<f32, 4, 4> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::UniformMatrix4fv(location, 1, gl::FALSE, self.as_ptr() as *const GLfloat);
-        }
-    }
-}
-
-impl ShaderUniformType for Matrix<f32, 4, 2> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::UniformMatrix2x4fv(location, 1, gl::FALSE, self.as_ptr() as *const GLfloat);
-        }
-    }
-}
-
-impl ShaderUniformType for Matrix<f32, 2, 4> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::UniformMatrix4x2fv(location, 1, gl::FALSE, self.as_ptr() as *const GLfloat);
-        }
-    }
-}
-
-impl ShaderUniformType for Matrix<f32, 4, 3> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::UniformMatrix3x4fv(location, 1, gl::FALSE, self.as_ptr() as *const GLfloat);
-        }
-    }
-}
-
-impl ShaderUniformType for Matrix<f32, 3, 4> {
-    fn upload_uniform(self, location: GLint) {
-        unsafe {
-            gl::UniformMatrix4x3fv(location, 1, gl::FALSE, self.as_ptr() as *const GLfloat);
-        }
-    }
-}
-
-impl ShaderUniformType for &Texture2D {
-    fn upload_uniform(self, location: GLint) {
+impl ShaderUniformType for Texture2D {
+    fn upload_uniform(&self, location: GLint) {
         self.bind();
-        unsafe {
-            gl::Uniform1ui(location, self.bind_slot());
-        }
+        self.bind_slot().upload_uniform(location);
     }
 }
 
@@ -370,7 +333,7 @@ impl Program {
         }
     }
 
-    pub fn set_uniform(&self, name: &str, value: impl ShaderUniformType) {
+    pub fn set_uniform(&self, name: &str, value: &impl ShaderUniformType) {
         let name = CString::new(name).expect("uniform name must not contain any NUL bytes.");
         self.bind();
         let location = unsafe {

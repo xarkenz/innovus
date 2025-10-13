@@ -23,16 +23,12 @@ impl Camera {
         }
     }
 
-    pub fn view(&self) -> Transform3D<f32> {
-        self.view
+    pub fn view(&self) -> &Transform3D<f32> {
+        &self.view
     }
 
-    pub fn projection(&self) -> Transform3D<f32> {
-        self.projection
-    }
-
-    pub fn view_projection(&self) -> Transform3D<f32> {
-        self.projection * self.view
+    pub fn projection(&self) -> &Transform3D<f32> {
+        &self.projection
     }
 
     pub fn position(&self) -> Vector<f32, 2> {
