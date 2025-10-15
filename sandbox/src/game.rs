@@ -160,6 +160,7 @@ impl<'world> Game<'world> {
                 self.gui.set_inventory_shown(!self.gui.inventory_shown());
                 self.gui.clear_text();
             }
+            self.gui.handle_input(inputs);
 
             if left_held || right_held || middle_held {
                 let chunk_location = Vector([

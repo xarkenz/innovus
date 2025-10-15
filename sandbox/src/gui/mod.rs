@@ -7,6 +7,7 @@ use render::GuiVertex;
 use render::cursor::GuiCursor;
 use render::text::{TextLine, TextLineRenderer};
 use crate::gui::render::text::TextBackground;
+use crate::tools::input::InputState;
 
 pub mod render;
 pub mod hotbar;
@@ -17,8 +18,7 @@ pub struct GuiManager {
     gui_scale: f32,
     offset_scale: Vector<f32, 2>,
     cursor_position: Vector<f32, 2>,
-    cursor_offset: Vector<f32, 2>,
-    cursor_renderer: GuiCursor,
+    cursor: GuiCursor,
     hotbar: hotbar::Hotbar,
     inventory: MeshRenderer<GuiVertex>,
     inventory_shown: bool,
@@ -35,8 +35,7 @@ impl GuiManager {
             gui_scale,
             offset_scale: Self::compute_offset_scale(viewport_size, content_scale.mul(gui_scale)),
             cursor_position: Vector::zero(),
-            cursor_offset: Vector::zero(),
-            cursor_renderer: GuiCursor::new(Vector::zero(), Vector::zero(), &AIR),
+            cursor: GuiCursor::new(Vector::zero(), Vector::zero(), &AIR),
             hotbar: hotbar::Hotbar::new(assets)?,
             inventory: MeshRenderer::create(),
             inventory_shown: false,
@@ -126,13 +125,12 @@ impl GuiManager {
     }
 
     fn compute_cursor_offset(&mut self) {
-        self.cursor_offset = self.cursor_position.mul(2.0)
-            / self.content_scale.mul(self.gui_scale);
-        self.cursor_renderer.set_offset(self.cursor_offset);
+        self.cursor.set_offset(self.cursor_position.mul(2.0)
+            / self.content_scale.mul(self.gui_scale));
     }
 
     pub fn anchor_adjustment(&self, from_anchor: Vector<f32, 2>, to_anchor: Vector<f32, 2>) -> Vector<f32, 2> {
-        (from_anchor - to_anchor) / self.offset_scale
+        (from_anchor - to_anchor).mul(2.0) / self.offset_scale
     }
 
     pub fn hotbar(&self) -> &hotbar::Hotbar {
@@ -172,7 +170,7 @@ impl GuiManager {
     }
 
     pub fn update_item_display(&mut self, item: &Item, assets: &AssetPool) {
-        self.cursor_renderer.set_item_type(item.item_type());
+        self.cursor.set_item_type(item.item_type());
         if item.item_type() == &AIR {
             self.hotbar.set_held_item_text(String::new());
         }
@@ -200,6 +198,15 @@ impl GuiManager {
 
     pub fn clear_text(&mut self) {
         self.input_test.data_mut().set_text(String::new());
+    }
+
+    pub fn handle_input(&mut self, inputs: &InputState) -> bool {
+        let cursor_offset = self.anchor_adjustment(self.cursor.anchor(), self.hotbar.anchor())
+            + self.cursor.offset();
+        if self.hotbar.handle_input(cursor_offset, inputs) {
+            return true;
+        }
+        false
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {
@@ -233,6 +240,6 @@ impl GuiManager {
 
         self.fps_display.render(assets);
         self.player_info_display.render(assets);
-        self.cursor_renderer.render(assets);
+        self.cursor.render(assets);
     }
 }

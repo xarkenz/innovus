@@ -3,6 +3,7 @@ use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::{GuiImage, GuiVertex};
 use crate::gui::render::text::{TextBackground, TextLine};
 use crate::tools::asset::AssetPool;
+use crate::tools::input::InputState;
 use crate::world::item::Item;
 
 pub fn format_item_count(count: u32) -> String {
@@ -18,9 +19,12 @@ pub struct ItemSlot {
     item: Item,
     image: Option<GuiImage>,
     count_text: TextLine,
+    hovered: bool,
 }
 
 impl ItemSlot {
+    pub const BOUNDS: Rectangle<f32> = Rectangle::new(Vector([0.0, 0.0]), Vector([16.0, 16.0]));
+
     pub fn new() -> Self {
         Self {
             item: Item::default(),
@@ -34,6 +38,7 @@ impl ItemSlot {
                 },
                 String::new(),
             ),
+            hovered: false,
         }
     }
 
@@ -58,6 +63,11 @@ impl ItemSlot {
         self.count_text.invalidate();
     }
 
+    pub fn handle_input(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) {
+        let _ = (inputs, cursor_offset);
+        self.hovered = true;
+    }
+
     pub fn append_to_mesh(
         &mut self,
         item_layer: &mut Mesh<GuiVertex>,
@@ -67,14 +77,17 @@ impl ItemSlot {
     ) {
         if self.image.is_none() {
             self.image = assets.get_item_image(self.item.item_type()).map(|atlas_region| {
-                GuiImage::new(
-                    Rectangle::from_span(Vector::zero(), Vector([16.0, 16.0])),
-                    Vector::one(),
-                    atlas_region,
-                )
-            })
+                GuiImage::new(Self::BOUNDS, Vector::one(), atlas_region)
+            });
         }
-        if let Some(image) = &self.image {
+        if let Some(image) = &mut self.image {
+            if self.hovered {
+                image.set_color(Vector([0.0, 1.0, 0.0, 1.0]));
+                self.hovered = false;
+            }
+            else {
+                image.set_color(Vector::one());
+            }
             image.append_to_mesh(item_layer, offset)
         }
         self.count_text.append_to_mesh(foreground_layer, offset + Vector([17.0, 19.0]), assets);
@@ -142,6 +155,31 @@ impl ItemGrid {
         }
     }
 
+    pub fn handle_input(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) -> bool {
+        let mut cursor_y = cursor_offset.y();
+        for row_slots in self.slots.chunks_mut(self.column_count) {
+            if cursor_y < 0.0 {
+                return false;
+            }
+            else if cursor_y <= ItemSlot::BOUNDS.y_span() {
+                let mut cursor_x = cursor_offset.x();
+                for slot in row_slots {
+                    if cursor_x < 0.0 {
+                        return false;
+                    }
+                    else if cursor_x <= ItemSlot::BOUNDS.x_span() {
+                        slot.handle_input(Vector([cursor_x, cursor_y]), inputs);
+                        return true;
+                    }
+                    cursor_x -= ItemSlot::BOUNDS.x_span() + self.gap.x();
+                }
+                return false;
+            }
+            cursor_y -= ItemSlot::BOUNDS.y_span() + self.gap.y();
+        }
+        false
+    }
+
     pub fn append_to_mesh(
         &mut self,
         item_layer: &mut Mesh<GuiVertex>,
@@ -159,9 +197,9 @@ impl ItemGrid {
                     Vector([offset_x, offset_y]),
                     assets,
                 );
-                offset_x += 16.0 + self.gap.x();
+                offset_x += ItemSlot::BOUNDS.x_span() + self.gap.x();
             }
-            offset_y += 16.0 + self.gap.y();
+            offset_y += ItemSlot::BOUNDS.y_span() + self.gap.y();
         }
     }
 }

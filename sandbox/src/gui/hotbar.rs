@@ -4,6 +4,7 @@ use crate::gui::render::{GuiImage, GuiVertex};
 use crate::gui::render::item::ItemGrid;
 use crate::gui::render::text::{TextBackground, TextLine};
 use crate::tools::asset::AssetPool;
+use crate::tools::input::InputState;
 use crate::world::item::{types, Item};
 
 pub struct Hotbar {
@@ -18,6 +19,9 @@ pub struct Hotbar {
 }
 
 impl Hotbar {
+    const HELD_ITEM_TEXT_OFFSET: Vector<f32, 2> = Vector([106.0, 0.0]);
+    const ITEM_GRID_OFFSET: Vector<f32, 2> = Vector([8.0, 8.0]);
+
     pub fn new(assets: &mut AssetPool) -> Result<Self, String> {
         Ok(Self {
             anchor: Vector([0.5, 1.0]),
@@ -91,6 +95,17 @@ impl Hotbar {
         Ok(())
     }
 
+    pub fn handle_input(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) -> bool {
+        let cursor_offset = cursor_offset - self.offset;
+        if self.background_image.bounds().contains_inclusive(cursor_offset) {
+            self.item_grid.handle_input(cursor_offset - Self::ITEM_GRID_OFFSET, inputs);
+            true
+        }
+        else {
+            false
+        }
+    }
+
     pub fn render(&mut self, assets: &mut AssetPool) {
         if self.background_layer.is_empty() {
             self.item_layer.clear();
@@ -103,12 +118,12 @@ impl Hotbar {
             self.item_grid.append_to_mesh(
                 self.item_layer.data_mut(),
                 self.foreground_layer.data_mut(),
-                self.offset + Vector([8.0, 8.0]),
+                self.offset + Self::ITEM_GRID_OFFSET,
                 assets,
             );
             self.held_item_text.append_to_mesh(
                 self.foreground_layer.data_mut(),
-                self.offset + Vector([106.0, 0.0]),
+                self.offset + Self::HELD_ITEM_TEXT_OFFSET,
                 assets,
             );
 
