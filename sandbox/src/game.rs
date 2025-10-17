@@ -136,7 +136,7 @@ impl<'world> Game<'world> {
 
             let cursor_world_pos = world.camera().get_world_pos(cursor_pos);
 
-            if inputs.key_was_pressed(Key::Tab) {
+            if inputs.key_was_repeated(Key::Tab) {
                 let offset = if inputs.key_is_held(Key::LeftShift) { -1 } else { 1 };
                 let held_item_type = world.player().held_item().item_type();
                 let item_index = ITEM_TYPES

@@ -94,6 +94,7 @@ pub const ITEM_TYPES: &[&ItemType] = &[
     &MAGMIUM_PICKAXE,
     &MAGMIUM_SHOVEL,
     &MAGMIUM_SWORD,
+    &OAK_TRUNK,
     &OAK_WOOD,
     &OBSIDIAN,
     &OBSIDIAN_BLOCK,
@@ -484,6 +485,12 @@ pub static MAGMIUM_SHOVEL: ItemType = ItemType {
 pub static MAGMIUM_SWORD: ItemType = ItemType {
     name: "magmium_sword",
     max_count: 1,
+    ..DEFAULTS
+};
+pub static OAK_TRUNK: ItemType = ItemType {
+    name: "oak_trunk",
+    block_type: Some(&block::types::OAK_TRUNK),
+    right_click: right_click_place_block,
     ..DEFAULTS
 };
 pub static OAK_WOOD: ItemType = ItemType {

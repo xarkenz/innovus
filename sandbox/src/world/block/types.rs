@@ -55,6 +55,11 @@ fn connects_to_pipe(this: &Block, that: &Block) -> bool {
     that.block_type() == &PIPE || that.block_type() == &PIPE_SPOUT
 }
 
+fn connects_to_trunk(this: &Block, that: &Block) -> bool {
+    let _ = this;
+    that.is_full_block() || that.block_type() == &OAK_TRUNK
+}
+
 fn right_click_no_action(target_block: &Block, held_item: &Item, side: BlockSide) -> (Option<Block>, Option<Item>) {
     // Defer to the held item's right click handler
     held_item.handle_right_click(target_block, side)
@@ -100,6 +105,7 @@ pub const BLOCK_TYPES: &[&BlockType] = &[
     &LANTERN,
     &LUMINITE_BLOCK,
     &MAGMIUM_BLOCK,
+    &OAK_TRUNK,
     &OAK_WOOD,
     &OBSIDIAN_BLOCK,
     &PHYLUMUS_BLOCK,
@@ -349,6 +355,27 @@ pub static MAGMIUM_BLOCK: BlockType = BlockType {
     item_type: Some(&item::types::MAGMIUM_BLOCK),
     palette_key: Some("magmium"),
     connects_to: connects_to_same_type,
+    ..DEFAULTS
+};
+pub static OAK_TRUNK: BlockType = BlockType {
+    name: "oak_trunk",
+    attributes: &[
+        ("axis", AttributeType::Enum {
+            side_default_values: [1, 0, 0, 1, 1],
+            value_names: &["x", "y"],
+        }),
+    ],
+    item_type: Some(&item::types::OAK_TRUNK),
+    colliders: &[],
+    palette_key: Some("bark_oak"),
+    is_full_block: full_block_never,
+    connects_to: connects_to_trunk,
+    right_click: |target_block, _, _| {
+        let mut block = target_block.clone();
+        let axis = block.attribute_value(0).expect_u8();
+        block.set_attribute_value(0, AttributeValue::U8((axis + 1) % 2));
+        (Some(block), None)
+    },
     ..DEFAULTS
 };
 pub static OAK_WOOD: BlockType = BlockType {
