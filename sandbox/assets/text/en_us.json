@@ -1,4 +1,16 @@
 {
+  "command": {
+    "error": {
+      "empty": "A command must be specified after '/'.",
+      "unknown": "Unrecognized command.",
+      "syntax": "Invalid command syntax.",
+      "arg_count": "Wrong number of arguments (expected {0}, got {1}).",
+      "invalid_integer": "Invalid integer value '{0}'.",
+      "no_such_item": "Invalid item type '{0}'.",
+      "no_such_block": "Invalid block type '{0}'."
+    },
+    "success": "Done."
+  },
   "item": {
     "aluminum": "Aluminum",
     "aluminum_axe": "Aluminum Axe",

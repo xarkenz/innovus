@@ -5,6 +5,7 @@ use innovus::gfx::screen;
 use innovus::tools::{Clock, Vector};
 use crate::audio::AudioEngine;
 use crate::gui::GuiManager;
+use crate::script::ScriptingEngine;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
 use crate::world::camera::Camera;
@@ -24,6 +25,7 @@ pub struct Game<'world> {
     content_scale: Vector<f32, 2>,
     assets: AssetPool,
     gui: GuiManager,
+    scripting: ScriptingEngine,
     audio: AudioEngine,
     current_world: Option<World<'world>>,
     last_block_pos: Option<(usize, usize)>,
@@ -42,6 +44,7 @@ impl<'world> Game<'world> {
             content_scale,
             gui: GuiManager::new(viewport_size, content_scale, 8.0, &mut assets)?,
             assets,
+            scripting: ScriptingEngine::new(),
             audio: AudioEngine::new()?,
             current_world: None,
             last_block_pos: None,
@@ -118,6 +121,21 @@ impl<'world> Game<'world> {
             if !inputs.entered_text().is_empty() {
                 self.gui.enter_text(inputs.entered_text());
             }
+            if inputs.key_was_pressed(Key::Enter) {
+                if self.gui.entered_text().starts_with('/') {
+                    let result = self.scripting.dispatch_command(
+                        self.gui.entered_text(),
+                        self.current_world.as_mut().unwrap(),
+                        &self.assets,
+                    );
+                    let text = result.unwrap_or_else(|error| error);
+                    self.gui.clear_text();
+                    self.gui.enter_text(&text);
+                }
+                else {
+                    self.gui.clear_text();
+                }
+            }
         }
 
         let cursor_pos = inputs.cursor_pos().map(|x| x as f32);
@@ -144,10 +162,7 @@ impl<'world> Game<'world> {
                     .position(|&item_type| item_type == held_item_type)
                     .unwrap();
                 let next_item_index = (item_index as isize + offset).rem_euclid(ITEM_TYPES.len() as isize) as usize;
-                world.player_mut().set_held_item(Item::new(
-                    ITEM_TYPES[next_item_index],
-                    ITEM_TYPES[next_item_index].max_count(),
-                ));
+                world.player_mut().set_held_item(Item::with_max_count(ITEM_TYPES[next_item_index]));
             }
             if inputs.key_was_pressed(Key::F4) {
                 let current_mode = world.player().mode();

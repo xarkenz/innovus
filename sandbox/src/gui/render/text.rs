@@ -104,7 +104,7 @@ impl TextLine {
             const INVALID_GLYPH_WIDTH: u32 = 6;
             const X: u32 = u32::MAX;
             const GLYPH_WIDTHS: [u32; 256] = [
-                X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+                X, X, X, X, X, X, X, X, X, X, 6, X, X, X, X, X,
                 X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
                 4, 1, 3, 5, 5, 5, 5, 1, 3, 3, 5, 5, 2, 5, 1, 5,
                 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 2, 5, 5, 5, 5,

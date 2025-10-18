@@ -10,6 +10,7 @@ pub mod game;
 pub mod gui;
 pub mod tools;
 pub mod world;
+pub mod script;
 
 fn main() {
     let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();

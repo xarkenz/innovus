@@ -23,6 +23,10 @@ impl ItemType {
     pub fn block_type(&self) -> Option<&'static BlockType> {
         self.block_type
     }
+
+    pub fn is_air(&self) -> bool {
+        self == &types::AIR
+    }
 }
 
 impl PartialEq for ItemType {
@@ -55,6 +59,13 @@ impl Item {
         Self {
             item_type,
             count,
+        }
+    }
+
+    pub fn with_max_count(item_type: &'static ItemType) -> Self {
+        Self {
+            item_type,
+            count: item_type.max_count(),
         }
     }
 

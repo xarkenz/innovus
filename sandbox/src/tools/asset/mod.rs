@@ -299,11 +299,21 @@ impl AssetPool {
         self.color_palettes.clear();
     }
 
-    pub fn get_text_string<'a>(&'a self, key: &'a str) -> &'a str {
+    pub fn get_text<'a>(&'a self, key: &'a str) -> &'a str {
         match self.text_strings.get(key) {
             Some(string) => string,
             None => key,
         }
+    }
+
+    pub fn get_template_text(&self, key: &str, elements: &[&str]) -> String {
+        let template_string = self.get_text(key).to_owned();
+        elements
+            .iter()
+            .enumerate()
+            .fold(template_string, |string, (index, &element)| {
+                string.replace(&format!("{{{index}}}"), element)
+            })
     }
 
     pub fn reload_text_strings(&mut self) -> Result<(), String> {

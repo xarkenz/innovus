@@ -2,7 +2,6 @@ use innovus::gfx::MeshRenderer;
 use innovus::tools::Vector;
 use crate::tools::asset::AssetPool;
 use crate::world::item::Item;
-use crate::world::item::types::AIR;
 use render::GuiVertex;
 use render::cursor::GuiCursor;
 use render::text::{TextLine, TextLineRenderer};
@@ -35,7 +34,7 @@ impl GuiManager {
             gui_scale,
             offset_scale: Self::compute_offset_scale(viewport_size, content_scale.mul(gui_scale)),
             cursor_position: Vector::zero(),
-            cursor: GuiCursor::new(Vector::zero(), Vector::zero(), &AIR),
+            cursor: GuiCursor::new(Vector::zero(), Vector::zero(), &crate::world::item::types::AIR),
             hotbar: hotbar::Hotbar::new(assets)?,
             inventory: MeshRenderer::create(),
             inventory_shown: false,
@@ -68,7 +67,7 @@ impl GuiManager {
             input_test: TextLineRenderer::create(
                 TextLine::new(
                     Vector([0.5, 0.5]),
-                    Vector([0.0, 0.0, 0.0, 1.0]),
+                    Vector([1.0, 1.0, 1.0, 1.0]),
                     TextBackground::Rectangle {
                         color: Vector([0.0, 0.0, 0.0, 0.4]),
                         margin: Vector([1.0, 0.0]),
@@ -171,17 +170,21 @@ impl GuiManager {
 
     pub fn update_item_display(&mut self, item: &Item, assets: &AssetPool) {
         self.cursor.set_item_type(item.item_type());
-        if item.item_type() == &AIR {
+        if item.item_type().is_air() {
             self.hotbar.set_held_item_text(String::new());
         }
         else {
             let item_key = format!("item.{}", item.item_type());
-            let item_name = assets.get_text_string(&item_key);
+            let item_name = assets.get_text(&item_key);
             self.hotbar.set_held_item_text(match item.count() {
                 1 => item_name.to_string(),
                 count => format!("{item_name} ({count})")
             });
         }
+    }
+
+    pub fn entered_text(&self) -> &str {
+        self.input_test.data().text()
     }
 
     pub fn enter_text(&mut self, text: &str) {
