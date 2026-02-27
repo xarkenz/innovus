@@ -1,52 +1,116 @@
 use std::io::{BufRead, BufReader, Read};
 use crate::tools::Vector;
 
-#[repr(transparent)]
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct RGBColor(pub Vector<f32, 3>);
+#[derive(Default, Copy, Clone, Debug)]
+pub enum Color {
+    #[default]
+    Black,
+    White,
+    Red,
+    Green,
+    Blue,
+    Cyan,
+    Magenta,
+    Yellow,
+    IntRGB(Vector<u8, 3>),
+    RGB(Vector<f32, 3>),
+}
 
-impl RGBColor {
-    pub const fn new(r: f32, g: f32, b: f32) -> Self {
-        Self(Vector([r, g, b]))
+impl Color {
+    pub fn rgb(&self) -> Vector<f32, 3> {
+        match *self {
+            Self::Black => Vector::zero(),
+            Self::White => Vector::one(),
+            Self::Red => Vector([1.0, 0.0, 0.0]),
+            Self::Green => Vector([0.0, 1.0, 0.0]),
+            Self::Blue => Vector([0.0, 0.0, 1.0]),
+            Self::Cyan => Vector([0.0, 1.0, 1.0]),
+            Self::Magenta => Vector([1.0, 0.0, 1.0]),
+            Self::Yellow => Vector([1.0, 1.0, 0.0]),
+            Self::IntRGB(rgb) => rgb.map(|x| x as f32 / 255.0),
+            Self::RGB(rgb) => rgb,
+        }
     }
 
-    pub const fn black() -> Self {
-        Self::new(0.0, 0.0, 0.0)
+    pub fn with_alpha(self, alpha: f32) -> AlphaColor {
+        AlphaColor::new(self, alpha)
+    }
+}
+
+impl std::ops::Mul for Color {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        Self::RGB(self.rgb() * rhs.rgb())
+    }
+}
+
+#[derive(Default, Copy, Clone, Debug)]
+pub struct AlphaColor {
+    pub color: Color,
+    pub alpha: f32,
+}
+
+impl AlphaColor {
+    pub fn new(color: Color, alpha: f32) -> Self {
+        Self {
+            color,
+            alpha,
+        }
     }
 
-    pub const fn white() -> Self {
-        Self::new(1.0, 1.0, 1.0)
+    pub fn opaque(color: Color) -> Self {
+        Self::new(color, 1.0)
     }
 
-    pub const fn r(&self) -> f32 {
-        self.0.x()
+    pub fn rgb(&self) -> Vector<f32, 3> {
+        self.color.rgb()
     }
 
-    pub const fn g(&self) -> f32 {
-        self.0.y()
+    pub fn rgba(&self) -> Vector<f32, 4> {
+        self.color.rgb().with_w(self.alpha)
     }
+}
 
-    pub const fn b(&self) -> f32 {
-        self.0.z()
+impl From<Color> for AlphaColor {
+    fn from(color: Color) -> Self {
+        Self::opaque(color)
+    }
+}
+
+impl From<Vector<f32, 4>> for AlphaColor {
+    fn from(rgba: Vector<f32, 4>) -> Self {
+        Self::new(Color::RGB(rgba.xyz()), rgba.w())
+    }
+}
+
+impl std::ops::Mul for AlphaColor {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        (self.rgba() * rhs.rgba()).into()
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ColorPalette {
     name: String,
-    colors: Vec<RGBColor>,
+    colors: Vec<Color>,
 }
 
 impl ColorPalette {
-    pub fn new(name: String, colors: Vec<RGBColor>) -> Self {
-        Self { name, colors }
+    pub fn new(name: String, colors: Vec<Color>) -> Self {
+        Self {
+            name,
+            colors,
+        }
     }
 
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn colors(&self) -> &[RGBColor] {
+    pub fn colors(&self) -> &[Color] {
         &self.colors
     }
 
@@ -74,11 +138,7 @@ impl ColorPalette {
             let (Ok(r), Ok(g), Ok(b)) = (r.parse::<u8>(), g.parse::<u8>(), b.parse::<u8>()) else {
                 continue;
             };
-            colors.push(RGBColor::new(
-                r as f32 / 255.0,
-                g as f32 / 255.0,
-                b as f32 / 255.0,
-            ));
+            colors.push(Color::IntRGB(Vector([r, g, b])));
         }
 
         Ok(Self::new(name, colors))

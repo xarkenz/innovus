@@ -1,4 +1,4 @@
-use innovus::gfx::color::RGBColor;
+use innovus::gfx::color::{AlphaColor, Color};
 use innovus::gfx::{MeshRenderer, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::noise::scramble;
@@ -27,7 +27,7 @@ pub struct ParticleInfo {
     pub velocity: Vector<f32, 2>,
     pub acceleration: Vector<f32, 2>,
     pub lifetime: f32,
-    pub color: RGBColor,
+    pub color: AlphaColor,
     pub size: f32,
 }
 
@@ -38,7 +38,7 @@ impl Default for ParticleInfo {
             velocity: Vector::zero(),
             acceleration: Vector([0.0, -32.0]),
             lifetime: 1.0,
-            color: RGBColor::black(),
+            color: Color::White.into(),
             size: 1.0,
         }
     }
@@ -92,7 +92,7 @@ impl ParticleManager {
             for offset in OFFSETS {
                 vertices.push(Vertex2D::new(
                     (particle.position + offset.mul(particle.size / 16.0)).with_z(0.0),
-                    Some(particle.color.0.with_w(opacity)),
+                    Some((particle.color * Color::White.with_alpha(opacity)).rgba()),
                     None,
                 ));
             }

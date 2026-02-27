@@ -1,6 +1,6 @@
 use std::path::Path;
 use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight, Window};
-use innovus::gfx::color::RGBColor;
+use innovus::gfx::color::Color;
 use innovus::gfx::screen;
 use innovus::tools::{Clock, Vector};
 use crate::audio::AudioEngine;
@@ -241,10 +241,10 @@ impl<'world> Game<'world> {
             clear_color = world.sky_color();
         }
         else {
-            clear_color = RGBColor::black();
+            clear_color = Color::Black;
         }
 
-        screen::set_clear_color(clear_color);
+        screen::set_clear_color(clear_color.into());
         screen::clear();
 
         if let Some(world) = &mut self.current_world {

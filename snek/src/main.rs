@@ -4,7 +4,7 @@ use glfw::{Action, Context, Key, MouseButton};
 use innovus::gfx::*;
 use innovus::tools::{AnimationTimer, Clock, Easing, Transform3D, Vector};
 use std::{collections::VecDeque, f32::consts, str::FromStr};
-use innovus::gfx::color::RGBColor;
+use innovus::gfx::color::Color;
 
 const BOARD_W: u32 = 10;
 const BOARD_H: u32 = 10;
@@ -124,7 +124,7 @@ fn main() {
     test_tex.set_wrap_t(TextureWrap::MirroredRepeat);
     test_tex.upload_image(&test_image);
 
-    screen::set_clear_color(RGBColor::new(0.6, 0.9, 1.0));
+    screen::set_clear_color(Color::RGB(Vector([0.6, 0.9, 1.0])).into());
     screen::set_blend_func(screen::BlendFunc::Transparency);
     screen::set_viewport(0, 0, 800, 800);
     screen::set_culling(true);

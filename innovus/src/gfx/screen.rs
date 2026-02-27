@@ -1,5 +1,6 @@
 use gl::types::*;
-use crate::gfx::color::RGBColor;
+use crate::gfx::color::AlphaColor;
+use crate::tools::Vector;
 
 pub fn bind_glfw(manager: &glfw::Glfw) {
     gl::load_with(|symbol| unsafe {
@@ -7,9 +8,10 @@ pub fn bind_glfw(manager: &glfw::Glfw) {
     });
 }
 
-pub fn set_clear_color(color: RGBColor) {
+pub fn set_clear_color(color: AlphaColor) {
+    let Vector([r, g, b, a]) = color.rgba();
     unsafe {
-        gl::ClearColor(color.r(), color.g(), color.b(), 1.0);
+        gl::ClearColor(r, g, b, a);
     }
 }
 

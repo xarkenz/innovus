@@ -1,6 +1,6 @@
 use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
-use innovus::gfx::color::RGBColor;
+use innovus::gfx::color::Color;
 use innovus::tools::phys::Physics;
 use crate::audio::AudioEngine;
 use crate::tools::*;
@@ -59,8 +59,8 @@ impl<'world> World<'world> {
         world
     }
 
-    pub fn sky_color(&self) -> RGBColor {
-        RGBColor(self.sky_color.mul(self.sky_light))
+    pub fn sky_color(&self) -> Color {
+        Color::RGB(self.sky_color.mul(self.sky_light))
     }
 
     pub fn camera(&self) -> &Camera {
@@ -138,7 +138,7 @@ impl<'world> World<'world> {
                         self.particles.create_particle(ParticleInfo {
                             position,
                             velocity,
-                            color,
+                            color: color.into(),
                             size: 2.0,
                             ..Default::default()
                         });
