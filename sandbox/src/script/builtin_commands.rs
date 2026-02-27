@@ -16,7 +16,8 @@ pub fn hello(args: &[&str], world: &mut World, assets: &AssetPool) -> CommandRes
 pub fn give(args: &[&str], world: &mut World, assets: &AssetPool) -> CommandResult<String> {
     let item_type = utils::parse_item_type(args[0], assets)?;
     let item_count = match args.get(1) {
-        Some(count_text) => utils::parse_u32(count_text, assets)?,
+        Some(&"max") => item_type.max_count(),
+        Some(&count_text) => utils::parse_u32(count_text, assets)?.min(item_type.max_count()),
         None => 1,
     };
     let item = if item_count > 0 && !item_type.is_air() {
