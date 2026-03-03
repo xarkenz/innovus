@@ -9,7 +9,10 @@
       "no_such_item": "Invalid item type '{0}'.",
       "no_such_block": "Invalid block type '{0}'."
     },
-    "success": "Done."
+    "give": {
+      "success": "Gave player {0}\u00D7 {1}.",
+      "success_empty": "Cleared player hand."
+    }
   },
   "item": {
     "aluminum": "Aluminum",

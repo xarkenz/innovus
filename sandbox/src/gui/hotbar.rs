@@ -1,6 +1,6 @@
-use innovus::gfx::MeshRenderer;
+use innovus::gfx::color::Color;
 use innovus::tools::{Rectangle, Vector};
-use crate::gui::render::{GuiImage, GuiVertex};
+use crate::gui::render::{GuiImage, GuiLayerMesh};
 use crate::gui::render::item::ItemGrid;
 use crate::gui::render::text::{TextBackground, TextLine};
 use crate::tools::asset::AssetPool;
@@ -13,9 +13,9 @@ pub struct Hotbar {
     background_image: GuiImage,
     held_item_text: TextLine,
     item_grid: ItemGrid,
-    background_layer: MeshRenderer<GuiVertex>,
-    item_layer: MeshRenderer<GuiVertex>,
-    foreground_layer: MeshRenderer<GuiVertex>,
+    background_layer: GuiLayerMesh,
+    item_layer: GuiLayerMesh,
+    foreground_layer: GuiLayerMesh,
 }
 
 impl Hotbar {
@@ -28,15 +28,15 @@ impl Hotbar {
             offset: Vector([-106.0, -32.0]),
             background_image: GuiImage::new(
                 Rectangle::from_span(Vector::zero(), Vector([212.0, 32.0])),
-                Vector::one(),
+                Color::White.into(),
                 assets.get_gui_image("gui/hotbar")?,
             ),
             held_item_text: TextLine::new(
                 Vector([0.5, 1.0]),
-                Vector([1.0, 1.0, 1.0, 1.0]),
-                TextBackground::Rectangle {
-                    color: Vector([0.0, 0.0, 0.0, 0.4]),
-                    margin: Vector([1.0, 0.0]),
+                Color::White.into(),
+                TextBackground::DropShadow {
+                    color: Color::Black.with_alpha(0.8),
+                    offset: Vector([1.0, 1.0]),
                 },
                 String::new(),
             ),
@@ -44,7 +44,7 @@ impl Hotbar {
                 let mut item_grid = ItemGrid::new(
                     10,
                     10,
-                    Vector::filled(4.0)
+                    Vector::splat(4.0)
                 );
                 item_grid.slot_mut(0).set_item(Item::new(&types::DIAMOND, 20));
                 item_grid.slot_mut(1).set_item(Item::new(&types::DIAMOND_BLOCK, 7));
@@ -53,9 +53,9 @@ impl Hotbar {
                 item_grid.slot_mut(4).set_item(Item::new(&types::MAGMIUM_PICKAXE, 1));
                 item_grid
             },
-            background_layer: MeshRenderer::create(),
-            item_layer: MeshRenderer::create(),
-            foreground_layer: MeshRenderer::create(),
+            background_layer: GuiLayerMesh::create(),
+            item_layer: GuiLayerMesh::create(),
+            foreground_layer: GuiLayerMesh::create(),
         })
     }
 
@@ -95,10 +95,10 @@ impl Hotbar {
         Ok(())
     }
 
-    pub fn handle_input(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) -> bool {
+    pub fn handle_cursor(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) -> bool {
         let cursor_offset = cursor_offset - self.offset;
         if self.background_image.bounds().contains_inclusive(cursor_offset) {
-            self.item_grid.handle_input(cursor_offset - Self::ITEM_GRID_OFFSET, inputs);
+            self.item_grid.handle_cursor(cursor_offset - Self::ITEM_GRID_OFFSET, inputs);
             true
         }
         else {

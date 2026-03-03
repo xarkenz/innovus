@@ -27,7 +27,7 @@ impl<T, const N: usize> Vector<T, N> {
         Self(std::array::from_fn(|_| T::one()))
     }
 
-    pub const fn filled(value: T) -> Self
+    pub const fn splat(value: T) -> Self
     where
         T: Copy,
     {
@@ -231,6 +231,18 @@ where
 {
     fn clone(&self) -> Self {
         Vector(self.0.clone())
+    }
+}
+
+impl<T, const N: usize> Default for Vector<T, N>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        // Arrays implement Default manually for every length up to 32 because [T; 0] needs to
+        // implement Default even if T doesn't implement it.
+        // We can just kind of ignore that caveat lol who cares.
+        Vector(std::array::from_fn(|_| Default::default()))
     }
 }
 

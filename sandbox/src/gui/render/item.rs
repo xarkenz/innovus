@@ -1,3 +1,4 @@
+use innovus::gfx::color::Color;
 use innovus::gfx::Mesh;
 use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::{GuiImage, GuiVertex};
@@ -31,9 +32,9 @@ impl ItemSlot {
             image: None,
             count_text: TextLine::new(
                 Vector([1.0, 1.0]),
-                Vector::one(),
+                Color::White.into(),
                 TextBackground::DropShadow {
-                    color: Vector([0.0, 0.0, 0.0, 0.8]),
+                    color: Color::Black.with_alpha(0.8),
                     offset: Vector([0.0, 1.0]),
                 },
                 String::new(),
@@ -63,7 +64,7 @@ impl ItemSlot {
         self.count_text.invalidate();
     }
 
-    pub fn handle_input(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) {
+    pub fn handle_cursor(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) {
         let _ = (inputs, cursor_offset);
         self.hovered = true;
     }
@@ -77,16 +78,16 @@ impl ItemSlot {
     ) {
         if self.image.is_none() {
             self.image = assets.get_item_image(self.item.item_type()).map(|atlas_region| {
-                GuiImage::new(Self::BOUNDS, Vector::one(), atlas_region)
+                GuiImage::new(Self::BOUNDS, Color::White.into(), atlas_region)
             });
         }
         if let Some(image) = &mut self.image {
             if self.hovered {
-                image.set_color(Vector([0.0, 1.0, 0.0, 1.0]));
+                image.set_color(Color::Green.into());
                 self.hovered = false;
             }
             else {
-                image.set_color(Vector::one());
+                image.set_color(Color::White.into());
             }
             image.append_to_mesh(item_layer, offset)
         }
@@ -155,7 +156,7 @@ impl ItemGrid {
         }
     }
 
-    pub fn handle_input(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) -> bool {
+    pub fn handle_cursor(&mut self, cursor_offset: Vector<f32, 2>, inputs: &InputState) -> bool {
         let mut cursor_y = cursor_offset.y();
         for row_slots in self.slots.chunks_mut(self.column_count) {
             if cursor_y < 0.0 {
@@ -168,7 +169,7 @@ impl ItemGrid {
                         return false;
                     }
                     else if cursor_x <= ItemSlot::BOUNDS.x_span() {
-                        slot.handle_input(Vector([cursor_x, cursor_y]), inputs);
+                        slot.handle_cursor(Vector([cursor_x, cursor_y]), inputs);
                         return true;
                     }
                     cursor_x -= ItemSlot::BOUNDS.x_span() + self.gap.x();

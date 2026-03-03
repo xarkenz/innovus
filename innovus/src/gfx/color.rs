@@ -1,7 +1,7 @@
 use std::io::{BufRead, BufReader, Read};
 use crate::tools::Vector;
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone, PartialEq, Debug)]
 pub enum Color {
     #[default]
     Black,
@@ -12,6 +12,7 @@ pub enum Color {
     Cyan,
     Magenta,
     Yellow,
+    Value(f32),
     IntRGB(Vector<u8, 3>),
     RGB(Vector<f32, 3>),
 }
@@ -27,6 +28,7 @@ impl Color {
             Self::Cyan => Vector([0.0, 1.0, 1.0]),
             Self::Magenta => Vector([1.0, 0.0, 1.0]),
             Self::Yellow => Vector([1.0, 1.0, 0.0]),
+            Self::Value(value) => Vector::splat(value),
             Self::IntRGB(rgb) => rgb.map(|x| x as f32 / 255.0),
             Self::RGB(rgb) => rgb,
         }
@@ -45,7 +47,7 @@ impl std::ops::Mul for Color {
     }
 }
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone, PartialEq, Debug)]
 pub struct AlphaColor {
     pub color: Color,
     pub alpha: f32,

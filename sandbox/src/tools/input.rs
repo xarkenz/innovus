@@ -99,6 +99,10 @@ impl InputState {
         self.entered_text.push(character);
     }
 
+    pub fn handle_paste(&mut self, text: &str) {
+        self.entered_text.push_str(text);
+    }
+
     pub fn handle_mouse_button(&mut self, button: MouseButton, action: Action, mods: Modifiers) {
         let _ = mods;
         if let Some(button_index) = get_button_index(button) {

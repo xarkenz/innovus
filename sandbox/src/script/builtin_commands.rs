@@ -20,11 +20,17 @@ pub fn give(args: &[&str], world: &mut World, assets: &AssetPool) -> CommandResu
         Some(&count_text) => utils::parse_u32(count_text, assets)?.min(item_type.max_count()),
         None => 1,
     };
+    let result_text;
     let item = if item_count > 0 && !item_type.is_air() {
+        result_text = assets.get_template_text("command.give.success", &[
+            &item_count.to_string(),
+            assets.get_text(&format!("item.{item_type}")),
+        ]);
         Item::new(item_type, item_count)
     } else {
+        result_text = assets.get_text("command.give.success_empty").into();
         Item::default()
     };
     world.player_mut().set_held_item(item);
-    Ok(assets.get_text("command.success").into())
+    Ok(result_text)
 }

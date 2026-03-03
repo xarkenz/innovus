@@ -94,13 +94,13 @@ impl Drop for Shader {
     }
 }
 
-pub trait ShaderUniformType {
+pub trait ShaderUniform {
     fn upload_uniform(&self, location: GLint);
 }
 
 macro_rules! impl_scalar_shader_uniform {
     ($t:ty, $f1:ident, $fv:ident) => {
-        impl ShaderUniformType for $t {
+        impl ShaderUniform for $t {
             fn upload_uniform(&self, location: GLint) {
                 unsafe {
                     gl::$f1(location, *self);
@@ -108,7 +108,7 @@ macro_rules! impl_scalar_shader_uniform {
             }
         }
 
-        impl ShaderUniformType for [$t] {
+        impl ShaderUniform for [$t] {
             fn upload_uniform(&self, location: GLint) {
                 unsafe {
                     gl::$fv(location, self.len() as GLsizei, self.as_ptr() as *const _);
@@ -120,7 +120,7 @@ macro_rules! impl_scalar_shader_uniform {
 
 macro_rules! impl_vector_shader_uniform {
     ($t:ty, $n:expr, $f:ident) => {
-        impl ShaderUniformType for Vector<$t, $n> {
+        impl ShaderUniform for Vector<$t, $n> {
             fn upload_uniform(&self, location: GLint) {
                 unsafe {
                     gl::$f(location, 1, self.as_ptr() as *const _);
@@ -128,7 +128,7 @@ macro_rules! impl_vector_shader_uniform {
             }
         }
 
-        impl ShaderUniformType for [Vector<$t, $n>] {
+        impl ShaderUniform for [Vector<$t, $n>] {
             fn upload_uniform(&self, location: GLint) {
                 unsafe {
                     gl::$f(location, self.len() as GLsizei, self.as_ptr() as *const _);
@@ -140,7 +140,7 @@ macro_rules! impl_vector_shader_uniform {
 
 macro_rules! impl_matrix_shader_uniform {
     ($t:ty, $r:expr, $c:expr, $f:ident) => {
-        impl ShaderUniformType for Matrix<$t, $r, $c> {
+        impl ShaderUniform for Matrix<$t, $r, $c> {
             fn upload_uniform(&self, location: GLint) {
                 unsafe {
                     gl::$f(location, 1, gl::FALSE, self.as_ptr() as *const _);
@@ -148,7 +148,7 @@ macro_rules! impl_matrix_shader_uniform {
             }
         }
 
-        impl ShaderUniformType for [Matrix<$t, $r, $c>] {
+        impl ShaderUniform for [Matrix<$t, $r, $c>] {
             fn upload_uniform(&self, location: GLint) {
                 unsafe {
                     gl::$f(location, self.len() as GLsizei, gl::FALSE, self.as_ptr() as *const _);
@@ -178,7 +178,7 @@ impl_matrix_shader_uniform!(f32, 2, 4, UniformMatrix4x2fv);
 impl_matrix_shader_uniform!(f32, 4, 3, UniformMatrix3x4fv);
 impl_matrix_shader_uniform!(f32, 3, 4, UniformMatrix4x3fv);
 
-impl ShaderUniformType for bool {
+impl ShaderUniform for bool {
     fn upload_uniform(&self, location: GLint) {
         unsafe {
             gl::Uniform1ui(location, *self as GLuint);
@@ -186,7 +186,7 @@ impl ShaderUniformType for bool {
     }
 }
 
-impl ShaderUniformType for Texture2D {
+impl ShaderUniform for Texture2D {
     fn upload_uniform(&self, location: GLint) {
         self.bind();
         self.bind_slot().upload_uniform(location);
@@ -333,7 +333,7 @@ impl Program {
         }
     }
 
-    pub fn set_uniform(&self, name: &str, value: &impl ShaderUniformType) {
+    pub fn set_uniform<T: ShaderUniform>(&self, name: &str, value: &T) {
         let name = CString::new(name).expect("uniform name must not contain any NUL bytes.");
         self.bind();
         let location = unsafe {
@@ -397,7 +397,7 @@ impl Vertex3D {
         Self {
             position,
             color: color.unwrap_or(Vector::one()),
-            uv: uv.unwrap_or(Vector::filled(f32::NAN)),
+            uv: uv.unwrap_or(Vector::splat(f32::NAN)),
             normal: normal.unwrap_or(Vector::zero()),
         }
     }
@@ -406,7 +406,7 @@ impl Vertex3D {
         Self {
             position,
             color,
-            uv: Vector::filled(f32::NAN),
+            uv: Vector::splat(f32::NAN),
             normal: Vector::zero(),
         }
     }
@@ -456,7 +456,7 @@ impl Vertex2D {
         Self {
             position,
             color: color.unwrap_or(Vector::one()),
-            uv: uv.unwrap_or(Vector::filled(f32::NAN)),
+            uv: uv.unwrap_or(Vector::splat(f32::NAN)),
         }
     }
 }

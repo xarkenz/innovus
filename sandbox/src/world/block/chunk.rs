@@ -385,7 +385,7 @@ impl Chunk {
             for _ in 0..VERTICES_PER_BLOCK {
                 let vertex = self.mesh.vertex_at_mut(index);
                 vertex.color = Vector::zero();
-                vertex.uv = Vector::filled(f32::NAN);
+                vertex.uv = Vector::splat(f32::NAN);
                 index += 1;
             }
         }

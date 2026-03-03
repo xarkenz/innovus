@@ -1,5 +1,6 @@
 use std::mem::offset_of;
-use innovus::gfx::{Mesh, Vertex, VertexAttribute, VertexAttributeType};
+use innovus::gfx::{Mesh, MeshRenderer, Vertex, VertexAttribute, VertexAttributeType};
+use innovus::gfx::color::AlphaColor;
 use innovus::tools::{Rectangle, Vector};
 
 pub mod cursor;
@@ -23,7 +24,7 @@ impl GuiVertex {
         Self {
             offset,
             color: color.unwrap_or(Vector::one()),
-            uv: uv.unwrap_or(Vector::filled(f32::NAN)),
+            uv: uv.unwrap_or(Vector::splat(f32::NAN)),
         }
     }
 }
@@ -36,15 +37,17 @@ impl Vertex for GuiVertex {
     ];
 }
 
+pub type GuiLayerMesh = MeshRenderer<GuiVertex>;
+
 #[derive(Debug)]
 pub struct GuiImage {
     bounds: Rectangle<f32>,
-    color: Vector<f32, 4>,
+    color: AlphaColor,
     atlas_region: Rectangle<u32>,
 }
 
 impl GuiImage {
-    pub fn new(bounds: Rectangle<f32>, color: Vector<f32, 4>, atlas_region: Rectangle<u32>) -> Self {
+    pub fn new(bounds: Rectangle<f32>, color: AlphaColor, atlas_region: Rectangle<u32>) -> Self {
         Self {
             bounds,
             color,
@@ -60,11 +63,11 @@ impl GuiImage {
         self.bounds = bounds;
     }
 
-    pub fn color(&self) -> Vector<f32, 4> {
+    pub fn color(&self) -> AlphaColor {
         self.color
     }
 
-    pub fn set_color(&mut self, color: Vector<f32, 4>) {
+    pub fn set_color(&mut self, color: AlphaColor) {
         self.color = color;
     }
 
@@ -77,27 +80,28 @@ impl GuiImage {
     }
 
     pub fn append_to_mesh(&self, mesh: &mut Mesh<GuiVertex>, offset: Vector<f32, 2>) {
+        let rgba_color = self.color.rgba();
         let to_f32 = |x: u32| x as f32;
         mesh.add(
             &[
                 GuiVertex::new(
                     offset + self.bounds.min,
-                    Some(self.color),
+                    Some(rgba_color),
                     Some(self.atlas_region.min.map(to_f32)),
                 ),
                 GuiVertex::new(
                     offset + self.bounds.min_x_max_y(),
-                    Some(self.color),
+                    Some(rgba_color),
                     Some(self.atlas_region.min_x_max_y().map(to_f32)),
                 ),
                 GuiVertex::new(
                     offset + self.bounds.max,
-                    Some(self.color),
+                    Some(rgba_color),
                     Some(self.atlas_region.max.map(to_f32)),
                 ),
                 GuiVertex::new(
                     offset + self.bounds.max_x_min_y(),
-                    Some(self.color),
+                    Some(rgba_color),
                     Some(self.atlas_region.max_x_min_y().map(to_f32)),
                 ),
             ],

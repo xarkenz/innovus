@@ -63,6 +63,12 @@ fn main() {
                 }
                 WindowEvent::Key(key, _scancode, action, mods) => {
                     input_state.handle_key(key, action, mods);
+                    // TODO: maybe a bit hacky? unsure of the best way to handle this
+                    if key == glfw::Key::V && mods.contains(glfw::Modifiers::Control) {
+                        if let Some(text) = window.get_clipboard_string() {
+                            input_state.handle_paste(&text);
+                        }
+                    }
                 }
                 WindowEvent::Char(character) => {
                     input_state.handle_char(character);

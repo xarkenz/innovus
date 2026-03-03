@@ -1,15 +1,19 @@
-use innovus::gfx::MeshRenderer;
-use innovus::tools::Vector;
+use glfw::Key;
+use innovus::gfx::color::Color;
+use innovus::tools::{Rectangle, Vector};
 use crate::tools::asset::AssetPool;
 use crate::world::item::Item;
-use render::GuiVertex;
 use render::cursor::GuiCursor;
 use render::text::{TextLine, TextLineRenderer};
-use crate::gui::render::text::TextBackground;
+use render::{GuiImage, GuiLayerMesh};
+use render::text::TextBackground;
+use crate::script::ScriptingEngine;
 use crate::tools::input::InputState;
+use crate::world::World;
 
 pub mod render;
 pub mod hotbar;
+pub mod chat;
 
 pub struct GuiManager {
     viewport_size: Vector<f32, 2>,
@@ -19,11 +23,12 @@ pub struct GuiManager {
     cursor_position: Vector<f32, 2>,
     cursor: GuiCursor,
     hotbar: hotbar::Hotbar,
-    inventory: MeshRenderer<GuiVertex>,
+    chat_box: chat::ChatBox,
+    inventory: GuiImage,
+    inventory_layer: GuiLayerMesh,
     inventory_shown: bool,
     fps_display: TextLineRenderer,
     player_info_display: TextLineRenderer,
-    input_test: TextLineRenderer,
 }
 
 impl GuiManager {
@@ -36,46 +41,39 @@ impl GuiManager {
             cursor_position: Vector::zero(),
             cursor: GuiCursor::new(Vector::zero(), Vector::zero(), &crate::world::item::types::AIR),
             hotbar: hotbar::Hotbar::new(assets)?,
-            inventory: MeshRenderer::create(),
+            chat_box: chat::ChatBox::new(20, 12.0, 0.4)?,
+            inventory: GuiImage::new(
+                Rectangle::new(Vector([-106.0, -62.0]), Vector([106.0, 62.0])),
+                Color::White.into(),
+                assets.get_gui_image("gui/inventory")?,
+            ),
+            inventory_layer: GuiLayerMesh::create(),
             inventory_shown: false,
             fps_display: TextLineRenderer::create(
                 TextLine::new(
                     Vector([0.0, 0.0]),
-                    Vector([1.0, 1.0, 1.0, 1.0]),
+                    Color::White.into(),
                     TextBackground::Rectangle {
-                        color: Vector([0.0, 0.0, 0.0, 0.4]),
+                        color: Color::Black.with_alpha(0.4),
                         margin: Vector([1.0, 0.0]),
                     },
                     String::new(),
                 ),
                 Vector([0.0, 0.0]),
-                Vector([0.0, 0.0]),
+                Vector([1.0, 0.0]),
             ),
             player_info_display: TextLineRenderer::create(
                 TextLine::new(
                     Vector([1.0, 0.0]),
-                    Vector([1.0, 1.0, 1.0, 1.0]),
+                    Color::White.into(),
                     TextBackground::Rectangle {
-                        color: Vector([0.0, 0.0, 0.0, 0.4]),
+                        color: Color::Black.with_alpha(0.4),
                         margin: Vector([1.0, 0.0]),
                     },
                     String::new(),
                 ),
                 Vector([1.0, 0.0]),
-                Vector([0.0, 0.0]),
-            ),
-            input_test: TextLineRenderer::create(
-                TextLine::new(
-                    Vector([0.5, 0.5]),
-                    Vector([1.0, 1.0, 1.0, 1.0]),
-                    TextBackground::Rectangle {
-                        color: Vector([0.0, 0.0, 0.0, 0.4]),
-                        margin: Vector([1.0, 0.0]),
-                    },
-                    String::new(),
-                ),
-                Vector([0.5, 0.25]),
-                Vector([0.0, 0.0]),
+                Vector([-1.0, 0.0]),
             ),
         })
     }
@@ -140,22 +138,24 @@ impl GuiManager {
         &mut self.hotbar
     }
 
-    pub fn inventory_shown(&self) -> bool {
-        self.inventory_shown
+    pub fn chat_box(&self) -> &chat::ChatBox {
+        &self.chat_box
     }
 
-    pub fn set_inventory_shown(&mut self, shown: bool) {
-        self.inventory_shown = shown;
+    pub fn chat_box_mut(&mut self) -> &mut chat::ChatBox {
+        &mut self.chat_box
     }
 
     pub fn reload_assets(&mut self, assets: &mut AssetPool) -> Result<(), String> {
         self.hotbar.reload_assets(assets)?;
-        self.inventory.clear();
+        self.chat_box.reload_assets();
+        self.inventory.set_atlas_region(assets.get_gui_image("gui/inventory")?);
+        self.inventory_layer.clear();
         Ok(())
     }
 
-    pub fn update_fps_display(&mut self, average_fps: f32) {
-        self.fps_display.data_mut().set_text(format!("Average FPS: {average_fps:.1}"));
+    pub fn update_fps_display(&mut self, min_fps: f32) {
+        self.fps_display.data_mut().set_text(format!("Min recent FPS: {min_fps:.1}"));
     }
 
     pub fn update_player_info_display(&mut self, position: Vector<f32, 2>, velocity: Vector<f32, 2>) {
@@ -183,63 +183,44 @@ impl GuiManager {
         }
     }
 
-    pub fn entered_text(&self) -> &str {
-        self.input_test.data().text()
-    }
-
-    pub fn enter_text(&mut self, text: &str) {
-        let mut string = self.input_test.data().text().to_string();
-        string.push_str(text);
-        self.input_test.data_mut().set_text(string);
-    }
-
-    pub fn backspace(&mut self) {
-        let mut string = self.input_test.data().text().to_string();
-        string.pop();
-        self.input_test.data_mut().set_text(string);
-    }
-
-    pub fn clear_text(&mut self) {
-        self.input_test.data_mut().set_text(String::new());
-    }
-
-    pub fn handle_input(&mut self, inputs: &InputState) -> bool {
+    pub fn handle_cursor(&mut self, inputs: &InputState, scripting: &ScriptingEngine, world: &mut World, assets: &AssetPool) -> bool {
+        let _ = (scripting, world, assets);
         let cursor_offset = self.anchor_adjustment(self.cursor.anchor(), self.hotbar.anchor())
             + self.cursor.offset();
-        if self.hotbar.handle_input(cursor_offset, inputs) {
-            return true;
-        }
-        false
+
+        self.hotbar.handle_cursor(cursor_offset, inputs)
+    }
+
+    pub fn handle_keyboard(&mut self, inputs: &InputState, scripting: &ScriptingEngine, world: &mut World, assets: &AssetPool) -> bool {
+        // TODO: probably need some kind of "focus" system... idk how exactly that should work
+        self.chat_box.handle_keyboard(inputs, scripting, world, assets) ||
+            {
+                if inputs.key_was_pressed(Key::E) {
+                    self.inventory_shown = !self.inventory_shown;
+                    true
+                }
+                else {
+                    false
+                }
+            }
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {
         assets.gui_shaders().set_uniform("offset_scale", &self.offset_scale);
         assets.gui_shaders().set_uniform("tex_atlas", assets.gui_texture());
 
-        if self.inventory.is_empty() {
-            let atlas_region = assets.get_gui_image("gui/inventory").unwrap();
-            let to_f32 = |x: u32| x as f32;
-            self.inventory.add(
-                &[
-                    GuiVertex::new(Vector([-106.0, -62.0]), None, Some(atlas_region.min.map(to_f32))),
-                    GuiVertex::new(Vector([-106.0, 62.0]), None, Some(atlas_region.min_x_max_y().map(to_f32))),
-                    GuiVertex::new(Vector([106.0, 62.0]), None, Some(atlas_region.max.map(to_f32))),
-                    GuiVertex::new(Vector([106.0, -62.0]), None, Some(atlas_region.max_x_min_y().map(to_f32))),
-                ],
-                &[
-                    [0, 1, 2],
-                    [2, 3, 0],
-                ],
-            );
-        }
         if self.inventory_shown {
+            if self.inventory_layer.is_empty() {
+                self.inventory.append_to_mesh(self.inventory_layer.data_mut(), Vector::zero());
+                self.inventory_layer.upload_buffers();
+            }
             assets.gui_texture().bind();
             assets.gui_shaders().set_uniform("anchor", &Vector([0.5f32, 0.5f32]));
-            self.inventory.render();
-            self.input_test.render(assets);
+            self.inventory_layer.render();
         }
 
         self.hotbar.render(assets);
+        self.chat_box.render(assets);
 
         self.fps_display.render(assets);
         self.player_info_display.render(assets);

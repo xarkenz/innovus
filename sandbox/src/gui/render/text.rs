@@ -1,4 +1,5 @@
 use innovus::gfx::{Mesh, MeshRenderer};
+use innovus::gfx::color::AlphaColor;
 use innovus::tools::Vector;
 use crate::gui::render::GuiVertex;
 use crate::tools::asset::AssetPool;
@@ -7,18 +8,18 @@ use crate::tools::asset::AssetPool;
 pub enum TextBackground {
     None,
     Rectangle {
-        color: Vector<f32, 4>,
+        color: AlphaColor,
         margin: Vector<f32, 2>,
     },
     DropShadow {
-        color: Vector<f32, 4>,
+        color: AlphaColor,
         offset: Vector<f32, 2>,
     },
 }
 
 pub struct TextLine {
     fixed_point: Vector<f32, 2>,
-    text_color: Vector<f32, 4>,
+    text_color: AlphaColor,
     background: TextBackground,
     text: String,
     mesh: Mesh<GuiVertex>,
@@ -27,7 +28,7 @@ pub struct TextLine {
 impl TextLine {
     pub fn new(
         fixed_point: Vector<f32, 2>,
-        text_color: Vector<f32, 4>,
+        text_color: AlphaColor,
         background: TextBackground,
         text: String,
     ) -> Self {
@@ -51,11 +52,11 @@ impl TextLine {
         self.fixed_point = fixed_point;
     }
 
-    pub fn text_color(&self) -> Vector<f32, 4> {
+    pub fn text_color(&self) -> AlphaColor {
         self.text_color
     }
 
-    pub fn set_text_color(&mut self, color: Vector<f32, 4>) {
+    pub fn set_text_color(&mut self, color: AlphaColor) {
         if color != self.text_color {
             self.invalidate();
         }
@@ -75,6 +76,14 @@ impl TextLine {
 
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    pub fn text_mut(&mut self) -> &mut String {
+        // We have no idea what the caller is going to do with the string, but we know that they
+        // must release the reference to self.text in order to redraw the line. Thus, invalidating
+        // here ensures that the caller's changes are reflected the next time a redraw happens.
+        self.invalidate();
+        &mut self.text
     }
 
     pub fn set_text(&mut self, text: String) {
@@ -151,7 +160,7 @@ impl TextLine {
                     &OFFSETS.map(|(vertex_offset, _)| {
                         GuiVertex::new(
                             background_offset + vertex_offset * background_size,
-                            Some(color),
+                            Some(color.rgba()),
                             None,
                         )
                     }),
@@ -171,7 +180,7 @@ impl TextLine {
                 let vertices = OFFSETS.map(|(vertex_offset, atlas_offset)| {
                     GuiVertex::new(
                         current_offset + vertex_offset.mul(glyph_max_size),
-                        Some(self.text_color),
+                        Some(self.text_color.rgba()),
                         Some((image_origin + atlas_offset).map(|x| x as f32)),
                     )
                 });
@@ -180,7 +189,7 @@ impl TextLine {
                     let mut shadow_vertices = vertices.clone();
                     for vertex in &mut shadow_vertices {
                         vertex.offset += shadow_offset;
-                        vertex.color = color;
+                        vertex.color = color.rgba();
                     }
                     self.mesh.add(&shadow_vertices, &[[0, 1, 2], [2, 3, 0]]);
                 }

@@ -92,17 +92,13 @@ impl<'world> Game<'world> {
     }
 
     pub fn run_frame(&mut self, inputs: &InputState, window: &mut Window) {
+        let _ = window;
         let dt = self.frame_clock.read();
         self.frame_clock.reset();
         self.fps_tracker[self.fps_tracker_index] = 1.0 / dt;
         self.fps_tracker_index = (self.fps_tracker_index + 1) % self.fps_tracker.len();
 
         if inputs.key_is_held(Key::LeftControl) {
-            if inputs.key_was_pressed(Key::V) {
-                if let Some(pasted_text) = window.get_clipboard_string() {
-                    self.gui.enter_text(&pasted_text);
-                }
-            }
             if inputs.key_was_pressed(Key::R) {
                 match self.assets.reload() {
                     Err(err) => eprintln!("Failed to reload assets: {err}"),
@@ -110,30 +106,6 @@ impl<'world> Game<'world> {
                 }
                 if let Err(err) = self.gui.reload_assets(&mut self.assets) {
                     eprintln!("Failed to reload assets: {err}");
-                }
-            }
-        }
-
-        if self.gui.inventory_shown() {
-            if inputs.key_was_repeated(Key::Backspace) {
-                self.gui.backspace();
-            }
-            if !inputs.entered_text().is_empty() {
-                self.gui.enter_text(inputs.entered_text());
-            }
-            if inputs.key_was_pressed(Key::Enter) {
-                if self.gui.entered_text().starts_with('/') {
-                    let result = self.scripting.dispatch_command(
-                        self.gui.entered_text(),
-                        self.current_world.as_mut().unwrap(),
-                        &self.assets,
-                    );
-                    let text = result.unwrap_or_else(|error| error);
-                    self.gui.clear_text();
-                    self.gui.enter_text(&text);
-                }
-                else {
-                    self.gui.clear_text();
                 }
             }
         }
@@ -171,11 +143,9 @@ impl<'world> Game<'world> {
                     PlayerMode::Spectating => PlayerMode::Normal,
                 });
             }
-            if inputs.key_was_pressed(Key::Escape) {
-                self.gui.set_inventory_shown(!self.gui.inventory_shown());
-                self.gui.clear_text();
-            }
-            self.gui.handle_input(inputs);
+            // TODO: actually handle the part where these should capture input
+            self.gui.handle_cursor(inputs, &self.scripting, world, &self.assets);
+            self.gui.handle_keyboard(inputs, &self.scripting, world, &self.assets);
 
             if left_held || right_held || middle_held {
                 let chunk_location = Vector([
@@ -233,9 +203,9 @@ impl<'world> Game<'world> {
                 world.player().position(),
                 world.player().velocity(),
             );
-            let average_fps = self.fps_tracker.iter().sum::<f32>() / self.fps_tracker.len() as f32;
-            if average_fps.is_finite() {
-                self.gui.update_fps_display(average_fps);
+            let min_fps = self.fps_tracker.into_iter().reduce(f32::min).unwrap_or(f32::NAN);
+            if min_fps.is_finite() {
+                self.gui.update_fps_display(min_fps);
             }
 
             clear_color = world.sky_color();
