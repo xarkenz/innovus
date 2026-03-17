@@ -1,22 +1,22 @@
 use crate::script::CommandResult;
-use crate::tools::asset::AssetPool;
+use crate::tools::asset::text::TextAsset;
 use crate::world::item::{ItemType, ITEM_TYPES};
 
-pub fn parse_u32(string: &str, assets: &AssetPool) -> CommandResult<u32> {
-    string.parse().map_err(|_| assets.get_template_text(
+pub fn parse_u32(string: &str) -> CommandResult<u32> {
+    string.parse().map_err(|_| TextAsset::template(
         "command.error.invalid_integer",
-        &[string],
-    ))
+        Box::new([string.into()]),
+    ).into())
 }
 
-pub fn parse_item_type(name: &str, assets: &AssetPool) -> CommandResult<&'static ItemType> {
+pub fn parse_item_type(name: &str) -> CommandResult<&'static ItemType> {
     // TODO: HashMap would probably be better
     ITEM_TYPES
         .iter()
         .copied()
         .find(|item_type| item_type.name() == name)
-        .ok_or_else(|| assets.get_template_text(
+        .ok_or_else(|| TextAsset::template(
             "command.error.no_such_item",
-            &[name],
-        ))
+            Box::new([name.into()]),
+        ).into())
 }

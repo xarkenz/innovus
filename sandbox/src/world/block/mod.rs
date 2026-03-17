@@ -148,6 +148,10 @@ impl BlockType {
         self.palette_key
     }
 
+    pub fn is_air(&self) -> bool {
+        self == &types::AIR
+    }
+
     pub fn get_attribute_info(&self, name: &str) -> Option<(usize, &AttributeType)> {
         self.attributes
             .iter()
@@ -194,6 +198,12 @@ impl std::fmt::Debug for BlockType {
     }
 }
 
+impl Default for &'static BlockType {
+    fn default() -> Self {
+        &types::AIR
+    }
+}
+
 pub const QUADRANT_OFFSETS: [Vector<f32, 2>; 4] = [
     Vector([0.0, 0.5]), // Top left
     Vector([0.5, 0.5]), // Top right
@@ -226,6 +236,10 @@ impl Block {
         self.block_type
     }
 
+    pub fn is_air(&self) -> bool {
+        self.block_type.is_air()
+    }
+
     pub fn attributes(&self) -> &[AttributeValue] {
         &self.attributes
     }
@@ -250,7 +264,7 @@ impl Block {
         (self.block_type.connects_to)(self, other)
     }
 
-    pub fn handle_right_click(&self, held_item: &Item, side: BlockSide) -> (Option<Self>, Option<Item>) {
+    pub fn handle_use_item(&self, held_item: &Item, side: BlockSide) -> (Option<Self>, Option<Item>) {
         (self.block_type.right_click)(self, held_item, side)
     }
 }

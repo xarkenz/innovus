@@ -19,9 +19,9 @@ path = "snek/src/main.rs"
 [dependencies]
 fnv = "1.0.7"
 gl = "0.14.0"
-glfw = "0.60.0"
+glfw = "0.61.0"
 image = "0.25.6"
 json = "0.12.4"
 num = "0.4.0"
-rodio = "0.21.1"
+rodio = "0.22.2"
 uuid = { version = "1.2.2", features = ["v4", "fast-rng"] }

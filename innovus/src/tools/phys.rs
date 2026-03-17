@@ -180,7 +180,7 @@ impl Collider {
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
-        self.rectangle.intersects_inclusive(&other.rectangle)
+        self.rectangle.intersects_exclusive(&other.rectangle)
     }
 
     pub fn broad_phase(&self, dt: f32) -> Rectangle<f32> {
@@ -306,7 +306,7 @@ impl Physics {
             // Double-check that there is still a broad phase intersection between the colliders.
             // This is necessary because the colliders' velocities may have changed since the
             // initial sweep (due to previous collisions).
-            if !collider_1.broad_phase(dt).intersects_inclusive(&collider_2.broad_phase(dt)) {
+            if !collider_1.broad_phase(dt).intersects_exclusive(&collider_2.broad_phase(dt)) {
                 continue;
             }
 
@@ -372,7 +372,7 @@ impl Physics {
                 // check if there is broad phase intersection. The broad phase is a
                 // rectangle encompassing the projected motion of a collider, so if their
                 // broad phases don't intersect, we can discard the pair.
-                if !collider_1.broad_phase(dt).intersects_inclusive(&collider_2.broad_phase(dt)) {
+                if !collider_1.broad_phase(dt).intersects_exclusive(&collider_2.broad_phase(dt)) {
                     continue;
                 }
                 // Now, check for an actual collision between the two colliders.

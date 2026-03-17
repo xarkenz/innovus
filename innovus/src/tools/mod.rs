@@ -305,7 +305,7 @@ where
     type Output = Vector<<T as Neg>::Output, N>;
 
     fn neg(self) -> Self::Output {
-        Vector(self.0.map(|x| -x))
+        Vector(self.0.map(Neg::neg))
     }
 }
 
@@ -314,7 +314,7 @@ where
     T: Zero + Add<Output = T>,
 {
     fn sum<I: Iterator<Item = Vector<T, N>>>(iter: I) -> Self {
-        iter.reduce(|lhs, rhs| lhs + rhs).unwrap_or(Vector::zero())
+        iter.reduce(Add::add).unwrap_or(Vector::zero())
     }
 }
 
@@ -770,7 +770,7 @@ where
     type Output = Matrix<<T as Neg>::Output, R, C>;
 
     fn neg(self) -> Self::Output {
-        Matrix(self.0.map(|v| -v))
+        Matrix(self.0.map(Neg::neg))
     }
 }
 
@@ -988,7 +988,7 @@ impl<T, const N: usize> Rectangle<T, N> {
             std::iter::zip(&other.min.0, &other.max.0),
         )
             .all(|((self_min, self_max), (other_min, other_max))| {
-                self_max > other_min && self_min < other_max
+                self_max >= other_min && self_min <= other_max
             })
     }
 

@@ -1,7 +1,7 @@
 use glfw::{Action, Modifiers};
 use innovus::tools::Vector;
 
-pub use glfw::{Key, MouseButton};
+pub use glfw::{Key, MouseButton, MouseButtonLeft, MouseButtonRight, MouseButtonMiddle};
 
 const FIRST_KEY_VALUE: usize = Key::Space as usize;
 const LAST_KEY_VALUE: usize = Key::Menu as usize;

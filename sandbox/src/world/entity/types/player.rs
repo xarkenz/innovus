@@ -1,39 +1,20 @@
-use innovus::tools::phys::Physics;
-use crate::tools::*;
-use crate::tools::asset::AssetPool;
-use crate::tools::asset::entity::EntityImage;
-use crate::tools::input::{InputState, Key};
-use crate::world::block::ChunkMap;
-use crate::world::entity::{movement, Entity};
-use crate::world::entity::render::{EntityPiece, EntityPieceHandle, EntityRenderer};
-use crate::world::item::Item;
-use crate::world::particle::ParticleManager;
 use super::*;
-
-struct PlayerAppearance {
-    idle_image: EntityImage,
-    run_image: EntityImage,
-    jump_ascend_image: EntityImage,
-    jump_descend_image: EntityImage,
-    crouch_idle_image: EntityImage,
-    crouch_walk_image: EntityImage,
-    body: EntityPieceHandle,
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum PlayerMode {
-    Normal,
-    Spectating,
-}
+use crate::tools::asset::entity::EntityImage;
+use crate::tools::input::{InputState, Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight};
+use crate::world::block::CHUNK_SIZE;
+use crate::world::entity::render::{EntityPiece, EntityPieceHandle};
+use crate::world::item::ITEM_TYPES;
 
 const JUMP_COOLDOWN_SECONDS: f32 = 0.3;
 const COYOTE_TIME_SECONDS: f32 = 0.1;
+const SPECTATOR_MAX_SPEED: f32 = 20.0;
 
 pub struct Player {
     uuid: Uuid,
     position: Vector<f32, 2>,
     velocity: Vector<f32, 2>,
     collider: Option<phys::ColliderHandle>,
+    inputs: PlayerInputs,
     appearance: Option<PlayerAppearance>,
     name: String,
     mode: PlayerMode,
@@ -46,6 +27,38 @@ pub struct Player {
     coyote_time: f32,
 }
 
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum PlayerMode {
+    Normal,
+    Spectating,
+}
+
+#[derive(Clone, Default, Debug)]
+struct PlayerInputs {
+    left: bool,
+    right: bool,
+    up: bool,
+    down: bool,
+    jump: bool,
+    crouch: bool,
+    destroy_block: bool,
+    use_item: bool,
+    pick_block: bool,
+    next_mode: bool,
+    next_item: isize,
+    block_pos: Option<(Vector<i64, 2>, BlockSide)>,
+}
+
+struct PlayerAppearance {
+    idle_image: EntityImage,
+    run_image: EntityImage,
+    jump_ascend_image: EntityImage,
+    jump_descend_image: EntityImage,
+    crouch_idle_image: EntityImage,
+    crouch_walk_image: EntityImage,
+    body: EntityPieceHandle,
+}
+
 impl Player {
     pub fn new(uuid: Uuid, position: Vector<f32, 2>, name: Option<String>, mode: PlayerMode) -> Self {
         Self {
@@ -53,10 +66,11 @@ impl Player {
             position,
             velocity: Vector::zero(),
             collider: None,
+            inputs: Default::default(),
             appearance: None,
             name: name.unwrap_or_else(|| "(anonymous)".into()),
             mode,
-            held_item: Item::new(&crate::world::item::types::AIR, 0),
+            held_item: Default::default(),
             crouching: false,
             spawn_point: None,
             movement_accel: 32.0,
@@ -101,6 +115,41 @@ impl Player {
 
         // TODO
     }
+
+    pub fn handle_mouse(&mut self, inputs: &InputState, cursor_world_pos: Vector<f32, 2>) {
+        self.inputs.destroy_block = inputs.button_is_held(MouseButtonLeft);
+        self.inputs.use_item = inputs.button_is_held(MouseButtonRight);
+        self.inputs.pick_block = inputs.button_is_held(MouseButtonMiddle);
+
+        if self.inputs.destroy_block || self.inputs.use_item || self.inputs.pick_block {
+            let block_pos = cursor_world_pos.map(|x| x.floor() as i64);
+
+            if self.inputs.block_pos.is_some_and(|(pos, _)| block_pos == pos) {
+                self.inputs.destroy_block = false;
+                self.inputs.use_item = false;
+                self.inputs.pick_block = false;
+            }
+            else {
+                self.inputs.block_pos = Some((block_pos, BlockSide::from_position(cursor_world_pos)));
+            }
+        }
+        else {
+            self.inputs.block_pos = None;
+        }
+    }
+
+    pub fn handle_keyboard(&mut self, inputs: &InputState) {
+        self.inputs.left = inputs.key_is_held(Key::A);
+        self.inputs.right = inputs.key_is_held(Key::D);
+        self.inputs.up = inputs.key_is_held(Key::W);
+        self.inputs.down = inputs.key_is_held(Key::S);
+        self.inputs.jump = self.inputs.up || inputs.key_is_held(Key::Space);
+        self.inputs.crouch = self.inputs.down || inputs.key_is_held(Key::LeftShift);
+        self.inputs.next_mode ^= inputs.key_was_pressed(Key::F4);
+        if inputs.key_was_repeated(Key::Tab) {
+            self.inputs.next_item += if inputs.key_is_held(Key::LeftShift) { -1 } else { 1 };
+        }
+    }
 }
 
 impl Entity for Player {
@@ -124,6 +173,12 @@ impl Entity for Player {
             ),
             Vector::zero(),
         )));
+    }
+
+    fn detach_collision(&mut self, physics: &mut Physics) {
+        if let Some(collider) = self.collider.take() {
+            physics.remove_collider(collider);
+        }
     }
 
     fn attach_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
@@ -151,51 +206,34 @@ impl Entity for Player {
         });
     }
 
-    fn detach_collision(&mut self, physics: &mut Physics) {
-        if let Some(collider) = self.collider.take() {
-            physics.remove_collider(collider);
-        }
-    }
-
     fn detach_appearance(&mut self, renderer: &mut EntityRenderer) {
         if let Some(appearance) = self.appearance.take() {
             renderer.remove_piece(appearance.body);
         }
     }
 
-    fn update(
-        &mut self,
-        dt: f32,
-        inputs: &InputState,
-        physics: &mut Physics,
-        renderer: &mut EntityRenderer,
-        chunks: &mut ChunkMap,
-        particles: &mut ParticleManager,
-    ) {
-        let _ = (chunks, particles);
-
+    fn run_frame(&mut self, dt: f32, physics: &mut Physics, renderer: &mut EntityRenderer, responses: &mut EntityResponseQueue) {
+        let _ = responses;
         let mut touching_ground = true;
 
         if self.mode == PlayerMode::Spectating {
-            const SPEED_LIMIT: f32 = 20.0;
-
-            if inputs.key_is_held(Key::A) {
-                self.velocity.set_x((self.velocity.x() - self.movement_accel * dt).max(-SPEED_LIMIT));
+            if self.inputs.left {
+                self.velocity.set_x((self.velocity.x() - self.movement_accel * dt).max(-SPECTATOR_MAX_SPEED));
             }
-            if inputs.key_is_held(Key::D) {
-                self.velocity.set_x((self.velocity.x() + self.movement_accel * dt).min(SPEED_LIMIT));
+            if self.inputs.right {
+                self.velocity.set_x((self.velocity.x() + self.movement_accel * dt).min(SPECTATOR_MAX_SPEED));
             }
-            if inputs.key_is_held(Key::S) {
-                self.velocity.set_y((self.velocity.y() - self.movement_accel * dt).max(-SPEED_LIMIT));
+            if self.inputs.up {
+                self.velocity.set_y((self.velocity.y() + self.movement_accel * dt).min(SPECTATOR_MAX_SPEED));
             }
-            if inputs.key_is_held(Key::W) {
-                self.velocity.set_y((self.velocity.y() + self.movement_accel * dt).min(SPEED_LIMIT));
+            if self.inputs.down {
+                self.velocity.set_y((self.velocity.y() - self.movement_accel * dt).max(-SPECTATOR_MAX_SPEED));
             }
 
-            self.velocity = self.velocity.map(|x| movement::apply_friction(
+            self.velocity = self.velocity.map(|x| apply_friction(
                 x,
                 dt,
-                movement::DEFAULT_FRICTION_DECELERATION,
+                DEFAULT_FRICTION_DECELERATION,
             ));
 
             self.position += self.velocity.mul(dt);
@@ -214,12 +252,11 @@ impl Entity for Player {
                 touching_ground = false;
             }
 
-            let jump_held = inputs.key_is_held(Key::W) || inputs.key_is_held(Key::Space);
-            if !jump_held {
+            if !self.inputs.jump {
                 self.jump_cooldown = 0.0;
             }
             if self.jump_cooldown <= 0.0 {
-                if jump_held && touching_ground {
+                if self.inputs.jump && touching_ground {
                     collider.velocity.set_y(self.jump_speed);
                     self.jump_cooldown += JUMP_COOLDOWN_SECONDS;
                     self.coyote_time = 0.0;
@@ -229,8 +266,7 @@ impl Entity for Player {
                 self.jump_cooldown -= dt;
             }
 
-            let crouch_held = inputs.key_is_held(Key::S) || inputs.key_is_held(Key::LeftShift);
-            if crouch_held {
+            if self.inputs.crouch {
                 self.crouching = true;
                 collider.rectangle.max.set_y(collider.rectangle.min.y() + pixels(23));
             }
@@ -245,23 +281,23 @@ impl Entity for Player {
                 1.0
             };
 
-            if inputs.key_is_held(Key::A) {
+            if self.inputs.left {
                 collider.velocity.set_x((collider.velocity.x() - self.movement_accel * dt).max(speed_multiplier * -5.0));
             }
-            if inputs.key_is_held(Key::D) {
+            if self.inputs.right {
                 collider.velocity.set_x((collider.velocity.x() + self.movement_accel * dt).min(speed_multiplier * 5.0));
             }
 
-            collider.velocity.set_y(movement::apply_gravity(
+            collider.velocity.set_y(apply_gravity(
                 collider.velocity.y(),
                 dt,
-                movement::DEFAULT_GRAVITY_ACCELERATION,
-                movement::DEFAULT_TERMINAL_VELOCITY,
+                DEFAULT_GRAVITY_ACCELERATION,
+                DEFAULT_TERMINAL_VELOCITY,
             ));
-            collider.velocity.set_x(movement::apply_friction(
+            collider.velocity.set_x(apply_friction(
                 collider.velocity.x(),
                 dt,
-                movement::DEFAULT_FRICTION_DECELERATION,
+                DEFAULT_FRICTION_DECELERATION,
             ));
 
             self.position.set_x(collider.rectangle.min.x() + pixels(5));
@@ -303,5 +339,76 @@ impl Entity for Player {
                 }
             }
         }
+
+        self.inputs.left = false;
+        self.inputs.right = false;
+        self.inputs.up = false;
+        self.inputs.down = false;
+        self.inputs.jump = false;
+        self.inputs.crouch = false;
+    }
+
+    fn tick(&mut self, chunks: &ChunkMap, responses: &mut EntityResponseQueue) {
+        let _ = responses;
+
+        if let Some((block_pos, side)) = self.inputs.block_pos {
+            let chunk_location = block_pos.map(|x| x.div_euclid(CHUNK_SIZE as i64));
+            let block_x = block_pos.x().rem_euclid(CHUNK_SIZE as i64) as usize;
+            let block_y = block_pos.y().rem_euclid(CHUNK_SIZE as i64) as usize;
+
+            if self.inputs.destroy_block {
+                responses.push_back((self.uuid, EntityResponse::DestroyBlock {
+                    chunk_location,
+                    block_x,
+                    block_y,
+                }));
+            }
+            if self.inputs.use_item {
+                responses.push_back((self.uuid, EntityResponse::UseHeldItem {
+                    item: self.held_item.clone(),
+                    chunk_location,
+                    block_x,
+                    block_y,
+                    side,
+                }));
+            }
+            if self.inputs.pick_block {
+                let block_type = chunks
+                    .get(chunk_location)
+                    .map_or(Default::default(), |chunk| {
+                        chunk.block_at(block_x, block_y).block_type()
+                    });
+                if let Some(item_type) = block_type.item_type() {
+                    self.held_item = Item::with_max_count(item_type);
+                }
+            }
+        }
+
+        if self.inputs.next_item != 0 {
+            let held_item_type = self.held_item.item_type();
+            let item_index = ITEM_TYPES
+                .iter()
+                .position(|&item_type| item_type == held_item_type)
+                .unwrap();
+            let next_item_index = (item_index as isize + self.inputs.next_item).rem_euclid(ITEM_TYPES.len() as isize) as usize;
+            self.held_item = Item::with_max_count(ITEM_TYPES[next_item_index]);
+        }
+        if self.inputs.next_mode {
+            self.mode = match self.mode {
+                PlayerMode::Normal => PlayerMode::Spectating,
+                PlayerMode::Spectating => PlayerMode::Normal,
+            };
+        }
+
+        self.inputs.destroy_block = false;
+        self.inputs.use_item = false;
+        self.inputs.pick_block = false;
+        self.inputs.next_item = 0;
+        self.inputs.next_mode = false;
+    }
+
+    fn set_held_item(&mut self, item: Item, responses: &mut EntityResponseQueue) {
+        let _ = responses;
+        self.held_item = item;
     }
 }

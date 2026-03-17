@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::tools::asset::AssetPool;
+use crate::tools::asset::text::{TextAsset, TextElement};
 use crate::world::World;
 
 pub mod builtin_commands;
@@ -7,9 +7,7 @@ pub mod utils;
 
 pub use builtin_commands::BUILTIN_COMMANDS;
 
-pub type CommandResult<T> = Result<T, String>;
-
-pub type DispatchFn = fn(&[&str], &mut World, &AssetPool) -> CommandResult<String>;
+pub type CommandResult<T = TextElement> = Result<T, TextElement>;
 
 #[derive(Clone, Debug)]
 pub struct Command {
@@ -18,6 +16,8 @@ pub struct Command {
     max_arg_count: usize,
     dispatch: DispatchFn,
 }
+
+type DispatchFn = fn(&[&str], &mut World) -> CommandResult;
 
 impl Command {
     pub const fn new(name: &'static str, min_arg_count: usize, max_arg_count: usize, dispatch: DispatchFn) -> Self {
@@ -54,8 +54,8 @@ impl Command {
         }
     }
 
-    pub fn dispatch(&self, args: &[&str], world: &mut World, assets: &AssetPool) -> CommandResult<String> {
-        (self.dispatch)(args, world, assets)
+    pub fn dispatch(&self, args: &[&str], world: &mut World) -> CommandResult {
+        (self.dispatch)(args, world)
     }
 }
 
@@ -73,25 +73,25 @@ impl ScriptingEngine {
         }
     }
 
-    pub fn dispatch_command(&self, command: &str, world: &mut World, assets: &AssetPool) -> CommandResult<String> {
+    pub fn dispatch_command(&self, command: &str, world: &mut World) -> CommandResult {
         let command = command.strip_prefix('/').unwrap_or(command);
         let mut args = command.split_whitespace();
 
         let Some(command_name) = args.next().map(str::to_lowercase) else {
-            return Err(assets.get_text("command.error.empty").into());
+            return Err(TextAsset::simple("command.error.empty").into());
         };
         let Some(command) = self.commands.get(&command_name) else {
-            return Err(assets.get_text("command.error.unknown").into());
+            return Err(TextAsset::simple("command.error.unknown").into());
         };
 
         let args = Vec::from_iter(args);
         if !command.accepts_arg_count(args.len()) {
-            return Err(assets.get_template_text(
-                "command.error.arg_count",
-                &[&command.get_arg_count_string(), &args.len().to_string()],
-            ));
+            return Err(TextAsset::template("command.error.arg_count", Box::new([
+                command.get_arg_count_string().into(),
+                args.len().to_string().into(),
+            ])).into());
         }
 
-        command.dispatch(&args, world, assets)
+        command.dispatch(&args, world)
     }
 }

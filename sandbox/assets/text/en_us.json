@@ -1,4 +1,7 @@
 {
+  "chat": {
+    "player": "{0}: {1}"
+  },
   "command": {
     "error": {
       "empty": "A command must be specified after '/'.",
@@ -12,7 +15,8 @@
     "give": {
       "success": "Gave player {0}\u00D7 {1}.",
       "success_empty": "Cleared player hand."
-    }
+    },
+    "hello": "Hello, world!"
   },
   "item": {
     "aluminum": "Aluminum",

@@ -1,21 +1,16 @@
+use std::collections::VecDeque;
 use std::path::Path;
-use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight, Window};
+use glfw::{Key, Window};
 use innovus::gfx::color::Color;
 use innovus::gfx::screen;
 use innovus::tools::{Clock, Vector};
 use crate::audio::AudioEngine;
-use crate::gui::GuiManager;
-use crate::script::ScriptingEngine;
+use crate::gui::{GuiManager, GuiRequest, GuiResponse, GuiResponseQueue};
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
 use crate::world::camera::Camera;
-use crate::world::block::{BlockSide, CHUNK_SIZE};
-use crate::world::block::types::AIR;
-use crate::world::entity::Entity;
-use crate::world::entity::types::player::PlayerMode;
 use crate::world::gen::WorldGenerator;
-use crate::world::item::{Item, ITEM_TYPES};
-use crate::world::World;
+use crate::world::{World, WorldRequest, WorldResponse, WorldResponseQueue};
 
 pub struct Game<'world> {
     frame_clock: Clock,
@@ -25,10 +20,9 @@ pub struct Game<'world> {
     content_scale: Vector<f32, 2>,
     assets: AssetPool,
     gui: GuiManager,
-    scripting: ScriptingEngine,
+    gui_responses: GuiResponseQueue,
     audio: AudioEngine,
     current_world: Option<World<'world>>,
-    last_block_pos: Option<(usize, usize)>,
 }
 
 impl<'world> Game<'world> {
@@ -43,11 +37,10 @@ impl<'world> Game<'world> {
             viewport_size,
             content_scale,
             gui: GuiManager::new(viewport_size, content_scale, 8.0, &mut assets)?,
+            gui_responses: GuiResponseQueue::new(),
             assets,
-            scripting: ScriptingEngine::new(),
             audio: AudioEngine::new()?,
             current_world: None,
-            last_block_pos: None,
         };
         game.set_viewport_size(viewport_size);
         Ok(game)
@@ -98,120 +91,93 @@ impl<'world> Game<'world> {
         self.fps_tracker[self.fps_tracker_index] = 1.0 / dt;
         self.fps_tracker_index = (self.fps_tracker_index + 1) % self.fps_tracker.len();
 
+        let mut world_responses = WorldResponseQueue::new();
+
         if inputs.key_is_held(Key::LeftControl) {
             if inputs.key_was_pressed(Key::R) {
                 match self.assets.reload() {
                     Err(err) => eprintln!("Failed to reload assets: {err}"),
                     Ok(()) => println!("Reloaded assets."),
                 }
-                if let Err(err) = self.gui.reload_assets(&mut self.assets) {
-                    eprintln!("Failed to reload assets: {err}");
+                self.gui.update(GuiRequest::ReloadAssets(&mut self.assets), &mut self.gui_responses);
+                if let Some(world) = &mut self.current_world {
+                    world.update(WorldRequest::ReloadAssets(&mut self.assets), &mut world_responses);
                 }
             }
         }
 
-        let cursor_pos = inputs.cursor_pos().map(|x| x as f32);
-        let left_held = inputs.button_is_held(MouseButtonLeft);
-        let right_held = inputs.button_is_held(MouseButtonRight);
-        let middle_held = inputs.button_is_held(MouseButtonMiddle);
+        self.gui.update(GuiRequest::HandleMouse(inputs), &mut self.gui_responses);
+        self.gui.update(GuiRequest::HandleKeyboard(inputs), &mut self.gui_responses);
 
-        self.gui.set_cursor_position(cursor_pos);
+        // Flush GUI responses, including those from the previous frame
+        let mut world_requests = VecDeque::new();
+        while let Some(response) = self.gui_responses.pop_front() {
+            match response {
+                GuiResponse::WorldHandleMouse => {
+                    world_requests.push_back(WorldRequest::HandleMouse(inputs));
+                }
+                GuiResponse::WorldHandleKeyboard => {
+                    world_requests.push_back(WorldRequest::HandleKeyboard(inputs));
+                }
+                GuiResponse::PlayerChat { content } => {
+                    world_requests.push_back(WorldRequest::PlayerChat {
+                        content,
+                    });
+                }
+                GuiResponse::PlaySound { path } => {
+                    self.audio.play_sound(self.assets.resolve_path(&path)).ok();
+                }
+                GuiResponse::AssetError { message } => {
+                    eprintln!("Failed to load assets: {message}");
+                }
+            }
+        }
 
         let clear_color;
         if let Some(world) = &mut self.current_world {
-            if let Some(scroll_amount) = inputs.scroll_amount() {
-                let target_zoom = world.camera().zoom().mul(f32::powf(1.125, scroll_amount.y() as f32));
-                world.camera_mut().set_zoom(target_zoom);
+            for request in world_requests {
+                world.update(request, &mut world_responses);
             }
+            world.update(WorldRequest::RunFrame {
+                dt,
+                assets: &mut self.assets,
+            }, &mut world_responses);
 
-            let cursor_world_pos = world.camera().get_world_pos(cursor_pos);
-
-            if inputs.key_was_repeated(Key::Tab) {
-                let offset = if inputs.key_is_held(Key::LeftShift) { -1 } else { 1 };
-                let held_item_type = world.player().held_item().item_type();
-                let item_index = ITEM_TYPES
-                    .iter()
-                    .position(|&item_type| item_type == held_item_type)
-                    .unwrap();
-                let next_item_index = (item_index as isize + offset).rem_euclid(ITEM_TYPES.len() as isize) as usize;
-                world.player_mut().set_held_item(Item::with_max_count(ITEM_TYPES[next_item_index]));
-            }
-            if inputs.key_was_pressed(Key::F4) {
-                let current_mode = world.player().mode();
-                world.player_mut().set_mode(match current_mode {
-                    PlayerMode::Normal => PlayerMode::Spectating,
-                    PlayerMode::Spectating => PlayerMode::Normal,
-                });
-            }
-            // TODO: actually handle the part where these should capture input
-            self.gui.handle_cursor(inputs, &self.scripting, world, &self.assets);
-            self.gui.handle_keyboard(inputs, &self.scripting, world, &self.assets);
-
-            if left_held || right_held || middle_held {
-                let chunk_location = Vector([
-                    cursor_world_pos.x().div_euclid(CHUNK_SIZE as f32) as i64,
-                    cursor_world_pos.y().div_euclid(CHUNK_SIZE as f32) as i64,
-                ]);
-                let block_x = cursor_world_pos.x().rem_euclid(CHUNK_SIZE as f32) as usize;
-                let block_y = cursor_world_pos.y().rem_euclid(CHUNK_SIZE as f32) as usize;
-
-                if self.last_block_pos.is_none_or(|pos| pos != (block_x, block_y)) {
-                    self.last_block_pos = Some((block_x, block_y));
-                    if middle_held {
-                        let block_type = world
-                            .get_chunk(chunk_location)
-                            .map_or(&AIR, |chunk| {
-                                chunk.block_at(block_x, block_y).block_type()
-                            });
-                        if let Some(item_type) = block_type.item_type() {
-                            world.player_mut().set_held_item(Item::new(
-                                item_type,
-                                item_type.max_count(),
-                            ));
-                        }
+            for response in world_responses {
+                match response {
+                    WorldResponse::Inventory { items } => {
+                        let _ = items;
+                        todo!()
                     }
-                    if left_held {
-                        world.user_destroy_block(
-                            chunk_location,
-                            block_x,
-                            block_y,
-                            &mut self.assets,
-                            &self.audio,
-                        );
+                    WorldResponse::PlayerInfo { position, velocity, held_item } => {
+                        self.gui.update(GuiRequest::DebugPlayerInfo {
+                            position,
+                            velocity,
+                        }, &mut self.gui_responses);
+                        self.gui.update(GuiRequest::HeldItem(held_item, &self.assets), &mut self.gui_responses);
                     }
-                    if right_held {
-                        world.player_use_item(
-                            chunk_location,
-                            block_x,
-                            block_y,
-                            BlockSide::from_position(cursor_world_pos),
-                            &self.assets,
-                            &self.audio,
-                        );
+                    WorldResponse::ChatMessage { content, color } => {
+                        self.gui.update(GuiRequest::ChatMessage {
+                            content,
+                            color,
+                            assets: &self.assets,
+                        }, &mut self.gui_responses);
+                    }
+                    WorldResponse::PlaySound { path } => {
+                        self.audio.play_sound(self.assets.resolve_path(&path)).ok();
                     }
                 }
-            }
-            else {
-                self.last_block_pos = None;
-            }
-
-            world.set_block_preview_position(cursor_world_pos);
-            world.update(inputs, dt);
-
-            self.gui.update_item_display(world.player().held_item(), &self.assets);
-            self.gui.update_player_info_display(
-                world.player().position(),
-                world.player().velocity(),
-            );
-            let min_fps = self.fps_tracker.into_iter().reduce(f32::min).unwrap_or(f32::NAN);
-            if min_fps.is_finite() {
-                self.gui.update_fps_display(min_fps);
             }
 
             clear_color = world.sky_color();
         }
         else {
             clear_color = Color::Black;
+        }
+
+        let min_fps = self.fps_tracker.into_iter().reduce(f32::min).unwrap_or(f32::NAN);
+        if min_fps.is_finite() {
+            self.gui.update(GuiRequest::DebugFPS(min_fps), &mut self.gui_responses);
         }
 
         screen::set_clear_color(clear_color.into());

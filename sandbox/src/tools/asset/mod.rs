@@ -7,6 +7,7 @@ use innovus::gfx::color::ColorPalette;
 use innovus::tools::Rectangle;
 use crate::tools::asset::block::{BlockAppearance, BlockImage};
 use crate::tools::asset::entity::EntityImage;
+use crate::tools::asset::text::TextAsset;
 use crate::world::block::{Block, BlockType, ChunkLocation, BLOCK_TYPES};
 use crate::world::item::ItemType;
 use crate::world::item::types::ITEM_TYPES;
@@ -14,6 +15,7 @@ use crate::world::item::types::ITEM_TYPES;
 pub mod anim;
 pub mod block;
 pub mod entity;
+pub mod text;
 
 pub struct AssetPool {
     assets_path: PathBuf,
@@ -33,7 +35,7 @@ pub struct AssetPool {
     entity_atlas: ImageAtlas,
     entity_images: HashMap<String, EntityImage>,
     color_palettes: HashMap<String, ColorPalette>,
-    text_strings: HashMap<String, String>,
+    text_assets: HashMap<String, String>,
 }
 
 impl AssetPool {
@@ -65,7 +67,7 @@ impl AssetPool {
             entity_atlas: ImageAtlas::new(Default::default()),
             entity_images: HashMap::new(),
             color_palettes: HashMap::new(),
-            text_strings: HashMap::new(),
+            text_assets: HashMap::new(),
         };
 
         // Despite the name of the method, this loads everything for the first time
@@ -107,7 +109,7 @@ impl AssetPool {
         self.clear_entity_images();
         self.clear_color_palettes();
         self.reload_shaders()?;
-        self.reload_text_strings()?;
+        self.reload_text_assets()?;
 
         Ok(())
     }
@@ -299,39 +301,35 @@ impl AssetPool {
         self.color_palettes.clear();
     }
 
-    pub fn get_text<'a>(&'a self, key: &'a str) -> &'a str {
-        match self.text_strings.get(key) {
-            Some(string) => string,
-            None => key,
-        }
-    }
-
-    pub fn get_template_text(&self, key: &str, elements: &[&str]) -> String {
-        let template_string = self.get_text(key).to_owned();
-        elements
+    pub fn resolve_text(&self, asset: &TextAsset) -> String {
+        let template_string = match self.text_assets.get(asset.key()) {
+            Some(string) => string.clone(),
+            None => asset.key().into(),
+        };
+        asset.parameters()
             .iter()
             .enumerate()
-            .fold(template_string, |string, (index, &element)| {
-                string.replace(&format!("{{{index}}}"), element)
+            .fold(template_string, |string, (index, parameter)| {
+                string.replace(&format!("{{{index}}}"), &parameter.resolve_text(self))
             })
     }
 
-    pub fn reload_text_strings(&mut self) -> Result<(), String> {
-        self.text_strings.clear();
+    pub fn reload_text_assets(&mut self) -> Result<(), String> {
+        self.text_assets.clear();
 
-        fn parse<'a>(value: &'a JsonValue, prefix: &mut Vec<&'a str>, text_strings: &mut HashMap<String, String>) {
+        fn parse<'a>(value: &'a JsonValue, prefix: &mut Vec<&'a str>, text_assets: &mut HashMap<String, String>) {
             for (inner_key, inner_value) in value.entries() {
                 prefix.push(inner_key);
-                parse(inner_value, prefix, text_strings);
+                parse(inner_value, prefix, text_assets);
                 prefix.pop();
             }
             if let Some(string) = value.as_str() {
-                text_strings.insert(prefix.join("."), string.into());
+                text_assets.insert(prefix.join("."), string.into());
             }
         }
 
         let data = self.load_json("text/en_us")?;
-        parse(&data, &mut Vec::new(), &mut self.text_strings);
+        parse(&data, &mut Vec::new(), &mut self.text_assets);
 
         Ok(())
     }

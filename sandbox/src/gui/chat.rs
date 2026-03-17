@@ -4,12 +4,11 @@ use glfw::Key;
 use innovus::gfx::color::Color;
 use innovus::gfx::MeshRenderer;
 use innovus::tools::Vector;
+use crate::gui::{GuiResponse, GuiResponseQueue};
 use crate::gui::render::GuiVertex;
 use crate::gui::render::text::{TextBackground, TextLine};
-use crate::script::ScriptingEngine;
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
-use crate::world::World;
 
 pub struct ChatBox {
     anchor: Vector<f32, 2>,
@@ -124,7 +123,7 @@ impl ChatBox {
         self.invalidate();
     }
 
-    pub fn handle_keyboard(&mut self, inputs: &InputState, scripting: &ScriptingEngine, world: &mut World, assets: &AssetPool) -> bool {
+    pub fn handle_keyboard(&mut self, inputs: &InputState, responses: &mut GuiResponseQueue) -> bool {
         if self.is_open {
             if inputs.key_was_repeated(Key::Backspace) {
                 self.current_message.text_mut().pop();
@@ -137,21 +136,11 @@ impl ChatBox {
                 self.set_open(false);
             }
             else if inputs.key_was_pressed(Key::Enter) {
-                let text = std::mem::take(self.current_message.text_mut());
-                if !text.is_empty() {
-                    if text.starts_with('/') {
-                        match scripting.dispatch_command(&text, world, assets) {
-                            Ok(text) => {
-                                self.add_plain_message(text, Color::Green);
-                            }
-                            Err(text) => {
-                                self.add_plain_message(text, Color::Red);
-                            }
-                        }
-                    }
-                    else {
-                        self.add_plain_message(format!("{}: {text}", world.player().name()), Color::White);
-                    }
+                let content = std::mem::take(self.current_message.text_mut());
+                if !content.is_empty() {
+                    responses.push_back(GuiResponse::PlayerChat {
+                        content,
+                    });
                 }
                 self.set_open(false);
             }
@@ -196,6 +185,7 @@ impl ChatBox {
             self.message_history.pop_front();
         }
         self.message_history.push_back(message);
+        self.invalidate();
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {

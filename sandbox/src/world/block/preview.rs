@@ -2,7 +2,6 @@ use innovus::gfx::{MeshRenderer, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::asset::AssetPool;
 use crate::world::block::{Block, BlockSide, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
-use crate::world::block::types::AIR;
 use crate::world::item::ItemType;
 
 pub struct BlockPreview {
@@ -65,7 +64,7 @@ impl BlockPreview {
                 eprintln!("x={block_x}, y={block_y}, fx={:.8}, fy={:.8}", self.position.x(), self.position.y());
             }
             let slot = chunk.block_slot_at(block_x, block_y);
-            if slot.block().block_type() != &AIR {
+            if !slot.block().is_air() {
                 return;
             }
             let light_value = slot.light_value();

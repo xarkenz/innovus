@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use glfw::Key;
 use innovus::gfx::color::Color;
 use innovus::tools::{Rectangle, Vector};
@@ -7,9 +8,8 @@ use render::cursor::GuiCursor;
 use render::text::{TextLine, TextLineRenderer};
 use render::{GuiImage, GuiLayerMesh};
 use render::text::TextBackground;
-use crate::script::ScriptingEngine;
+use crate::tools::asset::text::{TextAsset, TextElement};
 use crate::tools::input::InputState;
-use crate::world::World;
 
 pub mod render;
 pub mod hotbar;
@@ -31,6 +31,39 @@ pub struct GuiManager {
     player_info_display: TextLineRenderer,
 }
 
+pub enum GuiRequest<'a> {
+    HandleMouse(&'a InputState),
+    HandleKeyboard(&'a InputState),
+    ReloadAssets(&'a mut AssetPool),
+    HeldItem(Item, &'a AssetPool),
+    ChatMessage {
+        content: TextElement,
+        color: Color,
+        assets: &'a AssetPool,
+    },
+    DebugFPS(f32),
+    DebugPlayerInfo {
+        position: Vector<f32, 2>,
+        velocity: Vector<f32, 2>,
+    },
+}
+
+pub enum GuiResponse {
+    WorldHandleMouse,
+    WorldHandleKeyboard,
+    PlayerChat {
+        content: String,
+    },
+    PlaySound {
+        path: String,
+    },
+    AssetError {
+        message: String,
+    },
+}
+
+pub type GuiResponseQueue = VecDeque<GuiResponse>;
+
 impl GuiManager {
     pub fn new(viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>, gui_scale: f32, assets: &mut AssetPool) -> Result<Self, String> {
         Ok(Self {
@@ -39,7 +72,7 @@ impl GuiManager {
             gui_scale,
             offset_scale: Self::compute_offset_scale(viewport_size, content_scale.mul(gui_scale)),
             cursor_position: Vector::zero(),
-            cursor: GuiCursor::new(Vector::zero(), Vector::zero(), &crate::world::item::types::AIR),
+            cursor: GuiCursor::new(Vector::zero(), Vector::zero(), Default::default()),
             hotbar: hotbar::Hotbar::new(assets)?,
             chat_box: chat::ChatBox::new(20, 12.0, 0.4)?,
             inventory: GuiImage::new(
@@ -146,54 +179,50 @@ impl GuiManager {
         &mut self.chat_box
     }
 
-    pub fn reload_assets(&mut self, assets: &mut AssetPool) -> Result<(), String> {
-        self.hotbar.reload_assets(assets)?;
-        self.chat_box.reload_assets();
-        self.inventory.set_atlas_region(assets.get_gui_image("gui/inventory")?);
-        self.inventory_layer.clear();
-        Ok(())
-    }
-
-    pub fn update_fps_display(&mut self, min_fps: f32) {
-        self.fps_display.data_mut().set_text(format!("Min recent FPS: {min_fps:.1}"));
-    }
-
-    pub fn update_player_info_display(&mut self, position: Vector<f32, 2>, velocity: Vector<f32, 2>) {
-        self.player_info_display.data_mut().set_text(format!(
-            "P=({:.0}, {:.0}); V=({:.1}, {:.1})",
-            position.x().floor(),
-            position.y().floor(),
-            velocity.x(),
-            velocity.y(),
-        ));
-    }
-
-    pub fn update_item_display(&mut self, item: &Item, assets: &AssetPool) {
-        self.cursor.set_item_type(item.item_type());
-        if item.item_type().is_air() {
-            self.hotbar.set_held_item_text(String::new());
-        }
-        else {
-            let item_key = format!("item.{}", item.item_type());
-            let item_name = assets.get_text(&item_key);
-            self.hotbar.set_held_item_text(match item.count() {
-                1 => item_name.to_string(),
-                count => format!("{item_name} ({count})")
-            });
+    pub fn update(&mut self, request: GuiRequest, responses: &mut GuiResponseQueue) {
+        match request {
+            GuiRequest::HandleMouse(inputs) => {
+                self.handle_mouse(inputs, responses);
+            }
+            GuiRequest::HandleKeyboard(inputs) => {
+                self.handle_keyboard(inputs, responses);
+            }
+            GuiRequest::ReloadAssets(assets) => {
+                if let Err(message) = self.reload_assets(assets, responses) {
+                    responses.push_back(GuiResponse::AssetError {
+                        message,
+                    });
+                }
+            }
+            GuiRequest::HeldItem(item, assets) => {
+                self.update_item_display(item, assets, responses);
+            }
+            GuiRequest::ChatMessage { content, color, assets } => {
+                self.chat_message(content, color, assets, responses);
+            }
+            GuiRequest::DebugFPS(fps) => {
+                self.update_fps_display(fps, responses);
+            }
+            GuiRequest::DebugPlayerInfo { position, velocity } => {
+                self.update_player_info_display(position, velocity, responses);
+            }
         }
     }
 
-    pub fn handle_cursor(&mut self, inputs: &InputState, scripting: &ScriptingEngine, world: &mut World, assets: &AssetPool) -> bool {
-        let _ = (scripting, world, assets);
+    fn handle_mouse(&mut self, inputs: &InputState, responses: &mut GuiResponseQueue) {
+        self.set_cursor_position(inputs.cursor_pos().map(|x| x as f32));
         let cursor_offset = self.anchor_adjustment(self.cursor.anchor(), self.hotbar.anchor())
             + self.cursor.offset();
 
-        self.hotbar.handle_cursor(cursor_offset, inputs)
+        let handled = self.hotbar.handle_cursor(cursor_offset, inputs);
+        if !handled {
+            responses.push_back(GuiResponse::WorldHandleMouse);
+        }
     }
 
-    pub fn handle_keyboard(&mut self, inputs: &InputState, scripting: &ScriptingEngine, world: &mut World, assets: &AssetPool) -> bool {
+    fn handle_keyboard(&mut self, inputs: &InputState, responses: &mut GuiResponseQueue) {
         // TODO: probably need some kind of "focus" system... idk how exactly that should work
-        self.chat_box.handle_keyboard(inputs, scripting, world, assets) ||
+        let handled = self.chat_box.handle_keyboard(inputs, responses) ||
             {
                 if inputs.key_was_pressed(Key::E) {
                     self.inventory_shown = !self.inventory_shown;
@@ -202,7 +231,57 @@ impl GuiManager {
                 else {
                     false
                 }
-            }
+            };
+        if !handled {
+            responses.push_back(GuiResponse::WorldHandleKeyboard);
+        }
+    }
+
+    fn reload_assets(&mut self, assets: &mut AssetPool, responses: &mut GuiResponseQueue) -> Result<(), String> {
+        let _ = responses;
+        self.hotbar.reload_assets(assets)?;
+        self.chat_box.reload_assets();
+        self.inventory.set_atlas_region(assets.get_gui_image("gui/inventory")?);
+        self.inventory_layer.clear();
+        Ok(())
+    }
+
+    fn update_item_display(&mut self, item: Item, assets: &AssetPool, responses: &mut GuiResponseQueue) {
+        let _ = responses;
+        self.cursor.set_item_type(item.item_type());
+        if item.item_type().is_air() {
+            self.hotbar.set_held_item_text(String::new());
+        }
+        else {
+            let item_key = TextAsset::simple(format!("item.{}", item.item_type()));
+            let item_name = assets.resolve_text(&item_key);
+            self.hotbar.set_held_item_text(match item.count() {
+                1 => item_name.to_string(),
+                count => format!("{item_name} ({count})")
+            });
+        }
+    }
+
+    fn chat_message(&mut self, content: TextElement, color: Color, assets: &AssetPool, responses: &mut GuiResponseQueue) {
+        let _ = responses;
+        let text = content.resolve_text(assets);
+        self.chat_box.add_plain_message(text, color);
+    }
+
+    fn update_fps_display(&mut self, min_fps: f32, responses: &mut GuiResponseQueue) {
+        let _ = responses;
+        self.fps_display.data_mut().set_text(format!("Min recent FPS: {min_fps:.1}"));
+    }
+
+    fn update_player_info_display(&mut self, position: Vector<f32, 2>, velocity: Vector<f32, 2>, responses: &mut GuiResponseQueue) {
+        let _ = responses;
+        self.player_info_display.data_mut().set_text(format!(
+            "P=({:.0}, {:.0}); V=({:.1}, {:.1})",
+            position.x().floor(),
+            position.y().floor(),
+            velocity.x(),
+            velocity.y(),
+        ));
     }
 
     pub fn render(&mut self, assets: &mut AssetPool) {

@@ -48,6 +48,12 @@ impl std::fmt::Debug for ItemType {
     }
 }
 
+impl Default for &'static ItemType {
+    fn default() -> Self {
+        &types::AIR
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Item {
     item_type: &'static ItemType,
@@ -71,6 +77,10 @@ impl Item {
 
     pub fn item_type(&self) -> &'static ItemType {
         self.item_type
+    }
+
+    pub fn is_air(&self) -> bool {
+        self.count == 0 || self.item_type.is_air()
     }
 
     pub fn count(&self) -> u32 {
