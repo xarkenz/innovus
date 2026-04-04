@@ -1,6 +1,7 @@
 use innovus::gfx::color::AlphaColor;
 use innovus::gfx::Gfx;
 use innovus::gfx::mesh::Mesh;
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::Vector;
 use crate::gui::render::{GuiLayerMesh, GuiVertex};
 use crate::tools::asset::AssetPool;
@@ -105,7 +106,13 @@ impl TextLine {
         self.mesh.clear();
     }
 
-    pub fn append_to_mesh(&mut self, mesh: &mut Mesh<GuiVertex>, offset: Vector<f32, 2>, assets: &mut AssetPool) {
+    pub fn append_to_mesh(
+        &mut self,
+        mesh: &mut Mesh<GuiVertex>,
+        anchor: Vector<f32, 2>,
+        offset: Vector<f32, 2>,
+        assets: &mut AssetPool,
+    ) {
         if self.text.is_empty() {
             return;
         }
@@ -160,6 +167,7 @@ impl TextLine {
                 self.mesh.add(
                     &OFFSETS.map(|(vertex_offset, _)| {
                         GuiVertex::new(
+                            anchor,
                             background_offset + vertex_offset * background_size,
                             Some(color.rgba()),
                             None,
@@ -180,6 +188,7 @@ impl TextLine {
                     + Vector([image_index % 16, image_index / 16]) * image_size;
                 let vertices = OFFSETS.map(|(vertex_offset, atlas_offset)| {
                     GuiVertex::new(
+                        anchor,
                         current_offset + vertex_offset.mul(glyph_max_size),
                         Some(self.text_color.rgba()),
                         Some((image_origin + atlas_offset).map(|x| x as f32)),
@@ -254,13 +263,13 @@ impl TextLineRenderer {
             self.mesh.clear();
             self.text_line.append_to_mesh(
                 self.mesh.mesh_mut(),
+                self.anchor,
                 self.offset,
                 assets,
             );
             self.mesh.upload_buffers();
 
-            assets.gui_texture().bind();
-            assets.gui_shaders().set_uniform("anchor", &self.anchor);
+            render_pass.set_bind_group(0, assets.gui_texture().bind_group(), &[]);
             self.mesh.render(render_pass);
         }
     }

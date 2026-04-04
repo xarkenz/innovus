@@ -1,5 +1,6 @@
 use crate::gfx::Gfx;
 use crate::gfx::image::Image;
+use crate::gfx::pipeline::BindGroup;
 use crate::tools::Vector;
 
 #[derive(Clone, Debug)]
@@ -7,6 +8,7 @@ pub struct Texture2D {
     handle: wgpu::Texture,
     view: wgpu::TextureView,
     sampler: wgpu::Sampler,
+    bind_group: wgpu::BindGroup,
 }
 
 impl Texture2D {
@@ -14,6 +16,7 @@ impl Texture2D {
         device: &wgpu::Device,
         label: wgpu::Label,
         sampler: wgpu::Sampler,
+        layout: &wgpu::BindGroupLayout,
         format: wgpu::TextureFormat,
         size: Vector<u32, 2>,
     ) -> Self {
@@ -34,10 +37,26 @@ impl Texture2D {
 
         let view = handle.create_view(&Default::default());
 
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label,
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+
         Self {
             handle,
             view,
             sampler,
+            bind_group,
         }
     }
 
@@ -46,6 +65,7 @@ impl Texture2D {
         queue: &wgpu::Queue,
         label: wgpu::Label,
         sampler: wgpu::Sampler,
+        layout: &wgpu::BindGroupLayout,
         image: &Image,
         spare_size: Vector<u32, 2>,
     ) -> Self {
@@ -53,6 +73,7 @@ impl Texture2D {
             device,
             label,
             sampler,
+            layout,
             wgpu::TextureFormat::Rgba8UnormSrgb,
             image.size() + spare_size,
         );
@@ -74,6 +95,10 @@ impl Texture2D {
 
     pub fn set_sampler(&mut self, sampler: wgpu::Sampler) {
         self.sampler = sampler;
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
     }
 
     pub fn destroy(&self) {
@@ -112,11 +137,37 @@ impl Texture2D {
     }
 }
 
+impl BindGroup for Texture2D {
+    const ENTRIES: &'static [wgpu::BindGroupLayoutEntry] = &[
+        wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture {
+                multisampled: false,
+                view_dimension: wgpu::TextureViewDimension::D2,
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+            },
+            count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+            binding: 1,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+            count: None,
+        },
+    ];
+
+    fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
+    }
+}
+
 pub struct DynamicTexture2D {
     device: wgpu::Device,
     queue: wgpu::Queue,
     label: Option<Box<str>>,
     sampler: wgpu::Sampler,
+    layout: wgpu::BindGroupLayout,
     inner: Option<Texture2D>,
     size: Vector<u32, 2>,
 }
@@ -126,6 +177,7 @@ impl DynamicTexture2D {
         gfx: &Gfx,
         label: wgpu::Label,
         sampler: wgpu::Sampler,
+        layout: wgpu::BindGroupLayout,
         image: &Image,
     ) -> Self {
         let inner = (!image.is_empty()).then(|| {
@@ -135,6 +187,7 @@ impl DynamicTexture2D {
                 gfx.queue(),
                 label,
                 sampler.clone(),
+                &layout,
                 image,
                 size.map(Self::capacity_for_size) - size,
             )
@@ -145,6 +198,7 @@ impl DynamicTexture2D {
             queue: gfx.queue().clone(),
             label: label.map(Into::into),
             sampler,
+            layout,
             inner,
             size: image.size(),
         }
@@ -205,6 +259,7 @@ impl DynamicTexture2D {
                 &self.device,
                 self.label.as_deref(),
                 self.sampler.clone(),
+                &self.layout,
                 wgpu::TextureFormat::Rgba8UnormSrgb,
                 new_capacity,
             );
@@ -269,6 +324,7 @@ impl DynamicTexture2D {
                 &self.queue,
                 self.label.as_deref(),
                 self.sampler.clone(),
+                &self.layout,
                 new_image,
                 new_capacity - new_size,
             ));
@@ -281,6 +337,14 @@ impl DynamicTexture2D {
         // Grow and shrink exponentially so the texture doesn't have to be reallocated as often if
         // the size doesn't change much. Also, avoid reallocating often for small sizes.
         size.next_power_of_two().max(256)
+    }
+}
+
+impl BindGroup for DynamicTexture2D {
+    const ENTRIES: &'static [wgpu::BindGroupLayoutEntry] = Texture2D::ENTRIES;
+
+    fn bind_group(&self) -> &wgpu::BindGroup {
+        self.inner.as_ref().expect("cannot get bind group of empty texture").bind_group()
     }
 }
 

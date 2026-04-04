@@ -5,8 +5,11 @@ use json::JsonValue;
 use innovus::gfx::color::ColorPalette;
 use innovus::gfx::Gfx;
 use innovus::gfx::image::{Image, ImageAtlas};
+use innovus::gfx::mesh::{Vertex, Vertex2D};
+use innovus::gfx::pipeline::BindGroup;
 use innovus::gfx::texture::DynamicTexture2D;
 use innovus::tools::Rectangle;
+use crate::gui::render::GuiVertex;
 use crate::tools::asset::block::{BlockAppearance, BlockImage};
 use crate::tools::asset::entity::EntityImage;
 use crate::world::block::{Block, BlockType, ChunkLocation, BLOCK_TYPES};
@@ -19,15 +22,15 @@ pub mod entity;
 
 pub struct AssetPool {
     assets_path: PathBuf,
-    default_shaders: Program,
+    default_pipeline: Option<wgpu::RenderPipeline>,
     gui_texture: DynamicTexture2D,
     gui_atlas: ImageAtlas,
     gui_images: HashMap<String, Rectangle<u32>>,
-    gui_shaders: Program,
+    gui_pipeline: Option<wgpu::RenderPipeline>,
     block_texture: DynamicTexture2D,
     block_atlas: ImageAtlas,
     block_appearances: HashMap<*const BlockType, BlockAppearance>,
-    block_shaders: Program,
+    block_pipeline: Option<wgpu::RenderPipeline>,
     item_texture: DynamicTexture2D,
     item_atlas: ImageAtlas,
     item_images: HashMap<*const ItemType, Rectangle<u32>>,
@@ -47,25 +50,27 @@ impl AssetPool {
             address_mode_v: wgpu::AddressMode::Repeat,
             ..Default::default()
         });
+        let texture_layout = DynamicTexture2D::create_layout(gfx.device());
 
         let create_texture = |label| DynamicTexture2D::create(
             gfx,
             Some(label),
             sampler.clone(),
+            texture_layout.clone(),
             &Image::empty(),
         );
 
         let mut assets = Self {
             assets_path: assets_path.as_ref().into(),
-            default_shaders: Program::from_preset(ProgramPreset::Default2DShader)?,
+            default_pipeline: None,
             gui_texture: create_texture("GUI Texture"),
             gui_atlas: ImageAtlas::new(Default::default()),
             gui_images: HashMap::new(),
-            gui_shaders: Program::create()?,
+            gui_pipeline: None,
             block_texture: create_texture("Block Texture"),
             block_atlas: ImageAtlas::new(Default::default()),
             block_appearances: HashMap::new(),
-            block_shaders: Program::create()?,
+            block_pipeline: None,
             item_texture: create_texture("Item Texture"),
             item_atlas: ImageAtlas::new(Default::default()),
             item_images: HashMap::new(),
@@ -114,14 +119,14 @@ impl AssetPool {
         self.reload_item_images()?;
         self.clear_entity_images();
         self.clear_color_palettes();
-        self.reload_shaders()?;
+        self.reload_pipelines(gfx)?;
         self.reload_text_strings()?;
 
         Ok(())
     }
 
-    pub fn default_shaders(&self) -> &Program {
-        &self.default_shaders
+    pub fn default_pipeline(&self) -> &wgpu::RenderPipeline {
+        self.default_pipeline.as_ref().unwrap()
     }
 
     pub fn gui_texture(&self) -> &DynamicTexture2D {
@@ -152,8 +157,8 @@ impl AssetPool {
         self.gui_atlas.clear();
     }
 
-    pub fn gui_shaders(&self) -> &Program {
-        &self.gui_shaders
+    pub fn gui_pipeline(&self) -> &wgpu::RenderPipeline {
+        self.gui_pipeline.as_ref().unwrap()
     }
 
     pub fn block_texture(&self) -> &DynamicTexture2D {
@@ -221,8 +226,8 @@ impl AssetPool {
         self.get_block_appearance(block.block_type()).get_image(block, chunk_location, x, y)
     }
 
-    pub fn block_shaders(&self) -> &Program {
-        &self.block_shaders
+    pub fn block_pipeline(&self) -> &wgpu::RenderPipeline {
+        self.block_pipeline.as_ref().unwrap()
     }
 
     pub fn item_texture(&self) -> &DynamicTexture2D {
@@ -344,27 +349,92 @@ impl AssetPool {
         Ok(())
     }
 
-    pub fn reload_shaders(&mut self) -> Result<(), String> {
-        self.gui_shaders.attach_shader(&Shader::create(
-            &self.load_text("shaders/gui_v.glsl")?,
-            ShaderType::Vertex,
+    pub fn reload_pipelines(&mut self, gfx: &Gfx) -> Result<(), String> {
+        self.default_pipeline = Some(self.create_render_pipeline(
+            gfx,
+            "default",
+            "Default Render Pipeline",
+            &[
+                //
+            ],
+            Vertex2D::buffer_layout(),
         )?);
-        self.gui_shaders.attach_shader(&Shader::create(
-            &self.load_text("shaders/gui_f.glsl")?,
-            ShaderType::Fragment,
+        self.gui_pipeline = Some(self.create_render_pipeline(
+            gfx,
+            "gui",
+            "GUI Render Pipeline",
+            &[
+                //
+            ],
+            GuiVertex::buffer_layout(),
         )?);
-        self.gui_shaders.link()?;
-
-        self.block_shaders.attach_shader(&Shader::create(
-            &self.load_text("shaders/block_v.glsl")?,
-            ShaderType::Vertex,
+        self.block_pipeline = Some(self.create_render_pipeline(
+            gfx,
+            "block",
+            "Chunk Render Pipeline",
+            &[
+                //
+            ],
+            Vertex2D::buffer_layout(),
         )?);
-        self.block_shaders.attach_shader(&Shader::create(
-            &self.load_text("shaders/block_f.glsl")?,
-            ShaderType::Fragment,
-        )?);
-        self.block_shaders.link()?;
 
         Ok(())
+    }
+
+    fn create_render_pipeline(
+        &self,
+        gfx: &Gfx,
+        shader_name: &str,
+        label: &str,
+        bind_group_layouts: &[Option<&wgpu::BindGroupLayout>],
+        vertex_layout: wgpu::VertexBufferLayout,
+    ) -> Result<wgpu::RenderPipeline, String> {
+        let shader_path = format!("shaders/{shader_name}.wgsl");
+        let shader = gfx.device().create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(&shader_path),
+            source: wgpu::ShaderSource::Wgsl(self.load_text(&shader_path)?.into()),
+        });
+
+        let pipeline_layout = gfx.device().create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            bind_group_layouts,
+            ..Default::default()
+        });
+
+        let render_pipeline = gfx.device().create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some(label),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[vertex_layout],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: gfx.surface().get_configuration().map_or(wgpu::TextureFormat::Rgba8UnormSrgb, |config| config.format),
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::OVER,
+                        alpha: wgpu::BlendComponent::OVER,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
+        Ok(render_pipeline)
     }
 }

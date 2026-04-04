@@ -73,6 +73,7 @@ impl ItemSlot {
         &mut self,
         item_layer: &mut Mesh<GuiVertex>,
         foreground_layer: &mut Mesh<GuiVertex>,
+        anchor: Vector<f32, 2>,
         offset: Vector<f32, 2>,
         assets: &mut AssetPool,
     ) {
@@ -89,9 +90,9 @@ impl ItemSlot {
             else {
                 image.set_color(Color::White.into());
             }
-            image.append_to_mesh(item_layer, offset)
+            image.append_to_mesh(item_layer, anchor, offset)
         }
-        self.count_text.append_to_mesh(foreground_layer, offset + Vector([17.0, 19.0]), assets);
+        self.count_text.append_to_mesh(foreground_layer, anchor, offset + Vector([17.0, 19.0]), assets);
     }
 }
 
@@ -185,6 +186,7 @@ impl ItemGrid {
         &mut self,
         item_layer: &mut Mesh<GuiVertex>,
         foreground_layer: &mut Mesh<GuiVertex>,
+        anchor: Vector<f32, 2>,
         offset: Vector<f32, 2>,
         assets: &mut AssetPool,
     ) {
@@ -195,6 +197,7 @@ impl ItemGrid {
                 slot.append_to_mesh(
                     item_layer,
                     foreground_layer,
+                    anchor,
                     Vector([offset_x, offset_y]),
                     assets,
                 );

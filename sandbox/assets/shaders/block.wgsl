@@ -1,6 +1,5 @@
 struct Camera {
-    @binding(0) view: mat4x4<f32>,
-    @binding(1) proj: mat4x4<f32>,
+    @binding(0) view_proj: mat4x4<f32>,
 }
 
 struct Atlas {
@@ -29,7 +28,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
     out.color = in.color;
     out.uv = in.uv;
-    out.clip_position = camera.proj * camera.view * vec4<f32>(in.position, 1.0);
+    out.clip_position = camera.view_proj * vec4<f32>(in.position, 1.0);
 
     return out;
 }

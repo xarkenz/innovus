@@ -4,11 +4,11 @@ use bytemuck::{Pod, Zeroable};
 use crate::gfx::Gfx;
 
 pub struct ArrayBufferDescriptor<'a, T> {
-    label: wgpu::Label<'a>,
-    usage: wgpu::BufferUsages,
-    elements: &'a [T],
-    spare_len: wgpu::BufferAddress,
-    mapped_at_creation: bool,
+    pub label: wgpu::Label<'a>,
+    pub usage: wgpu::BufferUsages,
+    pub elements: &'a [T],
+    pub spare_len: wgpu::BufferAddress,
+    pub mapped_at_creation: bool,
 }
 
 impl<'a, T> Default for ArrayBufferDescriptor<'a, T> {
@@ -106,6 +106,10 @@ impl<T: Zeroable + Pod> ArrayBuffer<T> {
         let start_bound = bounds.start_bound().map(index_to_offset);
         let end_bound = bounds.end_bound().map(index_to_offset);
         self.handle.slice((start_bound, end_bound))
+    }
+
+    pub fn as_entire_binding(&self) -> wgpu::BindingResource {
+        self.handle.as_entire_binding()
     }
 
     pub fn write(&self, queue: &wgpu::Queue, start_index: wgpu::BufferAddress, elements: &[T]) {

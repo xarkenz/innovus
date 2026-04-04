@@ -8,6 +8,7 @@ pub mod color;
 pub mod texture;
 pub mod image;
 pub mod mesh;
+pub mod pipeline;
 
 pub struct Gfx<'window> {
     surface: wgpu::Surface<'window>,

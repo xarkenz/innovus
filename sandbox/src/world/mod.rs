@@ -2,6 +2,7 @@ use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
 use innovus::gfx::Gfx;
 use innovus::gfx::color::Color;
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::Vector;
 use innovus::tools::phys::Physics;
 use crate::audio::AudioEngine;
@@ -264,22 +265,15 @@ impl<'world> World<'world> {
     }
 
     pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &AssetPool) {
-        assets.block_texture().bind();
-        assets.block_shaders().set_uniform("tex_atlas", assets.block_texture());
-        assets.block_shaders().set_uniform("camera_view", self.camera.view());
-        assets.block_shaders().set_uniform("camera_proj", self.camera.projection());
+        render_pass.set_pipeline(assets.block_pipeline());
+        render_pass.set_bind_group(1, self.camera.bind_group(), &[]);
         for mut chunk in self.chunks.iter_mut() {
             chunk.render(render_pass, assets, &self.chunks);
         }
 
-        assets.default_shaders().set_uniform("tex_atlas", assets.block_texture());
-        assets.default_shaders().set_uniform("camera_view", self.camera.view());
-        assets.default_shaders().set_uniform("camera_proj", self.camera.projection());
+        render_pass.set_pipeline(assets.default_pipeline());
         self.particles.render(render_pass);
         self.block_preview.render(render_pass, assets, &self.chunks);
-
-        assets.entity_texture().bind();
-        assets.default_shaders().set_uniform("tex_atlas", assets.entity_texture());
-        self.entity_renderer.render_all(render_pass);
+        self.entity_renderer.render_all(render_pass, assets);
     }
 }

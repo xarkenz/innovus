@@ -2,6 +2,7 @@ use std::path::Path;
 use winit::window::Window;
 use innovus::gfx::color::Color;
 use innovus::gfx::Gfx;
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::{Clock, Vector};
 use crate::audio::AudioEngine;
 use crate::gui::GuiManager;
@@ -28,6 +29,7 @@ pub struct Game<'a> {
     gui: GuiManager,
     scripting: ScriptingEngine,
     audio: AudioEngine,
+    camera_layout: wgpu::BindGroupLayout,
     current_world: Option<World<'a>>,
     last_block_pos: Option<(usize, usize)>,
 }
@@ -36,6 +38,8 @@ impl<'a> Game<'a> {
     pub fn start(gfx: Gfx<'a>, assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>) -> Result<Self, String> {
         let mut assets = AssetPool::load(&gfx, assets_path)?;
         let gui = GuiManager::create(&gfx, viewport_size, content_scale, 8.0, &mut assets)?;
+        let camera_layout = Camera::create_layout(gfx.device());
+
         let mut game = Self {
             frame_clock: Clock::start(),
             fps_tracker: [f32::INFINITY; 120],
@@ -47,10 +51,13 @@ impl<'a> Game<'a> {
             assets,
             scripting: ScriptingEngine::new(),
             audio: AudioEngine::new()?,
+            camera_layout,
             current_world: None,
             last_block_pos: None,
         };
+
         game.set_viewport_size(viewport_size);
+
         Ok(game)
     }
 
@@ -83,6 +90,8 @@ impl<'a> Game<'a> {
 
     pub fn enter_world(&mut self, generator: Option<Box<dyn WorldGenerator>>) {
         let camera = Camera::new(
+            &self.gfx,
+            &self.camera_layout,
             Vector::zero(),
             self.viewport_size,
             self.content_scale.mul(48.0),

@@ -1,9 +1,10 @@
 use innovus::gfx::color::Color;
 use innovus::gfx::Gfx;
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::cursor::GuiCursor;
 use crate::gui::render::text::{TextLine, TextLineRenderer};
-use crate::gui::render::{GuiImage, GuiLayerMesh};
+use crate::gui::render::{GuiImage, GuiLayerMesh, GuiParams};
 use crate::gui::render::text::TextBackground;
 use crate::script::ScriptingEngine;
 use crate::tools::asset::AssetPool;
@@ -16,10 +17,7 @@ pub mod hotbar;
 pub mod chat;
 
 pub struct GuiManager {
-    viewport_size: Vector<f32, 2>,
-    content_scale: Vector<f32, 2>,
-    gui_scale: f32,
-    offset_scale: Vector<f32, 2>,
+    params: GuiParams,
     cursor_position: Vector<f32, 2>,
     cursor: GuiCursor,
     hotbar: hotbar::Hotbar,
@@ -34,10 +32,13 @@ pub struct GuiManager {
 impl GuiManager {
     pub fn create(gfx: &Gfx, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>, gui_scale: f32, assets: &mut AssetPool) -> Result<Self, String> {
         Ok(Self {
-            viewport_size,
-            content_scale,
-            gui_scale,
-            offset_scale: Self::compute_offset_scale(viewport_size, content_scale.mul(gui_scale)),
+            params: GuiParams::new(
+                gfx,
+                &GuiParams::create_layout(gfx.device()),
+                viewport_size,
+                content_scale,
+                gui_scale,
+            ),
             cursor_position: Vector::zero(),
             cursor: GuiCursor::create(gfx, Vector::zero(), Vector::zero(), &crate::world::item::types::AIR),
             hotbar: hotbar::Hotbar::create(gfx, assets)?,
@@ -81,37 +82,30 @@ impl GuiManager {
     }
 
     pub fn viewport_size(&self) -> Vector<f32, 2> {
-        self.viewport_size
+        self.params.viewport_size()
     }
 
     pub fn set_viewport_size(&mut self, viewport_size: Vector<f32, 2>) {
-        self.viewport_size = viewport_size;
-        self.offset_scale = Self::compute_offset_scale(viewport_size, self.content_scale.mul(self.gui_scale));
+        self.params.set_viewport_size(viewport_size);
         self.compute_cursor_offset();
     }
 
     pub fn content_scale(&self) -> Vector<f32, 2> {
-        self.content_scale
+        self.params.content_scale()
     }
 
     pub fn set_content_scale(&mut self, content_scale: Vector<f32, 2>) {
-        self.content_scale = content_scale;
-        self.offset_scale = Self::compute_offset_scale(self.viewport_size, content_scale.mul(self.gui_scale));
+        self.params.set_content_scale(content_scale);
         self.compute_cursor_offset();
     }
 
     pub fn gui_scale(&self) -> f32 {
-        self.gui_scale
+        self.params.gui_scale()
     }
 
     pub fn set_gui_scale(&mut self, gui_scale: f32) {
-        self.gui_scale = gui_scale;
-        self.offset_scale = Self::compute_offset_scale(self.viewport_size, self.content_scale.mul(gui_scale));
+        self.params.set_gui_scale(gui_scale);
         self.compute_cursor_offset();
-    }
-
-    fn compute_offset_scale(viewport_size: Vector<f32, 2>, scale: Vector<f32, 2>) -> Vector<f32, 2> {
-        scale / viewport_size
     }
 
     pub fn cursor_position(&self) -> Vector<f32, 2> {
@@ -125,11 +119,11 @@ impl GuiManager {
 
     fn compute_cursor_offset(&mut self) {
         self.cursor.set_offset(self.cursor_position.mul(2.0)
-            / self.content_scale.mul(self.gui_scale));
+            / self.content_scale().mul(self.gui_scale()));
     }
 
     pub fn anchor_adjustment(&self, from_anchor: Vector<f32, 2>, to_anchor: Vector<f32, 2>) -> Vector<f32, 2> {
-        (from_anchor - to_anchor).mul(2.0) / self.offset_scale
+        self.params.anchor_adjustment(from_anchor, to_anchor)
     }
 
     pub fn hotbar(&self) -> &hotbar::Hotbar {
@@ -208,16 +202,15 @@ impl GuiManager {
     }
 
     pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &mut AssetPool) {
-        assets.gui_shaders().set_uniform("offset_scale", &self.offset_scale);
-        assets.gui_shaders().set_uniform("tex_atlas", assets.gui_texture());
+        render_pass.set_pipeline(assets.gui_pipeline());
+        render_pass.set_bind_group(0, assets.gui_texture().bind_group(), &[]);
+        render_pass.set_bind_group(2, self.params.bind_group(), &[]);
 
         if self.inventory_shown {
             if self.inventory_layer.is_empty() {
-                self.inventory.append_to_mesh(self.inventory_layer.mesh_mut(), Vector::zero());
+                self.inventory.append_to_mesh(self.inventory_layer.mesh_mut(), Vector([0.5, 0.5]), Vector::zero());
                 self.inventory_layer.upload_buffers();
             }
-            assets.gui_texture().bind();
-            assets.gui_shaders().set_uniform("anchor", &Vector([0.5f32, 0.5f32]));
             self.inventory_layer.render(render_pass);
         }
 

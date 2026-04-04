@@ -2,6 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::BTreeMap;
 use innovus::gfx::Gfx;
 use innovus::gfx::mesh::{MeshRenderer, Vertex2D};
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::{Rectangle, Vector};
 use innovus::tools::phys::{Collider, ColliderHandle, Physics};
 use crate::tools::asset::AssetPool;
@@ -319,6 +320,7 @@ impl Chunk {
         self.mesh.upload_vertex_buffer();
         self.render_all = false;
 
+        render_pass.set_bind_group(0, assets.block_texture().bind_group(), &[]);
         self.mesh.render(render_pass);
     }
 

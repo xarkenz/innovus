@@ -1,5 +1,6 @@
 use innovus::gfx::color::Color;
 use innovus::gfx::Gfx;
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::{GuiImage, GuiLayerMesh};
 use crate::gui::render::item::ItemGrid;
@@ -114,16 +115,19 @@ impl Hotbar {
 
             self.background_image.append_to_mesh(
                 self.background_layer.mesh_mut(),
+                self.anchor,
                 self.offset,
             );
             self.item_grid.append_to_mesh(
                 self.item_layer.mesh_mut(),
                 self.foreground_layer.mesh_mut(),
+                self.anchor,
                 self.offset + Self::ITEM_GRID_OFFSET,
                 assets,
             );
             self.held_item_text.append_to_mesh(
                 self.foreground_layer.mesh_mut(),
+                self.anchor,
                 self.offset + Self::HELD_ITEM_TEXT_OFFSET,
                 assets,
             );
@@ -133,12 +137,11 @@ impl Hotbar {
             self.foreground_layer.upload_buffers();
         }
 
-        assets.gui_shaders().set_uniform("anchor", &self.anchor);
-        assets.gui_texture().bind();
+        render_pass.set_bind_group(0, assets.gui_texture().bind_group(), &[]);
         self.background_layer.render(render_pass);
-        assets.item_texture().bind();
+        render_pass.set_bind_group(0, assets.item_texture().bind_group(), &[]);
         self.item_layer.render(render_pass);
-        assets.gui_texture().bind();
+        render_pass.set_bind_group(0, assets.gui_texture().bind_group(), &[]);
         self.foreground_layer.render(render_pass);
     }
 }

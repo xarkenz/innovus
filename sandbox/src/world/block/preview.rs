@@ -1,5 +1,6 @@
 use innovus::gfx::Gfx;
 use innovus::gfx::mesh::{MeshRenderer, Vertex2D};
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::Vector;
 use crate::tools::asset::AssetPool;
 use crate::world::block::{Block, BlockSide, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
@@ -98,8 +99,8 @@ impl BlockPreview {
                 self.mesh.clear();
                 self.mesh.add(&vertices, &faces);
 
-                assets.block_texture().bind();
-                assets.block_shaders().bind();
+                render_pass.set_pipeline(assets.block_pipeline());
+                render_pass.set_bind_group(0, assets.block_texture().bind_group(), &[]);
                 self.mesh.render(render_pass);
             }
         }

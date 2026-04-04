@@ -3,6 +3,7 @@ use std::time::Instant;
 use innovus::gfx::color::Color;
 use innovus::gfx::Gfx;
 use innovus::gfx::mesh::MeshRenderer;
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::Vector;
 use crate::gui::render::GuiVertex;
 use crate::gui::render::text::{TextBackground, TextLine};
@@ -203,6 +204,7 @@ impl ChatBox {
             if self.is_open {
                 self.current_message.append_to_mesh(
                     self.text_layer.mesh_mut(),
+                    self.anchor,
                     self.offset,
                     assets,
                 );
@@ -213,6 +215,7 @@ impl ChatBox {
                 offset.set_y(offset.y() - self.line_spacing);
                 message.line_mut().append_to_mesh(
                     self.text_layer.mesh_mut(),
+                    self.anchor,
                     offset,
                     assets,
                 );
@@ -221,8 +224,7 @@ impl ChatBox {
             self.text_layer.upload_buffers();
         }
 
-        assets.gui_shaders().set_uniform("anchor", &self.anchor);
-        assets.gui_texture().bind();
+        render_pass.set_bind_group(0, assets.gui_texture().bind_group(), &[]);
         self.text_layer.render(render_pass);
     }
 }

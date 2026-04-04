@@ -21,7 +21,7 @@ struct VertexOutput {
 }
 
 @group(0) var atlas: Atlas;
-@group(1) var<uniform> params: GuiParams;
+@group(2) var<uniform> params: GuiParams;
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {

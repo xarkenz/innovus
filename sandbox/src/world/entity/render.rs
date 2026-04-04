@@ -1,7 +1,9 @@
 use innovus::gfx::Gfx;
 use innovus::gfx::mesh::{MeshRenderer, Vertex2D};
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::{Rectangle, Vector};
 use innovus::tools::arena::{ArenaHandle, BoundedArena, UnboundedArena};
+use crate::tools::asset::AssetPool;
 use crate::tools::asset::entity::EntityImage;
 
 #[derive(Debug)]
@@ -205,7 +207,8 @@ impl EntityRenderer {
         }
     }
 
-    pub fn render_all(&mut self, render_pass: &mut wgpu::RenderPass) {
+    pub fn render_all(&mut self, render_pass: &mut wgpu::RenderPass, assets: &AssetPool) {
+        render_pass.set_bind_group(0, assets.entity_texture().bind_group(), &[]);
         for (_, batch) in self.batches.values_mut() {
             batch.render(render_pass);
         }

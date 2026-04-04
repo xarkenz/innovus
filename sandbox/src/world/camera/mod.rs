@@ -1,3 +1,6 @@
+use innovus::gfx::buffer::{ArrayBuffer, ArrayBufferDescriptor};
+use innovus::gfx::Gfx;
+use innovus::gfx::pipeline::BindGroup;
 use innovus::tools::*;
 
 pub struct Camera {
@@ -9,10 +12,31 @@ pub struct Camera {
     size: Vector<f32, 2>,
     zoom: Vector<f32, 2>,
     speed: f32,
+    queue: wgpu::Queue,
+    buffer: ArrayBuffer<Transform3D<f32>>,
+    bind_group: wgpu::BindGroup,
 }
 
 impl Camera {
-    pub fn new(position: Vector<f32, 2>, size: Vector<f32, 2>, zoom: Vector<f32, 2>, speed: f32) -> Self {
+    pub fn new(gfx: &Gfx, layout: &wgpu::BindGroupLayout, position: Vector<f32, 2>, size: Vector<f32, 2>, zoom: Vector<f32, 2>, speed: f32) -> Self {
+        let buffer = ArrayBuffer::create(gfx.device(), ArrayBufferDescriptor {
+            label: Some("Camera Uniform Buffer"),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            spare_len: 1,
+            ..Default::default()
+        });
+
+        let bind_group = gfx.device().create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Camera Bind Group"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                },
+            ],
+        });
+
         Self {
             view: Transform3D::identity(),
             projection: Transform3D::identity(),
@@ -22,6 +46,9 @@ impl Camera {
             size,
             zoom,
             speed,
+            queue: gfx.queue().clone(),
+            buffer,
+            bind_group,
         }
     }
 
@@ -107,5 +134,26 @@ impl Camera {
         self.view_projection = self.projection * self.view;
 
         self.position = self.position.lerp(self.target, (self.speed * dt).min(1.0));
+
+        self.buffer.write(&self.queue, 0, &[self.view_projection]);
+    }
+}
+
+impl BindGroup for Camera {
+    const ENTRIES: &'static [wgpu::BindGroupLayoutEntry] = &[
+        wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        },
+    ];
+
+    fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
     }
 }
