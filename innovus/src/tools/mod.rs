@@ -95,7 +95,7 @@ where
     }
 
     pub fn lerp(&self, other: Self, t: T) -> Self {
-        let mut result = Vector::zero();
+        let mut result = Self::zero();
         for index in 0..N {
             result.0[index] = self.0[index] * (T::one() - t) + other.0[index] * t;
         }
@@ -230,7 +230,7 @@ where
     T: Clone,
 {
     fn clone(&self) -> Self {
-        Vector(self.0.clone())
+        Self(self.0.clone())
     }
 }
 
@@ -242,9 +242,19 @@ where
         // Arrays implement Default manually for every length up to 32 because [T; 0] needs to
         // implement Default even if T doesn't implement it.
         // We can just kind of ignore that caveat lol who cares.
-        Vector(std::array::from_fn(|_| Default::default()))
+        Self(std::array::from_fn(|_| Default::default()))
     }
 }
+
+unsafe impl<T, const N: usize> bytemuck::Zeroable for Vector<T, N>
+where
+    T: bytemuck::Zeroable,
+{}
+
+unsafe impl<T, const N: usize> bytemuck::Pod for Vector<T, N>
+where
+    T: bytemuck::Pod,
+{}
 
 impl<T, const N: usize> PartialEq for Vector<T, N>
 where
@@ -454,9 +464,31 @@ where
     T: Clone,
 {
     fn clone(&self) -> Self {
-        Matrix(self.0.clone())
+        Self(self.0.clone())
     }
 }
+
+impl<T, const R: usize, const C: usize> Default for Matrix<T, R, C>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        // Arrays implement Default manually for every length up to 32 because [T; 0] needs to
+        // implement Default even if T doesn't implement it.
+        // We can just kind of ignore that caveat lol who cares.
+        Self(std::array::from_fn(|_| Default::default()))
+    }
+}
+
+unsafe impl<T, const R: usize, const C: usize> bytemuck::Zeroable for Matrix<T, R, C>
+where
+    T: bytemuck::Zeroable,
+{}
+
+unsafe impl<T, const R: usize, const C: usize> bytemuck::Pod for Matrix<T, R, C>
+where
+    T: bytemuck::Pod,
+{}
 
 impl<T, const R: usize, const C: usize> Matrix<T, R, C> {
     pub fn zero() -> Self
@@ -510,7 +542,7 @@ impl<T, const N: usize> Matrix<T, N, N> {
     where
         T: Copy + Zero + One,
     {
-        let mut matrix = Matrix::zero();
+        let mut matrix = Self::zero();
         for n in 0..N {
             matrix[n][n] = T::one();
         }

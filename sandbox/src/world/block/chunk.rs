@@ -1,10 +1,11 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::BTreeMap;
-use innovus::gfx::{MeshRenderer, Vertex2D};
+use innovus::gfx::Gfx;
+use innovus::gfx::mesh::{MeshRenderer, Vertex2D};
 use innovus::tools::{Rectangle, Vector};
 use innovus::tools::phys::{Collider, ColliderHandle, Physics};
 use crate::tools::asset::AssetPool;
-use crate::world::gen::WorldGenerator;
+use crate::world::generation::WorldGenerator;
 use super::*;
 
 pub const CHUNK_SIZE: usize = 16;
@@ -109,13 +110,13 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    pub fn new(location: ChunkLocation) -> Self {
+    pub fn create(gfx: &Gfx, location: ChunkLocation) -> Self {
         Self {
             location,
             block_slots: Default::default(),
             collision_map: None,
             render_all: true,
-            mesh: MeshRenderer::create(),
+            mesh: MeshRenderer::create(gfx),
             height_map: Default::default(),
         }
     }
@@ -279,7 +280,7 @@ impl Chunk {
         }
     }
 
-    pub fn render(&mut self, assets: &AssetPool, chunk_map: &ChunkMap) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &AssetPool, chunk_map: &ChunkMap) {
         if self.mesh.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
@@ -318,7 +319,7 @@ impl Chunk {
         self.mesh.upload_vertex_buffer();
         self.render_all = false;
 
-        self.mesh.render();
+        self.mesh.render(render_pass);
     }
 
     fn update_block_vertices(&mut self, x: usize, y: usize, assets: &AssetPool, chunk_map: &ChunkMap) {
@@ -470,20 +471,20 @@ impl ChunkMap {
         self.chunks.get(&location).map(|chunk| chunk.borrow_mut())
     }
 
-    pub fn get_or_load(&mut self, location: ChunkLocation, physics: &mut Physics) -> Ref<'_, Chunk> {
-        self.get_or_load_cell(location, physics).borrow()
+    pub fn get_or_load(&mut self, gfx: &Gfx, physics: &mut Physics, location: ChunkLocation) -> Ref<'_, Chunk> {
+        self.get_or_load_cell(gfx, physics, location).borrow()
     }
 
-    pub fn get_or_load_mut(&mut self, location: ChunkLocation, physics: &mut Physics) -> RefMut<'_, Chunk> {
-        self.get_or_load_cell(location, physics).borrow_mut()
+    pub fn get_or_load_mut(&mut self, gfx: &Gfx, physics: &mut Physics, location: ChunkLocation) -> RefMut<'_, Chunk> {
+        self.get_or_load_cell(gfx, physics, location).borrow_mut()
     }
 
-    fn get_or_load_cell(&mut self, location: ChunkLocation, physics: &mut Physics) -> &RefCell<Chunk> {
+    fn get_or_load_cell(&mut self, gfx: &Gfx, physics: &mut Physics, location: ChunkLocation) -> &RefCell<Chunk> {
         if self.chunks.contains_key(&location) {
             &self.chunks[&location]
         }
         else {
-            self.chunks.insert(location, RefCell::new(Chunk::new(location)));
+            self.chunks.insert(location, RefCell::new(Chunk::create(gfx, location)));
             let cell = &self.chunks[&location];
             if let Some(generator) = &self.generator {
                 generator.generate_chunk(&mut *cell.borrow_mut(), self, physics);
@@ -510,7 +511,7 @@ impl ChunkMap {
         self.chunks.keys().copied()
     }
 
-    pub fn tick(&mut self, player_position: Vector<f32, 2>, physics: &mut Physics) {
+    pub fn tick(&mut self, player_position: Vector<f32, 2>, gfx: &Gfx, physics: &mut Physics) {
         let center_chunk_location = Vector([
             player_position.x().div_euclid(CHUNK_SIZE as f32) as i64,
             player_position.y().div_euclid(CHUNK_SIZE as f32) as i64,
@@ -520,7 +521,7 @@ impl ChunkMap {
         chunk_load_range.shift_by(center_chunk_location);
         for chunk_y in chunk_load_range.min.y() ..= chunk_load_range.max.y() {
             for chunk_x in chunk_load_range.min.x() ..= chunk_load_range.max.x() {
-                self.get_or_load_cell(Vector([chunk_x, chunk_y]), physics);
+                self.get_or_load_cell(gfx, physics, Vector([chunk_x, chunk_y]));
             }
         }
 

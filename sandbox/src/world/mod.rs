@@ -1,24 +1,26 @@
 use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
+use innovus::gfx::Gfx;
 use innovus::gfx::color::Color;
+use innovus::tools::Vector;
 use innovus::tools::phys::Physics;
 use crate::audio::AudioEngine;
-use crate::tools::*;
+use crate::tools::{generate_uuid, Uuid};
 use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
-use block::{light_value, Block, BlockSide, Chunk, ChunkLocation, ChunkMap, CHUNK_SIZE};
-use block::preview::BlockPreview;
-use camera::Camera;
-use entity::Entity;
-use entity::render::EntityRenderer;
-use entity::types::player::{Player, PlayerMode};
-use gen::WorldGenerator;
-use particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
+use crate::world::block::{light_value, Block, BlockSide, Chunk, ChunkLocation, ChunkMap, CHUNK_SIZE};
+use crate::world::block::preview::BlockPreview;
+use crate::world::camera::Camera;
+use crate::world::entity::Entity;
+use crate::world::entity::render::EntityRenderer;
+use crate::world::entity::types::player::{Player, PlayerMode};
+use crate::world::generation::WorldGenerator;
+use crate::world::particle::{choose_random, random_unit_vector, ParticleInfo, ParticleManager};
 
 pub mod block;
 pub mod camera;
 pub mod entity;
-pub mod gen;
+pub mod generation;
 pub mod item;
 pub mod particle;
 
@@ -39,7 +41,7 @@ pub struct World<'world> {
 }
 
 impl<'world> World<'world> {
-    pub fn new(generator: Option<Box<dyn WorldGenerator>>, camera: Camera, assets: &mut AssetPool) -> Self {
+    pub fn create(gfx: &Gfx, generator: Option<Box<dyn WorldGenerator>>, camera: Camera, assets: &mut AssetPool) -> Self {
         let mut world = Self {
             seconds_since_last_tick: SECONDS_PER_TICK,
             camera,
@@ -48,13 +50,13 @@ impl<'world> World<'world> {
             entities: HashMap::new(),
             entity_renderer: EntityRenderer::new(),
             player: Player::new(generate_uuid(), Vector([-0.5, 0.0]), None, PlayerMode::Normal),
-            particles: ParticleManager::new(),
-            block_preview: BlockPreview::new(Vector::zero(), &item::types::AIR, 0.4),
+            particles: ParticleManager::create(gfx),
+            block_preview: BlockPreview::create(gfx, Vector::zero(), &item::types::AIR, 0.4),
             sky_color: Vector([0.6, 0.8, 1.0]),
             sky_light: 1.0,
         };
         world.player.attach_collision(&mut world.physics);
-        world.player.attach_appearance(assets, &mut world.entity_renderer);
+        world.player.attach_appearance(gfx, assets, &mut world.entity_renderer);
         world.camera.set_position(world.player.position());
         world
     }
@@ -91,12 +93,12 @@ impl<'world> World<'world> {
         self.chunks.get_mut(location)
     }
 
-    pub fn load_chunk(&mut self, location: ChunkLocation) -> Ref<'_, Chunk> {
-        self.chunks.get_or_load(location, &mut self.physics)
+    pub fn load_chunk(&mut self, gfx: &Gfx, location: ChunkLocation) -> Ref<'_, Chunk> {
+        self.chunks.get_or_load(gfx, &mut self.physics, location)
     }
 
-    pub fn load_chunk_mut(&mut self, location: ChunkLocation) -> RefMut<'_, Chunk> {
-        self.chunks.get_or_load_mut(location, &mut self.physics)
+    pub fn load_chunk_mut(&mut self, gfx: &Gfx, location: ChunkLocation) -> RefMut<'_, Chunk> {
+        self.chunks.get_or_load_mut(gfx, &mut self.physics, location)
     }
 
     pub fn unload_chunk(&mut self, location: ChunkLocation) {
@@ -157,9 +159,9 @@ impl<'world> World<'world> {
         &mut self.player
     }
 
-    pub fn add_entity(&mut self, mut entity: Box<dyn Entity>, assets: &mut AssetPool) {
+    pub fn add_entity(&mut self, gfx: &Gfx, assets: &mut AssetPool, mut entity: Box<dyn Entity>) {
         entity.attach_collision(&mut self.physics);
-        entity.attach_appearance(assets, &mut self.entity_renderer);
+        entity.attach_appearance(gfx, assets, &mut self.entity_renderer);
         self.entities.insert(entity.uuid(), entity);
     }
 
@@ -194,23 +196,23 @@ impl<'world> World<'world> {
         self.block_preview.set_position(position);
     }
 
-    pub fn reload_assets(&mut self, assets: &mut AssetPool) {
+    pub fn reload_assets(&mut self, gfx: &Gfx, assets: &mut AssetPool) {
         for mut chunk in self.chunks.iter_mut() {
             chunk.set_all_need_render();
         }
         for entity in self.entities.values_mut() {
-            entity.attach_appearance(assets, &mut self.entity_renderer);
+            entity.attach_appearance(gfx, assets, &mut self.entity_renderer);
         }
-        self.player.attach_appearance(assets, &mut self.entity_renderer);
+        self.player.attach_appearance(gfx, assets, &mut self.entity_renderer);
     }
 
-    pub fn update(&mut self, inputs: &InputState, dt: f32) {
+    pub fn update(&mut self, gfx: &Gfx, inputs: &InputState, dt: f32) {
         self.seconds_since_last_tick += dt;
         if self.seconds_since_last_tick >= SECONDS_PER_TICK {
             // Advance one tick
             self.seconds_since_last_tick -= SECONDS_PER_TICK;
             // Perform tick actions
-            self.tick();
+            self.tick(gfx);
         }
 
         for entity in self.entities.values_mut() {
@@ -255,29 +257,29 @@ impl<'world> World<'world> {
         self.sky_light += (target_sky_light - self.sky_light) * dt.min(1.0);
     }
 
-    fn tick(&mut self) {
+    fn tick(&mut self, gfx: &Gfx) {
         self.entity_renderer.tick();
         self.block_preview.set_item_type(self.player.held_item().item_type());
-        self.chunks.tick(self.player.position(), &mut self.physics);
+        self.chunks.tick(self.player.position(), gfx, &mut self.physics);
     }
 
-    pub fn render(&mut self, assets: &AssetPool) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &AssetPool) {
         assets.block_texture().bind();
         assets.block_shaders().set_uniform("tex_atlas", assets.block_texture());
         assets.block_shaders().set_uniform("camera_view", self.camera.view());
         assets.block_shaders().set_uniform("camera_proj", self.camera.projection());
         for mut chunk in self.chunks.iter_mut() {
-            chunk.render(assets, &self.chunks);
+            chunk.render(render_pass, assets, &self.chunks);
         }
 
         assets.default_shaders().set_uniform("tex_atlas", assets.block_texture());
         assets.default_shaders().set_uniform("camera_view", self.camera.view());
         assets.default_shaders().set_uniform("camera_proj", self.camera.projection());
-        self.particles.render();
-        self.block_preview.render(assets, &self.chunks);
+        self.particles.render(render_pass);
+        self.block_preview.render(render_pass, assets, &self.chunks);
 
         assets.entity_texture().bind();
         assets.default_shaders().set_uniform("tex_atlas", assets.entity_texture());
-        self.entity_renderer.render_all();
+        self.entity_renderer.render_all(render_pass);
     }
 }

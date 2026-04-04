@@ -1,6 +1,5 @@
-use std::mem::offset_of;
-use innovus::gfx::{Mesh, MeshRenderer, Vertex, VertexAttribute, VertexAttributeType};
 use innovus::gfx::color::AlphaColor;
+use innovus::gfx::mesh::{Mesh, MeshRenderer};
 use innovus::tools::{Rectangle, Vector};
 
 pub mod cursor;
@@ -8,7 +7,7 @@ pub mod item;
 pub mod text;
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, bytemuck::Zeroable, bytemuck::Pod)]
 pub struct GuiVertex {
     pub offset: Vector<f32, 2>,
     pub color: Vector<f32, 4>,
@@ -29,12 +28,11 @@ impl GuiVertex {
     }
 }
 
-impl Vertex for GuiVertex {
-    const ATTRIBUTES: &'static [VertexAttribute] = &[
-        VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, offset)),
-        VertexAttribute::new(VertexAttributeType::F32, 4, offset_of!(Self, color)),
-        VertexAttribute::new(VertexAttributeType::F32, 2, offset_of!(Self, uv)),
-    ];
+innovus::impl_vertex! {
+    for GuiVertex,
+    offset: Float32x2 @ 0,
+    color: Float32x4 @ 1,
+    uv: Float32x2 @ 2,
 }
 
 pub type GuiLayerMesh = MeshRenderer<GuiVertex>;

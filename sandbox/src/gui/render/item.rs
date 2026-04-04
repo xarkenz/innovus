@@ -1,5 +1,5 @@
 use innovus::gfx::color::Color;
-use innovus::gfx::Mesh;
+use innovus::gfx::mesh::Mesh;
 use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::{GuiImage, GuiVertex};
 use crate::gui::render::text::{TextBackground, TextLine};

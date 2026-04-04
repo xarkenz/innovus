@@ -1,7 +1,7 @@
 use std::path::Path;
-use glfw::{Key, MouseButtonLeft, MouseButtonMiddle, MouseButtonRight, Window};
+use winit::window::Window;
 use innovus::gfx::color::Color;
-use innovus::gfx::screen;
+use innovus::gfx::Gfx;
 use innovus::tools::{Clock, Vector};
 use crate::audio::AudioEngine;
 use crate::gui::GuiManager;
@@ -13,36 +13,37 @@ use crate::world::block::{BlockSide, CHUNK_SIZE};
 use crate::world::block::types::AIR;
 use crate::world::entity::Entity;
 use crate::world::entity::types::player::PlayerMode;
-use crate::world::gen::WorldGenerator;
+use crate::world::generation::WorldGenerator;
 use crate::world::item::{Item, ITEM_TYPES};
 use crate::world::World;
 
-pub struct Game<'world> {
+pub struct Game<'a> {
     frame_clock: Clock,
     fps_tracker: [f32; 120],
     fps_tracker_index: usize,
     viewport_size: Vector<f32, 2>,
     content_scale: Vector<f32, 2>,
+    gfx: Gfx<'a>,
     assets: AssetPool,
     gui: GuiManager,
     scripting: ScriptingEngine,
     audio: AudioEngine,
-    current_world: Option<World<'world>>,
+    current_world: Option<World<'a>>,
     last_block_pos: Option<(usize, usize)>,
 }
 
-impl<'world> Game<'world> {
-    pub fn start(assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>) -> Result<Self, String> {
-        screen::set_blend_func(screen::BlendFunc::Transparency);
-
-        let mut assets = AssetPool::load(assets_path)?;
+impl<'a> Game<'a> {
+    pub fn start(gfx: Gfx<'a>, assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>) -> Result<Self, String> {
+        let mut assets = AssetPool::load(&gfx, assets_path)?;
+        let gui = GuiManager::create(&gfx, viewport_size, content_scale, 8.0, &mut assets)?;
         let mut game = Self {
             frame_clock: Clock::start(),
             fps_tracker: [f32::INFINITY; 120],
             fps_tracker_index: 0,
             viewport_size,
             content_scale,
-            gui: GuiManager::new(viewport_size, content_scale, 8.0, &mut assets)?,
+            gfx,
+            gui,
             assets,
             scripting: ScriptingEngine::new(),
             audio: AudioEngine::new()?,
@@ -60,7 +61,6 @@ impl<'world> Game<'world> {
     pub fn set_viewport_size(&mut self, viewport_size: Vector<f32, 2>) {
         self.viewport_size = viewport_size;
 
-        screen::set_viewport(0, 0, viewport_size.x() as i32, viewport_size.y() as i32);
         self.gui.set_viewport_size(viewport_size);
         if let Some(world) = &mut self.current_world {
             world.camera_mut().set_size(viewport_size);
@@ -88,7 +88,7 @@ impl<'world> Game<'world> {
             self.content_scale.mul(48.0),
             5.0,
         );
-        self.current_world = Some(World::new(generator, camera, &mut self.assets));
+        self.current_world = Some(World::create(&self.gfx, generator, camera, &mut self.assets));
     }
 
     pub fn run_frame(&mut self, inputs: &InputState, window: &mut Window) {
@@ -100,7 +100,7 @@ impl<'world> Game<'world> {
 
         if inputs.key_is_held(Key::LeftControl) {
             if inputs.key_was_pressed(Key::R) {
-                match self.assets.reload() {
+                match self.assets.reload(&self.gfx) {
                     Err(err) => eprintln!("Failed to reload assets: {err}"),
                     Ok(()) => println!("Reloaded assets."),
                 }
@@ -117,7 +117,6 @@ impl<'world> Game<'world> {
 
         self.gui.set_cursor_position(cursor_pos);
 
-        let clear_color;
         if let Some(world) = &mut self.current_world {
             if let Some(scroll_amount) = inputs.scroll_amount() {
                 let target_zoom = world.camera().zoom().mul(f32::powf(1.125, scroll_amount.y() as f32));
@@ -196,7 +195,7 @@ impl<'world> Game<'world> {
             }
 
             world.set_block_preview_position(cursor_world_pos);
-            world.update(inputs, dt);
+            world.update(&self.gfx, inputs, dt);
 
             self.gui.update_item_display(world.player().held_item(), &self.assets);
             self.gui.update_player_info_display(
@@ -208,18 +207,17 @@ impl<'world> Game<'world> {
                 self.gui.update_fps_display(min_fps);
             }
 
-            clear_color = world.sky_color();
+            self.gfx.set_clear_color(world.sky_color());
         }
         else {
-            clear_color = Color::Black;
+            self.gfx.set_clear_color(Color::Black);
         }
 
-        screen::set_clear_color(clear_color.into());
-        screen::clear();
-
-        if let Some(world) = &mut self.current_world {
-            world.render(&self.assets);
-        }
-        self.gui.render(&mut self.assets);
+        self.gfx.render(|render_pass| {
+            if let Some(world) = &mut self.current_world {
+                world.render(render_pass, &self.assets);
+            }
+            self.gui.render(render_pass, &mut self.assets);
+        });
     }
 }

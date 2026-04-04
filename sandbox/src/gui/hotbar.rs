@@ -1,4 +1,5 @@
 use innovus::gfx::color::Color;
+use innovus::gfx::Gfx;
 use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::{GuiImage, GuiLayerMesh};
 use crate::gui::render::item::ItemGrid;
@@ -22,7 +23,7 @@ impl Hotbar {
     const HELD_ITEM_TEXT_OFFSET: Vector<f32, 2> = Vector([106.0, 0.0]);
     const ITEM_GRID_OFFSET: Vector<f32, 2> = Vector([8.0, 8.0]);
 
-    pub fn new(assets: &mut AssetPool) -> Result<Self, String> {
+    pub fn create(gfx: &Gfx, assets: &mut AssetPool) -> Result<Self, String> {
         Ok(Self {
             anchor: Vector([0.5, 1.0]),
             offset: Vector([-106.0, -32.0]),
@@ -53,9 +54,9 @@ impl Hotbar {
                 item_grid.slot_mut(4).set_item(Item::new(&types::MAGMIUM_PICKAXE, 1));
                 item_grid
             },
-            background_layer: GuiLayerMesh::create(),
-            item_layer: GuiLayerMesh::create(),
-            foreground_layer: GuiLayerMesh::create(),
+            background_layer: GuiLayerMesh::create(gfx),
+            item_layer: GuiLayerMesh::create(gfx),
+            foreground_layer: GuiLayerMesh::create(gfx),
         })
     }
 
@@ -106,23 +107,23 @@ impl Hotbar {
         }
     }
 
-    pub fn render(&mut self, assets: &mut AssetPool) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &mut AssetPool) {
         if self.background_layer.is_empty() {
             self.item_layer.clear();
             self.foreground_layer.clear();
 
             self.background_image.append_to_mesh(
-                self.background_layer.data_mut(),
+                self.background_layer.mesh_mut(),
                 self.offset,
             );
             self.item_grid.append_to_mesh(
-                self.item_layer.data_mut(),
-                self.foreground_layer.data_mut(),
+                self.item_layer.mesh_mut(),
+                self.foreground_layer.mesh_mut(),
                 self.offset + Self::ITEM_GRID_OFFSET,
                 assets,
             );
             self.held_item_text.append_to_mesh(
-                self.foreground_layer.data_mut(),
+                self.foreground_layer.mesh_mut(),
                 self.offset + Self::HELD_ITEM_TEXT_OFFSET,
                 assets,
             );
@@ -134,10 +135,10 @@ impl Hotbar {
 
         assets.gui_shaders().set_uniform("anchor", &self.anchor);
         assets.gui_texture().bind();
-        self.background_layer.render();
+        self.background_layer.render(render_pass);
         assets.item_texture().bind();
-        self.item_layer.render();
+        self.item_layer.render(render_pass);
         assets.gui_texture().bind();
-        self.foreground_layer.render();
+        self.foreground_layer.render(render_pass);
     }
 }

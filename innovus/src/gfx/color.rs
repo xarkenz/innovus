@@ -39,6 +39,18 @@ impl Color {
     }
 }
 
+impl From<Color> for wgpu::Color {
+    fn from(color: Color) -> Self {
+        let Vector([r, g, b]) = color.rgb().map(f64::from);
+        Self {
+            r,
+            g,
+            b,
+            a: 1.0,
+        }
+    }
+}
+
 impl std::ops::Mul for Color {
     type Output = Self;
 
@@ -83,6 +95,18 @@ impl From<Color> for AlphaColor {
 impl From<Vector<f32, 4>> for AlphaColor {
     fn from(rgba: Vector<f32, 4>) -> Self {
         Self::new(Color::RGB(rgba.xyz()), rgba.w())
+    }
+}
+
+impl From<AlphaColor> for wgpu::Color {
+    fn from(color: AlphaColor) -> Self {
+        let Vector([r, g, b]) = color.color.rgb().map(f64::from);
+        Self {
+            r,
+            g,
+            b,
+            a: color.alpha.into(),
+        }
     }
 }
 

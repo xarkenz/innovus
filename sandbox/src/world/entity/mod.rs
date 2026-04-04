@@ -1,3 +1,4 @@
+use innovus::gfx::Gfx;
 use innovus::tools::phys::Physics;
 use crate::tools::*;
 use crate::tools::asset::AssetPool;
@@ -22,9 +23,9 @@ pub trait Entity {
         let _ = physics;
     }
 
-    fn attach_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
+    fn attach_appearance(&mut self, gfx: &Gfx, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
         // Do nothing by default
-        let _ = (assets, renderer);
+        let _ = (gfx, assets, renderer);
     }
 
     fn detach_collision(&mut self, physics: &mut Physics) {

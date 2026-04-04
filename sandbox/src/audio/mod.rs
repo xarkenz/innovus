@@ -1,16 +1,15 @@
 use std::fs::File;
 use std::path::Path;
-use rodio::{Decoder, OutputStream, Sink, Source};
 
 pub struct AudioEngine {
-    stream: OutputStream,
+    handle: rodio::MixerDeviceSink,
     volume: f32,
 }
 
 impl AudioEngine {
     pub fn new() -> Result<Self, String> {
         Ok(Self {
-            stream: rodio::OutputStreamBuilder::open_default_stream()
+            handle: rodio::DeviceSinkBuilder::open_default_sink()
                 .map_err(|err| err.to_string())?,
             volume: 0.8,
         })
@@ -25,13 +24,16 @@ impl AudioEngine {
     }
 
     pub fn play_sound(&self, path: impl AsRef<Path>) -> Result<(), String> {
-        let file = File::open(path).map_err(|err| err.to_string())?;
-        let source = Decoder::try_from(file)
+        use rodio::Source;
+        let path = path.as_ref();
+        let file = File::open(path.with_extension("ogg"))
+            .map_err(|err| err.to_string())?;
+        let source = rodio::Decoder::try_from(file)
             .map_err(|err| err.to_string())?
             .amplify(self.volume);
-        let sink = Sink::connect_new(self.stream.mixer());
-        sink.append(source);
-        sink.detach();
+        let player = rodio::Player::connect_new(self.handle.mixer());
+        player.append(source);
+        player.detach();
         Ok(())
     }
 }

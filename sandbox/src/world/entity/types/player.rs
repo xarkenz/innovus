@@ -1,3 +1,4 @@
+use innovus::gfx::Gfx;
 use innovus::tools::phys::Physics;
 use crate::tools::*;
 use crate::tools::asset::AssetPool;
@@ -126,7 +127,7 @@ impl Entity for Player {
         )));
     }
 
-    fn attach_appearance(&mut self, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
+    fn attach_appearance(&mut self, gfx: &Gfx, assets: &mut AssetPool, renderer: &mut EntityRenderer) {
         if let Some(appearance) = self.appearance.take() {
             renderer.remove_piece(appearance.body);
         }
@@ -147,7 +148,7 @@ impl Entity for Player {
             jump_descend_image,
             crouch_idle_image,
             crouch_walk_image,
-            body: renderer.add_piece(body),
+            body: renderer.add_piece(gfx, body),
         });
     }
 

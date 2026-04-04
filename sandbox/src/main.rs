@@ -1,9 +1,7 @@
-use glfw::{Context, WindowEvent};
-use innovus::gfx::screen;
 use innovus::tools::Vector;
 use crate::game::Game;
 use crate::tools::input::InputState;
-use crate::world::gen::types::OverworldGenerator;
+use crate::world::generation::types::OverworldGenerator;
 
 pub mod audio;
 pub mod game;

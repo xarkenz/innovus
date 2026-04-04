@@ -1,15 +1,15 @@
-use glfw::Key;
 use innovus::gfx::color::Color;
+use innovus::gfx::Gfx;
 use innovus::tools::{Rectangle, Vector};
-use crate::tools::asset::AssetPool;
-use crate::world::item::Item;
-use render::cursor::GuiCursor;
-use render::text::{TextLine, TextLineRenderer};
-use render::{GuiImage, GuiLayerMesh};
-use render::text::TextBackground;
+use crate::gui::render::cursor::GuiCursor;
+use crate::gui::render::text::{TextLine, TextLineRenderer};
+use crate::gui::render::{GuiImage, GuiLayerMesh};
+use crate::gui::render::text::TextBackground;
 use crate::script::ScriptingEngine;
+use crate::tools::asset::AssetPool;
 use crate::tools::input::InputState;
 use crate::world::World;
+use crate::world::item::Item;
 
 pub mod render;
 pub mod hotbar;
@@ -32,24 +32,25 @@ pub struct GuiManager {
 }
 
 impl GuiManager {
-    pub fn new(viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>, gui_scale: f32, assets: &mut AssetPool) -> Result<Self, String> {
+    pub fn create(gfx: &Gfx, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>, gui_scale: f32, assets: &mut AssetPool) -> Result<Self, String> {
         Ok(Self {
             viewport_size,
             content_scale,
             gui_scale,
             offset_scale: Self::compute_offset_scale(viewport_size, content_scale.mul(gui_scale)),
             cursor_position: Vector::zero(),
-            cursor: GuiCursor::new(Vector::zero(), Vector::zero(), &crate::world::item::types::AIR),
-            hotbar: hotbar::Hotbar::new(assets)?,
-            chat_box: chat::ChatBox::new(20, 12.0, 0.4)?,
+            cursor: GuiCursor::create(gfx, Vector::zero(), Vector::zero(), &crate::world::item::types::AIR),
+            hotbar: hotbar::Hotbar::create(gfx, assets)?,
+            chat_box: chat::ChatBox::create(gfx, 20, 12.0, 0.4)?,
             inventory: GuiImage::new(
                 Rectangle::new(Vector([-106.0, -62.0]), Vector([106.0, 62.0])),
                 Color::White.into(),
                 assets.get_gui_image("gui/inventory")?,
             ),
-            inventory_layer: GuiLayerMesh::create(),
+            inventory_layer: GuiLayerMesh::create(gfx),
             inventory_shown: false,
             fps_display: TextLineRenderer::create(
+                gfx,
                 TextLine::new(
                     Vector([0.0, 0.0]),
                     Color::White.into(),
@@ -63,6 +64,7 @@ impl GuiManager {
                 Vector([1.0, 0.0]),
             ),
             player_info_display: TextLineRenderer::create(
+                gfx,
                 TextLine::new(
                     Vector([1.0, 0.0]),
                     Color::White.into(),
@@ -205,25 +207,25 @@ impl GuiManager {
             }
     }
 
-    pub fn render(&mut self, assets: &mut AssetPool) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &mut AssetPool) {
         assets.gui_shaders().set_uniform("offset_scale", &self.offset_scale);
         assets.gui_shaders().set_uniform("tex_atlas", assets.gui_texture());
 
         if self.inventory_shown {
             if self.inventory_layer.is_empty() {
-                self.inventory.append_to_mesh(self.inventory_layer.data_mut(), Vector::zero());
+                self.inventory.append_to_mesh(self.inventory_layer.mesh_mut(), Vector::zero());
                 self.inventory_layer.upload_buffers();
             }
             assets.gui_texture().bind();
             assets.gui_shaders().set_uniform("anchor", &Vector([0.5f32, 0.5f32]));
-            self.inventory_layer.render();
+            self.inventory_layer.render(render_pass);
         }
 
-        self.hotbar.render(assets);
-        self.chat_box.render(assets);
+        self.hotbar.render(render_pass, assets);
+        self.chat_box.render(render_pass, assets);
 
-        self.fps_display.render(assets);
-        self.player_info_display.render(assets);
-        self.cursor.render(assets);
+        self.fps_display.render(render_pass, assets);
+        self.player_info_display.render(render_pass, assets);
+        self.cursor.render(render_pass, assets);
     }
 }

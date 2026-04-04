@@ -2,8 +2,10 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use json::JsonValue;
-use innovus::gfx::{Image, ImageAtlas, Program, ProgramPreset, Shader, ShaderType, Texture2D, TextureSampling, TextureWrap};
 use innovus::gfx::color::ColorPalette;
+use innovus::gfx::Gfx;
+use innovus::gfx::image::{Image, ImageAtlas};
+use innovus::gfx::texture::DynamicTexture2D;
 use innovus::tools::Rectangle;
 use crate::tools::asset::block::{BlockAppearance, BlockImage};
 use crate::tools::asset::entity::EntityImage;
@@ -18,18 +20,18 @@ pub mod entity;
 pub struct AssetPool {
     assets_path: PathBuf,
     default_shaders: Program,
-    gui_texture: Texture2D,
+    gui_texture: DynamicTexture2D,
     gui_atlas: ImageAtlas,
     gui_images: HashMap<String, Rectangle<u32>>,
     gui_shaders: Program,
-    block_texture: Texture2D,
+    block_texture: DynamicTexture2D,
     block_atlas: ImageAtlas,
     block_appearances: HashMap<*const BlockType, BlockAppearance>,
     block_shaders: Program,
-    item_texture: Texture2D,
+    item_texture: DynamicTexture2D,
     item_atlas: ImageAtlas,
     item_images: HashMap<*const ItemType, Rectangle<u32>>,
-    entity_texture: Texture2D,
+    entity_texture: DynamicTexture2D,
     entity_atlas: ImageAtlas,
     entity_images: HashMap<String, EntityImage>,
     color_palettes: HashMap<String, ColorPalette>,
@@ -37,31 +39,37 @@ pub struct AssetPool {
 }
 
 impl AssetPool {
-    pub fn load(assets_path: impl AsRef<Path>) -> Result<Self, String> {
-        fn create_texture(bind_slot: u32) -> Texture2D {
-            let mut texture = Texture2D::create(bind_slot);
-            texture.set_minify_sampling(TextureSampling::Nearest);
-            texture.set_magnify_sampling(TextureSampling::Nearest);
-            texture.set_wrap_s(TextureWrap::Repeat);
-            texture.set_wrap_t(TextureWrap::Repeat);
-            texture
-        }
+    pub fn load(gfx: &Gfx, assets_path: impl AsRef<Path>) -> Result<Self, String> {
+        let sampler = gfx.device().create_sampler(&wgpu::SamplerDescriptor {
+            min_filter: wgpu::FilterMode::Nearest,
+            mag_filter: wgpu::FilterMode::Nearest,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            ..Default::default()
+        });
+
+        let create_texture = |label| DynamicTexture2D::create(
+            gfx,
+            Some(label),
+            sampler.clone(),
+            &Image::empty(),
+        );
 
         let mut assets = Self {
             assets_path: assets_path.as_ref().into(),
             default_shaders: Program::from_preset(ProgramPreset::Default2DShader)?,
-            gui_texture: create_texture(0),
+            gui_texture: create_texture("GUI Texture"),
             gui_atlas: ImageAtlas::new(Default::default()),
             gui_images: HashMap::new(),
             gui_shaders: Program::create()?,
-            block_texture: create_texture(0),
+            block_texture: create_texture("Block Texture"),
             block_atlas: ImageAtlas::new(Default::default()),
             block_appearances: HashMap::new(),
             block_shaders: Program::create()?,
-            item_texture: create_texture(0),
+            item_texture: create_texture("Item Texture"),
             item_atlas: ImageAtlas::new(Default::default()),
             item_images: HashMap::new(),
-            entity_texture: create_texture(0),
+            entity_texture: create_texture("Entity Texture"),
             entity_atlas: ImageAtlas::new(Default::default()),
             entity_images: HashMap::new(),
             color_palettes: HashMap::new(),
@@ -69,7 +77,7 @@ impl AssetPool {
         };
 
         // Despite the name of the method, this loads everything for the first time
-        assets.reload()?;
+        assets.reload(gfx)?;
 
         Ok(assets)
     }
@@ -84,7 +92,7 @@ impl AssetPool {
 
     pub fn load_image(&self, sub_path: impl AsRef<Path>) -> Result<Image, String> {
         let path = self.resolve_path(sub_path).with_extension("png");
-        Image::load_file(&path)
+        Image::from_file(&path).map_err(|err| err.to_string())
     }
 
     pub fn load_json(&self, sub_path: impl AsRef<Path>) -> Result<JsonValue, String> {
@@ -100,7 +108,7 @@ impl AssetPool {
         std::fs::read_to_string(&path).map_err(|err| err.to_string())
     }
 
-    pub fn reload(&mut self) -> Result<(), String> {
+    pub fn reload(&mut self, gfx: &Gfx) -> Result<(), String> {
         self.clear_gui_images();
         self.reload_block_appearances()?;
         self.reload_item_images()?;
@@ -116,7 +124,7 @@ impl AssetPool {
         &self.default_shaders
     }
 
-    pub fn gui_texture(&self) -> &Texture2D {
+    pub fn gui_texture(&self) -> &DynamicTexture2D {
         &self.gui_texture
     }
 
@@ -132,7 +140,7 @@ impl AssetPool {
             let loaded_image = self.load_image(format!("images/{key}"))?;
             let atlas_offset = self.gui_atlas.add_image(&loaded_image);
             let atlas_region = Rectangle::from_span(atlas_offset, loaded_image.size());
-            self.gui_texture.upload_image(self.gui_atlas.image());
+            self.gui_texture.rewrite(self.gui_atlas.image());
 
             self.gui_images.insert(key.into(), atlas_region);
             Ok(atlas_region)
@@ -148,7 +156,7 @@ impl AssetPool {
         &self.gui_shaders
     }
 
-    pub fn block_texture(&self) -> &Texture2D {
+    pub fn block_texture(&self) -> &DynamicTexture2D {
         &self.block_texture
     }
 
@@ -200,7 +208,7 @@ impl AssetPool {
             self.block_appearances.insert(block_type, block_appearance);
         }
 
-        self.block_texture.upload_image(self.block_atlas.image());
+        self.block_texture.rewrite(self.block_atlas.image());
 
         Ok(())
     }
@@ -217,7 +225,7 @@ impl AssetPool {
         &self.block_shaders
     }
 
-    pub fn item_texture(&self) -> &Texture2D {
+    pub fn item_texture(&self) -> &DynamicTexture2D {
         &self.item_texture
     }
 
@@ -241,7 +249,7 @@ impl AssetPool {
             self.item_images.insert(item_type, atlas_region);
         }
 
-        self.item_texture.upload_image(self.item_atlas.image());
+        self.item_texture.rewrite(self.item_atlas.image());
 
         Ok(())
     }
@@ -250,7 +258,7 @@ impl AssetPool {
         self.item_images.get(&(item_type as *const _)).copied()
     }
 
-    pub fn entity_texture(&self) -> &Texture2D {
+    pub fn entity_texture(&self) -> &DynamicTexture2D {
         &self.entity_texture
     }
 
@@ -268,7 +276,7 @@ impl AssetPool {
             let loaded_image = self.load_image(&path)?;
             let atlas_offset = self.entity_atlas.add_image(&loaded_image);
             let atlas_region = Rectangle::from_span(atlas_offset, loaded_image.size());
-            self.entity_texture.upload_image(self.entity_atlas.image());
+            self.entity_texture.rewrite(self.entity_atlas.image());
 
             let metadata = self.load_json(&path)?;
 

@@ -1,5 +1,6 @@
 use innovus::gfx::color::{AlphaColor, Color};
-use innovus::gfx::{MeshRenderer, Vertex2D};
+use innovus::gfx::Gfx;
+use innovus::gfx::mesh::{MeshRenderer, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::noise::scramble;
 
@@ -50,10 +51,10 @@ pub struct ParticleManager {
 }
 
 impl ParticleManager {
-    pub fn new() -> Self {
+    pub fn create(gfx: &Gfx) -> Self {
         Self {
             active_particles: Vec::new(),
-            mesh: MeshRenderer::create(),
+            mesh: MeshRenderer::create(gfx),
         }
     }
 
@@ -75,7 +76,7 @@ impl ParticleManager {
         })
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass) {
         const OFFSETS: [Vector<f32, 2>; 4] = [
             Vector([0.0, 0.0]), // Bottom left
             Vector([0.0, 1.0]), // Top left
@@ -102,7 +103,7 @@ impl ParticleManager {
 
         if !vertices.is_empty() {
             self.mesh.add(&vertices, &triangles);
-            self.mesh.render();
+            self.mesh.render(render_pass);
         }
     }
 }

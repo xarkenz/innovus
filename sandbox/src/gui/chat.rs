@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 use std::time::Instant;
-use glfw::Key;
 use innovus::gfx::color::Color;
-use innovus::gfx::MeshRenderer;
+use innovus::gfx::Gfx;
+use innovus::gfx::mesh::MeshRenderer;
 use innovus::tools::Vector;
 use crate::gui::render::GuiVertex;
 use crate::gui::render::text::{TextBackground, TextLine};
@@ -24,7 +24,7 @@ pub struct ChatBox {
 }
 
 impl ChatBox {
-    pub fn new(max_history: usize, line_spacing: f32, background_opacity: f32) -> Result<Self, String> {
+    pub fn create(gfx: &Gfx, max_history: usize, line_spacing: f32, background_opacity: f32) -> Result<Self, String> {
         Ok(Self {
             anchor: Vector([0.0, 1.0]),
             offset: Vector([4.0, -36.0]),
@@ -42,7 +42,7 @@ impl ChatBox {
             is_open: false,
             line_spacing,
             background_opacity,
-            text_layer: MeshRenderer::create(),
+            text_layer: MeshRenderer::create(gfx),
         })
     }
 
@@ -198,11 +198,11 @@ impl ChatBox {
         self.message_history.push_back(message);
     }
 
-    pub fn render(&mut self, assets: &mut AssetPool) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &mut AssetPool) {
         if self.text_layer.is_empty() {
             if self.is_open {
                 self.current_message.append_to_mesh(
-                    self.text_layer.data_mut(),
+                    self.text_layer.mesh_mut(),
                     self.offset,
                     assets,
                 );
@@ -212,7 +212,7 @@ impl ChatBox {
             for message in self.message_history.iter_mut().rev() {
                 offset.set_y(offset.y() - self.line_spacing);
                 message.line_mut().append_to_mesh(
-                    self.text_layer.data_mut(),
+                    self.text_layer.mesh_mut(),
                     offset,
                     assets,
                 );
@@ -223,7 +223,7 @@ impl ChatBox {
 
         assets.gui_shaders().set_uniform("anchor", &self.anchor);
         assets.gui_texture().bind();
-        self.text_layer.render();
+        self.text_layer.render(render_pass);
     }
 }
 

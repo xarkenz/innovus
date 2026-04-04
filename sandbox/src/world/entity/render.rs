@@ -1,4 +1,5 @@
-use innovus::gfx::{MeshRenderer, Vertex2D};
+use innovus::gfx::Gfx;
+use innovus::gfx::mesh::{MeshRenderer, Vertex2D};
 use innovus::tools::{Rectangle, Vector};
 use innovus::tools::arena::{ArenaHandle, BoundedArena, UnboundedArena};
 use crate::tools::asset::entity::EntityImage;
@@ -158,7 +159,7 @@ impl EntityRenderer {
         }
     }
 
-    pub fn add_piece(&mut self, mut piece: EntityPiece) -> EntityPieceHandle {
+    pub fn add_piece(&mut self, gfx: &Gfx, mut piece: EntityPiece) -> EntityPieceHandle {
         for (batch_handle, batch) in self.batches.values_mut() {
             match batch.try_add_piece(piece) {
                 Ok(piece_handle) => return EntityPieceHandle {
@@ -169,7 +170,7 @@ impl EntityRenderer {
             }
         }
 
-        let batch_handle = self.batches.insert(RendererBatch::new());
+        let batch_handle = self.batches.insert(RendererBatch::create(gfx));
         let piece_handle = self.batches.get_current_mut(batch_handle.slot).unwrap()
             .try_add_piece(piece).unwrap();
         EntityPieceHandle {
@@ -204,9 +205,9 @@ impl EntityRenderer {
         }
     }
 
-    pub fn render_all(&mut self) {
+    pub fn render_all(&mut self, render_pass: &mut wgpu::RenderPass) {
         for (_, batch) in self.batches.values_mut() {
-            batch.render();
+            batch.render(render_pass);
         }
     }
 }
@@ -219,9 +220,9 @@ struct RendererBatch {
 }
 
 impl RendererBatch {
-    pub fn new() -> Self {
+    pub fn create(gfx: &Gfx) -> Self {
         Self {
-            mesh: MeshRenderer::create(),
+            mesh: MeshRenderer::create(gfx),
             pieces: BoundedArena::new(PIECES_PER_BATCH),
         }
     }
@@ -252,7 +253,7 @@ impl RendererBatch {
         }
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass) {
         if self.mesh.is_empty() {
             let mut vertices = Vec::new();
             let mut faces = Vec::new();
@@ -295,6 +296,6 @@ impl RendererBatch {
         if any_changed {
             self.mesh.upload_vertex_buffer();
         }
-        self.mesh.render();
+        self.mesh.render(render_pass);
     }
 }

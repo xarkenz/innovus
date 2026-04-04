@@ -1,4 +1,5 @@
-use innovus::gfx::{MeshRenderer, Vertex2D};
+use innovus::gfx::Gfx;
+use innovus::gfx::mesh::{MeshRenderer, Vertex2D};
 use innovus::tools::Vector;
 use crate::tools::asset::AssetPool;
 use crate::world::block::{Block, BlockSide, ChunkMap, CHUNK_SIZE, QUADRANT_OFFSETS, QUADRANT_VERTEX_OFFSETS};
@@ -13,12 +14,12 @@ pub struct BlockPreview {
 }
 
 impl BlockPreview {
-    pub fn new(position: Vector<f32, 2>, item_type: &'static ItemType, opacity: f32) -> Self {
+    pub fn create(gfx: &Gfx, position: Vector<f32, 2>, item_type: &'static ItemType, opacity: f32) -> Self {
         Self {
             position,
             item_type,
             opacity,
-            mesh: MeshRenderer::create(),
+            mesh: MeshRenderer::create(gfx),
         }
     }
 
@@ -46,7 +47,7 @@ impl BlockPreview {
         self.opacity = opacity;
     }
 
-    pub fn render(&mut self, assets: &AssetPool, chunks: &ChunkMap) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &AssetPool, chunks: &ChunkMap) {
         if let Some(block_type) = self.item_type.block_type() {
             let chunk_location = Vector([
                 self.position.x().div_euclid(CHUNK_SIZE as f32) as i64,
@@ -99,7 +100,7 @@ impl BlockPreview {
 
                 assets.block_texture().bind();
                 assets.block_shaders().bind();
-                self.mesh.render();
+                self.mesh.render(render_pass);
             }
         }
     }

@@ -3,6 +3,7 @@ use innovus::tools::*;
 pub struct Camera {
     view: Transform3D<f32>,
     projection: Transform3D<f32>,
+    view_projection: Transform3D<f32>,
     position: Vector<f32, 2>,
     target: Vector<f32, 2>,
     size: Vector<f32, 2>,
@@ -15,6 +16,7 @@ impl Camera {
         Self {
             view: Transform3D::identity(),
             projection: Transform3D::identity(),
+            view_projection: Transform3D::identity(),
             position,
             target: position,
             size,
@@ -29,6 +31,10 @@ impl Camera {
 
     pub fn projection(&self) -> &Transform3D<f32> {
         &self.projection
+    }
+
+    pub fn view_projection(&self) -> &Transform3D<f32> {
+        &self.view_projection
     }
 
     pub fn position(&self) -> Vector<f32, 2> {
@@ -97,6 +103,8 @@ impl Camera {
             100.0,
             -100.0,
         );
+
+        self.view_projection = self.projection * self.view;
 
         self.position = self.position.lerp(self.target, (self.speed * dt).min(1.0));
     }

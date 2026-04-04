@@ -1,6 +1,6 @@
-use innovus::gfx::MeshRenderer;
+use innovus::gfx::Gfx;
 use innovus::tools::Vector;
-use crate::gui::render::GuiVertex;
+use crate::gui::render::{GuiLayerMesh, GuiVertex};
 use crate::tools::asset::AssetPool;
 use crate::world::item::ItemType;
 
@@ -8,16 +8,21 @@ pub struct GuiCursor {
     anchor: Vector<f32, 2>,
     offset: Vector<f32, 2>,
     item_type: &'static ItemType,
-    mesh: MeshRenderer<GuiVertex>,
+    mesh: GuiLayerMesh,
 }
 
 impl GuiCursor {
-    pub fn new(anchor: Vector<f32, 2>, offset: Vector<f32, 2>, item_type: &'static ItemType) -> Self {
+    pub fn create(
+        gfx: &Gfx,
+        anchor: Vector<f32, 2>,
+        offset: Vector<f32, 2>,
+        item_type: &'static ItemType,
+    ) -> Self {
         Self {
             anchor,
             offset,
             item_type,
-            mesh: MeshRenderer::create(),
+            mesh: GuiLayerMesh::create(gfx),
         }
     }
 
@@ -45,7 +50,7 @@ impl GuiCursor {
         self.item_type = item_type;
     }
 
-    pub fn render(&mut self, assets: &mut AssetPool) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &mut AssetPool) {
         assets.gui_shaders().set_uniform("anchor", &self.anchor);
         let cursor_atlas_region = assets.get_gui_image("gui/cursor").unwrap();
         let to_f32 = |x: u32| x as f32;
@@ -82,7 +87,7 @@ impl GuiCursor {
             );
 
             assets.item_texture().bind();
-            self.mesh.render();
+            self.mesh.render(render_pass);
         }
 
         self.mesh.clear();
@@ -116,6 +121,6 @@ impl GuiCursor {
         );
 
         assets.gui_texture().bind();
-        self.mesh.render();
+        self.mesh.render(render_pass);
     }
 }

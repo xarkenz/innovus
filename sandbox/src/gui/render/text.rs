@@ -1,7 +1,8 @@
-use innovus::gfx::{Mesh, MeshRenderer};
 use innovus::gfx::color::AlphaColor;
+use innovus::gfx::Gfx;
+use innovus::gfx::mesh::Mesh;
 use innovus::tools::Vector;
-use crate::gui::render::GuiVertex;
+use crate::gui::render::{GuiLayerMesh, GuiVertex};
 use crate::tools::asset::AssetPool;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -201,7 +202,7 @@ impl TextLine {
         }
 
         let slice = mesh.add_mesh(&self.mesh);
-        for vertex in mesh.slice_vertices_mut(slice) {
+        for vertex in mesh.slice_vertices_mut(&slice) {
             vertex.offset += offset;
         }
     }
@@ -211,16 +212,16 @@ pub struct TextLineRenderer {
     text_line: TextLine,
     anchor: Vector<f32, 2>,
     offset: Vector<f32, 2>,
-    mesh: MeshRenderer<GuiVertex>,
+    mesh: GuiLayerMesh,
 }
 
 impl TextLineRenderer {
-    pub fn create(text_line: TextLine, anchor: Vector<f32, 2>, offset: Vector<f32, 2>) -> Self {
+    pub fn create(gfx: &Gfx, text_line: TextLine, anchor: Vector<f32, 2>, offset: Vector<f32, 2>) -> Self {
         Self {
             text_line,
             anchor,
             offset,
-            mesh: MeshRenderer::create(),
+            mesh: GuiLayerMesh::create(gfx),
         }
     }
 
@@ -248,11 +249,11 @@ impl TextLineRenderer {
         self.offset = offset;
     }
 
-    pub fn render(&mut self, assets: &mut AssetPool) {
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, assets: &mut AssetPool) {
         if !self.text_line.text().is_empty() {
             self.mesh.clear();
             self.text_line.append_to_mesh(
-                self.mesh.data_mut(),
+                self.mesh.mesh_mut(),
                 self.offset,
                 assets,
             );
@@ -260,7 +261,7 @@ impl TextLineRenderer {
 
             assets.gui_texture().bind();
             assets.gui_shaders().set_uniform("anchor", &self.anchor);
-            self.mesh.render();
+            self.mesh.render(render_pass);
         }
     }
 }
