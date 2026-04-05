@@ -1,12 +1,12 @@
 use innovus::gfx::color::Color;
 use innovus::gfx::Gfx;
 use innovus::gfx::pipeline::BindGroup;
+use innovus::input::InputState;
 use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::{GuiImage, GuiLayerMesh};
 use crate::gui::render::item::ItemGrid;
 use crate::gui::render::text::{TextBackground, TextLine};
 use crate::tools::asset::AssetPool;
-use crate::tools::input::InputState;
 use crate::world::item::{types, Item};
 
 pub struct Hotbar {

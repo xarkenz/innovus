@@ -1,5 +1,4 @@
 use std::error::Error;
-use pollster::FutureExt;
 use crate::gfx::color::Color;
 use crate::tools::Vector;
 
@@ -20,7 +19,7 @@ pub struct Gfx<'window> {
 }
 
 impl<'window> Gfx<'window> {
-    pub fn create(
+    pub async fn create(
         target: impl Into<wgpu::SurfaceTarget<'window>>,
         surface_size: Vector<u32, 2>,
         clear_color: Color,
@@ -35,12 +34,12 @@ impl<'window> Gfx<'window> {
                 compatible_surface: Some(&surface),
                 ..Default::default()
             })
-            .block_on()
+            .await
             .map_err(CreateGfxError::RequestAdapter)?;
 
         let (device, queue) = adapter
             .request_device(&Default::default())
-            .block_on()
+            .await
             .map_err(CreateGfxError::RequestDevice)?;
 
         let surface_capabilities = surface.get_capabilities(&adapter);

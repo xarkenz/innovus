@@ -9,10 +9,11 @@ use innovus::gfx::mesh::{Vertex, Vertex2D};
 use innovus::gfx::pipeline::BindGroup;
 use innovus::gfx::texture::DynamicTexture2D;
 use innovus::tools::Rectangle;
-use crate::gui::render::GuiVertex;
+use crate::gui::render::{GuiParams, GuiVertex};
 use crate::tools::asset::block::{BlockAppearance, BlockImage};
 use crate::tools::asset::entity::EntityImage;
 use crate::world::block::{Block, BlockType, ChunkLocation, BLOCK_TYPES};
+use crate::world::camera::Camera;
 use crate::world::item::ItemType;
 use crate::world::item::types::ITEM_TYPES;
 
@@ -350,12 +351,17 @@ impl AssetPool {
     }
 
     pub fn reload_pipelines(&mut self, gfx: &Gfx) -> Result<(), String> {
+        let texture_layout = DynamicTexture2D::create_layout(gfx.device());
+        let camera_layout = Camera::create_layout(gfx.device());
+        let gui_params_layout = GuiParams::create_layout(gfx.device());
+
         self.default_pipeline = Some(self.create_render_pipeline(
             gfx,
             "default",
             "Default Render Pipeline",
             &[
-                //
+                Some(&texture_layout),
+                Some(&camera_layout),
             ],
             Vertex2D::buffer_layout(),
         )?);
@@ -364,7 +370,9 @@ impl AssetPool {
             "gui",
             "GUI Render Pipeline",
             &[
-                //
+                Some(&texture_layout),
+                None,
+                Some(&gui_params_layout),
             ],
             GuiVertex::buffer_layout(),
         )?);
@@ -373,7 +381,8 @@ impl AssetPool {
             "block",
             "Chunk Render Pipeline",
             &[
-                //
+                Some(&texture_layout),
+                Some(&camera_layout),
             ],
             Vertex2D::buffer_layout(),
         )?);
@@ -426,7 +435,7 @@ impl AssetPool {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
+                cull_mode: None,
                 ..Default::default()
             },
             depth_stencil: None,

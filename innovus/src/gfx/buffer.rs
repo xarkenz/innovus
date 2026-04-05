@@ -108,7 +108,7 @@ impl<T: Zeroable + Pod> ArrayBuffer<T> {
         self.handle.slice((start_bound, end_bound))
     }
 
-    pub fn as_entire_binding(&self) -> wgpu::BindingResource {
+    pub fn as_entire_binding(&self) -> wgpu::BindingResource<'_> {
         self.handle.as_entire_binding()
     }
 
@@ -199,10 +199,7 @@ impl<T: Zeroable + Pod> DynamicArrayBuffer<T> {
     }
 
     pub fn clear(&mut self) {
-        if let Some(buffer) = self.inner.take() {
-            // If someone else is still using this buffer, that's their problem.
-            buffer.destroy();
-        }
+        self.inner = None;
         self.len = 0;
     }
 
@@ -238,9 +235,6 @@ impl<T: Zeroable + Pod> DynamicArrayBuffer<T> {
                     std::cmp::min(old_buffer.handle().size(), new_buffer.handle().size()),
                 );
                 self.queue.submit(std::iter::once(encoder.finish()));
-                // Nothing else should be using the old buffer, so we can just destroy it once
-                // the GPU finishes copying from it.
-                old_buffer.destroy();
             }
 
             self.inner = Some(new_buffer);
@@ -264,10 +258,6 @@ impl<T: Zeroable + Pod> DynamicArrayBuffer<T> {
         }
         else {
             // The new data doesn't fit in the existing capacity, so reallocate the buffer
-            if let Some(old_buffer) = self.inner.take() {
-                old_buffer.destroy();
-            }
-
             self.inner = Some(ArrayBuffer::create(&self.device, ArrayBufferDescriptor {
                 label: self.label.as_deref(),
                 usage: self.usage,
@@ -284,14 +274,5 @@ impl<T: Zeroable + Pod> DynamicArrayBuffer<T> {
         // Grow and shrink exponentially so the buffer doesn't have to be reallocated as often if
         // the length doesn't change much. Also, avoid reallocating often for small lengths.
         len.next_power_of_two().max(16)
-    }
-}
-
-impl<T: Zeroable + Pod> Drop for DynamicArrayBuffer<T> {
-    fn drop(&mut self) {
-        if let Some(buffer) = self.inner.take() {
-            // If someone else is still using this buffer, that's their problem.
-            buffer.destroy();
-        }
     }
 }

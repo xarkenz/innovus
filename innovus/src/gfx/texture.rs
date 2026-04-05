@@ -141,7 +141,7 @@ impl BindGroup for Texture2D {
     const ENTRIES: &'static [wgpu::BindGroupLayoutEntry] = &[
         wgpu::BindGroupLayoutEntry {
             binding: 0,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Texture {
                 multisampled: false,
                 view_dimension: wgpu::TextureViewDimension::D2,
@@ -236,10 +236,7 @@ impl DynamicTexture2D {
     }
 
     pub fn clear(&mut self) {
-        if let Some(texture) = self.inner.take() {
-            // If someone else is still using this texture, that's their problem.
-            texture.handle().destroy();
-        }
+        self.inner = None;
         self.size = Vector::zero();
     }
 
@@ -289,9 +286,6 @@ impl DynamicTexture2D {
                     },
                 );
                 self.queue.submit(std::iter::once(encoder.finish()));
-                // Nothing else should be using the old texture, so we can just destroy it once
-                // the GPU finishes copying from it.
-                old_texture.destroy();
             }
 
             self.inner = Some(new_texture);
@@ -315,10 +309,6 @@ impl DynamicTexture2D {
         }
         else {
             // The new image doesn't fit in the existing capacity, so reallocate the texture
-            if let Some(old_texture) = self.inner.take() {
-                old_texture.destroy();
-            }
-
             self.inner = Some(Texture2D::create_from_image(
                 &self.device,
                 &self.queue,
@@ -345,14 +335,5 @@ impl BindGroup for DynamicTexture2D {
 
     fn bind_group(&self) -> &wgpu::BindGroup {
         self.inner.as_ref().expect("cannot get bind group of empty texture").bind_group()
-    }
-}
-
-impl Drop for DynamicTexture2D {
-    fn drop(&mut self) {
-        if let Some(texture) = self.inner.take() {
-            // If someone else is still using this texture, that's their problem.
-            texture.destroy();
-        }
     }
 }

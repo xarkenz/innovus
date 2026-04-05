@@ -1,30 +1,37 @@
+use std::error::Error;
 use std::path::Path;
+use std::sync::Arc;
+use winit::event::MouseButton;
+use winit::keyboard::KeyCode;
 use winit::window::Window;
+use innovus::Game;
 use innovus::gfx::color::Color;
 use innovus::gfx::Gfx;
 use innovus::gfx::pipeline::BindGroup;
+use innovus::input::InputState;
 use innovus::tools::{Clock, Vector};
 use crate::audio::AudioEngine;
 use crate::gui::GuiManager;
 use crate::script::ScriptingEngine;
 use crate::tools::asset::AssetPool;
-use crate::tools::input::InputState;
 use crate::world::camera::Camera;
 use crate::world::block::{BlockSide, CHUNK_SIZE};
 use crate::world::block::types::AIR;
 use crate::world::entity::Entity;
 use crate::world::entity::types::player::PlayerMode;
+use crate::world::generation::types::OverworldGenerator;
 use crate::world::generation::WorldGenerator;
 use crate::world::item::{Item, ITEM_TYPES};
 use crate::world::World;
 
-pub struct Game<'a> {
+pub struct SandboxGame<'a> {
+    window: Arc<Window>,
+    gfx: Gfx<'static>,
     frame_clock: Clock,
     fps_tracker: [f32; 120],
     fps_tracker_index: usize,
     viewport_size: Vector<f32, 2>,
     content_scale: Vector<f32, 2>,
-    gfx: Gfx<'a>,
     assets: AssetPool,
     gui: GuiManager,
     scripting: ScriptingEngine,
@@ -34,19 +41,30 @@ pub struct Game<'a> {
     last_block_pos: Option<(usize, usize)>,
 }
 
-impl<'a> Game<'a> {
-    pub fn start(gfx: Gfx<'a>, assets_path: impl AsRef<Path>, viewport_size: Vector<f32, 2>, content_scale: Vector<f32, 2>) -> Result<Self, String> {
+impl<'a> SandboxGame<'a> {
+    pub fn create(window: Arc<Window>, gfx: Gfx<'static>, assets_path: impl AsRef<Path>) -> Result<Self, String> {
+        window.set_cursor_visible(false);
+        window.set_maximized(true);
+
+        let viewport_size = Vector([
+            window.inner_size().width as f32,
+            window.inner_size().height as f32,
+        ]);
+        // let content_scale = Vector::splat(window.scale_factor() as f32);
+        let content_scale = Vector::one();
+
         let mut assets = AssetPool::load(&gfx, assets_path)?;
         let gui = GuiManager::create(&gfx, viewport_size, content_scale, 8.0, &mut assets)?;
         let camera_layout = Camera::create_layout(gfx.device());
 
-        let mut game = Self {
+        Ok(Self {
+            window,
+            gfx,
             frame_clock: Clock::start(),
             fps_tracker: [f32::INFINITY; 120],
             fps_tracker_index: 0,
             viewport_size,
             content_scale,
-            gfx,
             gui,
             assets,
             scripting: ScriptingEngine::new(),
@@ -54,11 +72,19 @@ impl<'a> Game<'a> {
             camera_layout,
             current_world: None,
             last_block_pos: None,
-        };
+        })
+    }
 
-        game.set_viewport_size(viewport_size);
+    pub fn window(&self) -> &Window {
+        &self.window
+    }
 
-        Ok(game)
+    pub fn gfx(&self) -> &Gfx<'static> {
+        &self.gfx
+    }
+
+    pub fn gfx_mut(&mut self) -> &mut Gfx<'static> {
+        &mut self.gfx
     }
 
     pub fn viewport_size(&self) -> Vector<f32, 2> {
@@ -99,16 +125,35 @@ impl<'a> Game<'a> {
         );
         self.current_world = Some(World::create(&self.gfx, generator, camera, &mut self.assets));
     }
+}
 
-    pub fn run_frame(&mut self, inputs: &InputState, window: &mut Window) {
-        let _ = window;
+impl<'a> Game for SandboxGame<'a> {
+    fn start(window: Arc<Window>, gfx: Gfx<'static>) -> Result<Self, Box<dyn Error>>
+    where
+        Self: Sized,
+    {
+        let mut game = SandboxGame::create(window, gfx, "sandbox/assets")?;
+        game.enter_world(Some(Box::new(OverworldGenerator::new(0))));
+        Ok(game)
+    }
+
+    fn handle_resize(&mut self, size: Vector<u32, 2>) {
+        self.gfx.resize(size);
+        self.set_viewport_size(size.map(|x| x as f32));
+    }
+
+    // fn handle_scale_change(&mut self, scale_factor: f64) {
+    //     self.set_content_scale(Vector::splat(scale_factor as f32));
+    // }
+
+    fn run_frame(&mut self, inputs: &InputState) {
         let dt = self.frame_clock.read();
         self.frame_clock.reset();
         self.fps_tracker[self.fps_tracker_index] = 1.0 / dt;
         self.fps_tracker_index = (self.fps_tracker_index + 1) % self.fps_tracker.len();
 
-        if inputs.key_is_held(Key::LeftControl) {
-            if inputs.key_was_pressed(Key::R) {
+        if inputs.key_is_held(KeyCode::ControlLeft) {
+            if inputs.key_was_pressed(KeyCode::KeyR) {
                 match self.assets.reload(&self.gfx) {
                     Err(err) => eprintln!("Failed to reload assets: {err}"),
                     Ok(()) => println!("Reloaded assets."),
@@ -119,23 +164,25 @@ impl<'a> Game<'a> {
             }
         }
 
-        let cursor_pos = inputs.cursor_pos().map(|x| x as f32);
-        let left_held = inputs.button_is_held(MouseButtonLeft);
-        let right_held = inputs.button_is_held(MouseButtonRight);
-        let middle_held = inputs.button_is_held(MouseButtonMiddle);
+        let cursor_position = inputs.cursor_position().map(|position| {
+            position.map(|x| x as f32)
+        });
+        let left_held = inputs.button_is_held(MouseButton::Left);
+        let right_held = inputs.button_is_held(MouseButton::Right);
+        let middle_held = inputs.button_is_held(MouseButton::Middle);
 
-        self.gui.set_cursor_position(cursor_pos);
+        self.gui.set_cursor_position(cursor_position);
 
         if let Some(world) = &mut self.current_world {
-            if let Some(scroll_amount) = inputs.scroll_amount() {
+            if let Some(scroll_amount) = inputs.scroll_delta() {
                 let target_zoom = world.camera().zoom().mul(f32::powf(1.125, scroll_amount.y() as f32));
                 world.camera_mut().set_zoom(target_zoom);
             }
 
-            let cursor_world_pos = world.camera().get_world_pos(cursor_pos);
+            let cursor_world_pos = cursor_position.map(|position| world.camera().get_world_pos(position));
 
-            if inputs.key_was_repeated(Key::Tab) {
-                let offset = if inputs.key_is_held(Key::LeftShift) { -1 } else { 1 };
+            if inputs.key_was_repeated(KeyCode::Tab) {
+                let offset = if inputs.key_is_held(KeyCode::ShiftLeft) { -1 } else { 1 };
                 let held_item_type = world.player().held_item().item_type();
                 let item_index = ITEM_TYPES
                     .iter()
@@ -144,7 +191,7 @@ impl<'a> Game<'a> {
                 let next_item_index = (item_index as isize + offset).rem_euclid(ITEM_TYPES.len() as isize) as usize;
                 world.player_mut().set_held_item(Item::with_max_count(ITEM_TYPES[next_item_index]));
             }
-            if inputs.key_was_pressed(Key::F4) {
+            if inputs.key_was_pressed(KeyCode::F4) {
                 let current_mode = world.player().mode();
                 world.player_mut().set_mode(match current_mode {
                     PlayerMode::Normal => PlayerMode::Spectating,
@@ -155,7 +202,9 @@ impl<'a> Game<'a> {
             self.gui.handle_cursor(inputs, &self.scripting, world, &self.assets);
             self.gui.handle_keyboard(inputs, &self.scripting, world, &self.assets);
 
-            if left_held || right_held || middle_held {
+            if cursor_world_pos.is_some() && left_held || right_held || middle_held {
+                let cursor_world_pos = cursor_world_pos.unwrap();
+
                 let chunk_location = Vector([
                     cursor_world_pos.x().div_euclid(CHUNK_SIZE as f32) as i64,
                     cursor_world_pos.y().div_euclid(CHUNK_SIZE as f32) as i64,

@@ -1,15 +1,16 @@
 use std::collections::VecDeque;
 use std::time::Instant;
+use winit::keyboard::KeyCode;
 use innovus::gfx::color::Color;
 use innovus::gfx::Gfx;
 use innovus::gfx::mesh::MeshRenderer;
 use innovus::gfx::pipeline::BindGroup;
+use innovus::input::InputState;
 use innovus::tools::Vector;
 use crate::gui::render::GuiVertex;
 use crate::gui::render::text::{TextBackground, TextLine};
 use crate::script::ScriptingEngine;
 use crate::tools::asset::AssetPool;
-use crate::tools::input::InputState;
 use crate::world::World;
 
 pub struct ChatBox {
@@ -127,17 +128,17 @@ impl ChatBox {
 
     pub fn handle_keyboard(&mut self, inputs: &InputState, scripting: &ScriptingEngine, world: &mut World, assets: &AssetPool) -> bool {
         if self.is_open {
-            if inputs.key_was_repeated(Key::Backspace) {
+            if inputs.key_was_repeated(KeyCode::Backspace) {
                 self.current_message.text_mut().pop();
             }
             if !inputs.entered_text().is_empty() {
                 self.current_message.text_mut().push_str(inputs.entered_text());
             }
-            if inputs.key_was_pressed(Key::Escape) {
+            if inputs.key_was_pressed(KeyCode::Escape) {
                 std::mem::take(self.current_message.text_mut());
                 self.set_open(false);
             }
-            else if inputs.key_was_pressed(Key::Enter) {
+            else if inputs.key_was_pressed(KeyCode::Enter) {
                 let text = std::mem::take(self.current_message.text_mut());
                 if !text.is_empty() {
                     if text.starts_with('/') {
@@ -159,13 +160,13 @@ impl ChatBox {
             self.invalidate();
             true
         }
-        else if inputs.key_was_pressed(Key::T) {
+        else if inputs.key_was_pressed(KeyCode::KeyT) {
             self.set_open(true);
             self.current_message.text_mut().clear();
             self.invalidate();
             true
         }
-        else if inputs.key_was_pressed(Key::Slash) {
+        else if inputs.key_was_pressed(KeyCode::Slash) {
             self.set_open(true);
             self.current_message.text_mut().clear();
             self.current_message.text_mut().push('/');

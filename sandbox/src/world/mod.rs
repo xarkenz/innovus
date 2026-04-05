@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use innovus::gfx::Gfx;
 use innovus::gfx::color::Color;
 use innovus::gfx::pipeline::BindGroup;
+use innovus::input::InputState;
 use innovus::tools::Vector;
 use innovus::tools::phys::Physics;
 use crate::audio::AudioEngine;
 use crate::tools::{generate_uuid, Uuid};
 use crate::tools::asset::AssetPool;
-use crate::tools::input::InputState;
 use crate::world::block::{light_value, Block, BlockSide, Chunk, ChunkLocation, ChunkMap, CHUNK_SIZE};
 use crate::world::block::preview::BlockPreview;
 use crate::world::camera::Camera;
@@ -52,7 +52,7 @@ impl<'world> World<'world> {
             entity_renderer: EntityRenderer::new(),
             player: Player::new(generate_uuid(), Vector([-0.5, 0.0]), None, PlayerMode::Normal),
             particles: ParticleManager::create(gfx),
-            block_preview: BlockPreview::create(gfx, Vector::zero(), &item::types::AIR, 0.4),
+            block_preview: BlockPreview::create(gfx, None, &item::types::AIR, 0.4),
             sky_color: Vector([0.6, 0.8, 1.0]),
             sky_light: 1.0,
         };
@@ -193,7 +193,7 @@ impl<'world> World<'world> {
         }
     }
 
-    pub fn set_block_preview_position(&mut self, position: Vector<f32, 2>) {
+    pub fn set_block_preview_position(&mut self, position: Option<Vector<f32, 2>>) {
         self.block_preview.set_position(position);
     }
 

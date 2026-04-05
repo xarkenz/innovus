@@ -1,6 +1,8 @@
+use winit::keyboard::KeyCode;
 use innovus::gfx::color::Color;
 use innovus::gfx::Gfx;
 use innovus::gfx::pipeline::BindGroup;
+use innovus::input::InputState;
 use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::cursor::GuiCursor;
 use crate::gui::render::text::{TextLine, TextLineRenderer};
@@ -8,7 +10,6 @@ use crate::gui::render::{GuiImage, GuiLayerMesh, GuiParams};
 use crate::gui::render::text::TextBackground;
 use crate::script::ScriptingEngine;
 use crate::tools::asset::AssetPool;
-use crate::tools::input::InputState;
 use crate::world::World;
 use crate::world::item::Item;
 
@@ -18,7 +19,7 @@ pub mod chat;
 
 pub struct GuiManager {
     params: GuiParams,
-    cursor_position: Vector<f32, 2>,
+    cursor_position: Option<Vector<f32, 2>>,
     cursor: GuiCursor,
     hotbar: hotbar::Hotbar,
     chat_box: chat::ChatBox,
@@ -39,7 +40,7 @@ impl GuiManager {
                 content_scale,
                 gui_scale,
             ),
-            cursor_position: Vector::zero(),
+            cursor_position: None,
             cursor: GuiCursor::create(gfx, Vector::zero(), Vector::zero(), &crate::world::item::types::AIR),
             hotbar: hotbar::Hotbar::create(gfx, assets)?,
             chat_box: chat::ChatBox::create(gfx, 20, 12.0, 0.4)?,
@@ -108,18 +109,20 @@ impl GuiManager {
         self.compute_cursor_offset();
     }
 
-    pub fn cursor_position(&self) -> Vector<f32, 2> {
+    pub fn cursor_position(&self) -> Option<Vector<f32, 2>> {
         self.cursor_position
     }
 
-    pub fn set_cursor_position(&mut self, position: Vector<f32, 2>) {
+    pub fn set_cursor_position(&mut self, position: Option<Vector<f32, 2>>) {
         self.cursor_position = position;
         self.compute_cursor_offset();
     }
 
     fn compute_cursor_offset(&mut self) {
-        self.cursor.set_offset(self.cursor_position.mul(2.0)
-            / self.content_scale().mul(self.gui_scale()));
+        if let Some(cursor_position) = self.cursor_position {
+            self.cursor.set_offset(cursor_position.mul(2.0)
+                / self.content_scale().mul(self.gui_scale()));
+        }
     }
 
     pub fn anchor_adjustment(&self, from_anchor: Vector<f32, 2>, to_anchor: Vector<f32, 2>) -> Vector<f32, 2> {
@@ -191,7 +194,7 @@ impl GuiManager {
         // TODO: probably need some kind of "focus" system... idk how exactly that should work
         self.chat_box.handle_keyboard(inputs, scripting, world, assets) ||
             {
-                if inputs.key_was_pressed(Key::E) {
+                if inputs.key_was_pressed(KeyCode::KeyE) {
                     self.inventory_shown = !self.inventory_shown;
                     true
                 }
@@ -219,6 +222,9 @@ impl GuiManager {
 
         self.fps_display.render(render_pass, assets);
         self.player_info_display.render(render_pass, assets);
-        self.cursor.render(render_pass, assets);
+
+        if self.cursor_position.is_some() {
+            self.cursor.render(render_pass, assets);
+        }
     }
 }

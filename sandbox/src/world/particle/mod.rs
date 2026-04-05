@@ -92,7 +92,7 @@ impl ParticleManager {
             let opacity = particle.lifetime.min(1.0);
             for offset in OFFSETS {
                 vertices.push(Vertex2D::new(
-                    (particle.position + offset.mul(particle.size / 16.0)).with_z(0.0),
+                    (particle.position + offset.mul(particle.size / 16.0)).with_z(1.0),
                     Some((particle.color * Color::White.with_alpha(opacity)).rgba()),
                     None,
                 ));

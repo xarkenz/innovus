@@ -298,7 +298,7 @@ impl Chunk {
                         ]);
                         for vertex_offset in QUADRANT_VERTEX_OFFSETS {
                             vertices.push(Vertex2D::new(
-                                (vertex_position + vertex_offset).with_z(0.0),
+                                (vertex_position + vertex_offset).with_z(1.0),
                                 None,
                                 None,
                             ));

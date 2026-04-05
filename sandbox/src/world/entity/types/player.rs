@@ -1,9 +1,10 @@
+use winit::keyboard::KeyCode;
 use innovus::gfx::Gfx;
+use innovus::input::InputState;
 use innovus::tools::phys::Physics;
 use crate::tools::*;
 use crate::tools::asset::AssetPool;
 use crate::tools::asset::entity::EntityImage;
-use crate::tools::input::{InputState, Key};
 use crate::world::block::ChunkMap;
 use crate::world::entity::{movement, Entity};
 use crate::world::entity::render::{EntityPiece, EntityPieceHandle, EntityRenderer};
@@ -180,16 +181,16 @@ impl Entity for Player {
         if self.mode == PlayerMode::Spectating {
             const SPEED_LIMIT: f32 = 20.0;
 
-            if inputs.key_is_held(Key::A) {
+            if inputs.key_is_held(KeyCode::KeyA) {
                 self.velocity.set_x((self.velocity.x() - self.movement_accel * dt).max(-SPEED_LIMIT));
             }
-            if inputs.key_is_held(Key::D) {
+            if inputs.key_is_held(KeyCode::KeyD) {
                 self.velocity.set_x((self.velocity.x() + self.movement_accel * dt).min(SPEED_LIMIT));
             }
-            if inputs.key_is_held(Key::S) {
+            if inputs.key_is_held(KeyCode::KeyS) {
                 self.velocity.set_y((self.velocity.y() - self.movement_accel * dt).max(-SPEED_LIMIT));
             }
-            if inputs.key_is_held(Key::W) {
+            if inputs.key_is_held(KeyCode::KeyW) {
                 self.velocity.set_y((self.velocity.y() + self.movement_accel * dt).min(SPEED_LIMIT));
             }
 
@@ -215,7 +216,7 @@ impl Entity for Player {
                 touching_ground = false;
             }
 
-            let jump_held = inputs.key_is_held(Key::W) || inputs.key_is_held(Key::Space);
+            let jump_held = inputs.key_is_held(KeyCode::KeyW) || inputs.key_is_held(KeyCode::Space);
             if !jump_held {
                 self.jump_cooldown = 0.0;
             }
@@ -230,7 +231,7 @@ impl Entity for Player {
                 self.jump_cooldown -= dt;
             }
 
-            let crouch_held = inputs.key_is_held(Key::S) || inputs.key_is_held(Key::LeftShift);
+            let crouch_held = inputs.key_is_held(KeyCode::KeyS) || inputs.key_is_held(KeyCode::ShiftLeft);
             if crouch_held {
                 self.crouching = true;
                 collider.rectangle.max.set_y(collider.rectangle.min.y() + pixels(23));
@@ -246,10 +247,10 @@ impl Entity for Player {
                 1.0
             };
 
-            if inputs.key_is_held(Key::A) {
+            if inputs.key_is_held(KeyCode::KeyA) {
                 collider.velocity.set_x((collider.velocity.x() - self.movement_accel * dt).max(speed_multiplier * -5.0));
             }
-            if inputs.key_is_held(Key::D) {
+            if inputs.key_is_held(KeyCode::KeyD) {
                 collider.velocity.set_x((collider.velocity.x() + self.movement_accel * dt).min(speed_multiplier * 5.0));
             }
 

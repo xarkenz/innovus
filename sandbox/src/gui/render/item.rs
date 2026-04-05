@@ -1,10 +1,10 @@
 use innovus::gfx::color::Color;
 use innovus::gfx::mesh::Mesh;
+use innovus::input::InputState;
 use innovus::tools::{Rectangle, Vector};
 use crate::gui::render::{GuiImage, GuiVertex};
 use crate::gui::render::text::{TextBackground, TextLine};
 use crate::tools::asset::AssetPool;
-use crate::tools::input::InputState;
 use crate::world::item::Item;
 
 pub fn format_item_count(count: u32) -> String {

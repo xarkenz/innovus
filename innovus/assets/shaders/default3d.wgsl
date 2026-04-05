@@ -1,18 +1,19 @@
-struct Camera {
-    @binding(0) view_proj: mat4x4<f32>,
-}
+@group(0) @binding(0)
+var atlas_texture: texture_2d<f32>;
+@group(0) @binding(1)
+var atlas_sampler: sampler;
 
-struct Atlas {
-    @binding(0) texture: texture_2d<f32>,
-    @binding(1) texture_sampler: sampler,
-}
+@group(1) @binding(0)
+var<uniform> camera_view_proj: mat4x4<f32>;
 
-struct Lighting {
-    @binding(0) ambient_color: vec3<f32>,
-    @binding(1) point_light_position: vec3<f32>,
-    @binding(2) point_light_color: vec3<f32>,
-    @binding(3) point_light_power: f32,
-}
+@group(2) @binding(0)
+var<uniform> ambient_color: vec3<f32>;
+@group(2) @binding(1)
+var<uniform> point_light_position: vec3<f32>;
+@group(2) @binding(2)
+var<uniform> point_light_color: vec3<f32>;
+@group(2) @binding(3)
+var<uniform> point_light_power: f32;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -28,10 +29,6 @@ struct VertexOutput {
     @location(2) uv: vec2<f32>,
     @location(3) normal: vec3<f32>,
 }
-
-@group(0) var atlas: Atlas;
-@group(1) var<uniform> camera: Camera;
-@group(2) var<uniform> lighting: Lighting;
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
@@ -56,7 +53,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let light_color: vec3<f32> = lighting.ambient_color + lighting.point_light_color * light_received;
     out_color = vec4<f32>(clamp(in.color.rgb * light_color, vec3<f32>(0.0), vec3<f32>(1.0)), in.color.a);
 
-    out_color *= select(vec4<f32>(1.0), textureSample(atlas.texture, atlas.texture_sampler, in.uv), all(in.uv == in.uv));
+    out_color *= select(vec4<f32>(1.0), textureSample(atlas_texture, atlas_sampler, in.uv), all(in.uv == in.uv));
     if out_color.a <= 0.0 {
         discard;
     }

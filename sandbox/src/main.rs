@@ -1,7 +1,5 @@
-use innovus::tools::Vector;
-use crate::game::Game;
-use crate::tools::input::InputState;
-use crate::world::generation::types::OverworldGenerator;
+use std::error::Error;
+use crate::game::SandboxGame;
 
 pub mod audio;
 pub mod game;
@@ -10,82 +8,6 @@ pub mod tools;
 pub mod world;
 pub mod script;
 
-fn main() {
-    let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
-
-    let (mut window, event_receiver) = glfw.create_window(
-        1200,
-        800,
-        "2D Sandbox Game",
-        glfw::WindowMode::Windowed,
-    ).unwrap();
-
-    window.make_current();
-    window.maximize();
-    window.set_framebuffer_size_polling(true);
-    window.set_cursor_pos_polling(true);
-    window.set_mouse_button_polling(true);
-    window.set_key_polling(true);
-    window.set_char_polling(true);
-    window.set_scroll_polling(true);
-    window.set_cursor_mode(glfw::CursorMode::Hidden);
-
-    // glfw.set_swap_interval(glfw::SwapInterval::Sync(1));
-    screen::bind_glfw(&glfw);
-    screen::set_culling(false);
-    screen::set_depth_testing(false);
-    screen::set_blend_func(screen::BlendFunc::Transparency);
-
-    let mut input_state = InputState::new();
-
-    let viewport_size = {
-        let (width, height) = window.get_framebuffer_size();
-        Vector([width as f32, height as f32])
-    };
-    let _content_scale = {
-        let (x, y) = window.get_content_scale();
-        Vector([x, y])
-    };
-
-    let mut game = Game::start("sandbox/assets", viewport_size, Vector::one()).unwrap();
-    game.enter_world(Some(Box::new(OverworldGenerator::new(0))));
-
-    while !window.should_close() {
-        input_state.reset();
-
-        glfw.poll_events();
-        for (_, event) in glfw::flush_messages(&event_receiver) {
-            match event {
-                WindowEvent::FramebufferSize(width, height) => {
-                    game.set_viewport_size(Vector([width as f32, height as f32]));
-                }
-                WindowEvent::Key(key, _scancode, action, mods) => {
-                    input_state.handle_key(key, action, mods);
-                    // TODO: maybe a bit hacky? unsure of the best way to handle this
-                    if key == glfw::Key::V && mods.contains(glfw::Modifiers::Control) {
-                        if let Some(text) = window.get_clipboard_string() {
-                            input_state.handle_paste(&text);
-                        }
-                    }
-                }
-                WindowEvent::Char(character) => {
-                    input_state.handle_char(character);
-                }
-                WindowEvent::MouseButton(button, action, mods) => {
-                    input_state.handle_mouse_button(button, action, mods);
-                }
-                WindowEvent::CursorPos(x, y) => {
-                    input_state.handle_cursor_pos(x, y);
-                }
-                WindowEvent::Scroll(dx, dy) => {
-                    input_state.handle_scroll(dx, dy);
-                }
-                _ => {}
-            }
-        }
-
-        game.run_frame(&input_state, &mut window);
-
-        window.swap_buffers();
-    }
+fn main() -> Result<(), Box<dyn Error>> {
+    innovus::run_game_application::<SandboxGame>()
 }

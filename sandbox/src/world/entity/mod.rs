@@ -1,8 +1,8 @@
 use innovus::gfx::Gfx;
+use innovus::input::InputState;
 use innovus::tools::phys::Physics;
 use crate::tools::*;
 use crate::tools::asset::AssetPool;
-use crate::tools::input::InputState;
 use crate::world::block::ChunkMap;
 use crate::world::entity::render::EntityRenderer;
 use crate::world::particle::ParticleManager;
